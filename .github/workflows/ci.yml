@@ -1,0 +1,194 @@
+name: GTCP CI
+
+on:
+  push:
+    branches: [main, develop, 'sprint/**']
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (ESLint)
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+  # ────────────────────────────────────────────────────────────────────────────
+  test:
+    name: Tests (Jest + Supertest)
+    runs-on: ubuntu-22.04
+    needs: lint
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: gtcp_test
+          POSTGRES_USER: gtcp_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gtcp_user -d gtcp_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: gtcp_test
+      DB_USER: gtcp_user
+      DB_PASSWORD: test_password
+      JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET || 'ci-test-secret-gtcp' }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'ci-test-refresh-gtcp' }}
+      API_PREFIX: /api/v1
+      RATE_LIMIT_MAX: 100000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U gtcp_user; do
+            echo "Waiting for PostgreSQL…"; sleep 1
+          done
+
+      - name: Apply migrations
+        env:
+          PGPASSWORD: test_password
+        run: |
+          for f in src/db/migrations/*.sql; do
+            echo "Applying $f"
+            psql -h localhost -U gtcp_user -d gtcp_test -f "$f"
+          done
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/coverage/
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────────────────
+  security:
+    name: Security audit
+    runs-on: ubuntu-22.04
+    needs: lint
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (production only)
+        run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true   # warn but don't fail the pipeline
+
+  # ────────────────────────────────────────────────────────────────────────────
+  validate-openapi:
+    name: Validate OpenAPI spec
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install swagger-cli
+        run: npm install -g @apidevtools/swagger-cli
+
+      - name: Validate openapi.yaml
+        run: swagger-cli validate backend/docs/openapi.yaml
+
+  # ────────────────────────────────────────────────────────────────────────────
+  build-check:
+    name: Build check (syntax validation)
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check all source files parse
+        run: |
+          echo "Checking JS syntax..."
+          find src -name "*.js" | xargs node --check
+          echo "✅ All source files pass syntax check"
+
+      - name: Check test files parse
+        run: |
+          find tests -name "*.js" | xargs node --check
+          echo "✅ All test files pass syntax check"

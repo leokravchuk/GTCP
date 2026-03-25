@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GTCP API — Swagger UI</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.css">
+  <style>
+    body { margin: 0; background: #fafafa; }
+    .topbar { background: #1a1a2e !important; }
+    .topbar-wrapper img { display: none; }
+    .topbar-wrapper::after {
+      content: "GTCP — Gas Trading & Commercial Platform API";
+      color: #e0e0ff;
+      font-size: 18px;
+      font-weight: 600;
+      padding-left: 16px;
+    }
+    .info .title { color: #1a1a2e !important; }
+  </style>
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-standalone-preset.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<script>
+// Загружаем openapi.yaml через fetch (работает когда файл открыт через HTTP сервер)
+// Для локального просмотра без сервера — используем inline spec ниже
+async function initSwagger() {
+  let spec;
+  try {
+    const res = await fetch('./openapi.yaml');
+    if (res.ok) {
+      const yamlText = await res.text();
+      spec = jsyaml.load(yamlText);
+    }
+  } catch (e) {
+    console.warn('Could not fetch openapi.yaml, using embedded spec');
+  }
+
+  SwaggerUIBundle({
+    spec: spec,
+    url: spec ? undefined : './openapi.yaml',
+    dom_id: '#swagger-ui',
+    deepLinking: true,
+    presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+    plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+    layout: 'StandaloneLayout',
+    defaultModelsExpandDepth: 1,
+    defaultModelExpandDepth: 2,
+    docExpansion: 'list',
+    filter: true,
+    tagsSorter: 'alpha',
+    operationsSorter: 'alpha',
+    persistAuthorization: true,
+    tryItOutEnabled: true,
+  });
+}
+initSwagger();
+</script>
+</body>
+</html>

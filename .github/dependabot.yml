@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Europe/Belgrade"
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    ignore:
+      # Only auto-update patch versions for production dependencies
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

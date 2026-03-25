@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GTCP — Gas Trading & Commercial Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e14;
+  --bg2: #0f1520;
+  --bg3: #141c2a;
+  --panel: #131b28;
+  --border: #1e2d42;
+  --border2: #243549;
+  --accent: #00c8ff;
+  --accent2: #0088bb;
+  --green: #00e5a0;
+  --green2: #00b07a;
+  --red: #ff4d6d;
+  --red2: #cc3355;
+  --yellow: #ffd166;
+  --orange: #ff8c42;
+  --text: #c8d8e8;
+  --text2: #7a99b8;
+  --text3: #4a6a88;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:14px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TOP BAR ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  height: 52px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+}
+.logo {
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+.logo-icon {
+  width: 32px; height: 32px;
+  border: 2px solid var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px;
+  color: var(--accent);
+  position: relative;
+  overflow: hidden;
+}
+.logo-icon::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0,200,255,.15), transparent);
+  animation: shimmer 3s infinite;
+}
+@keyframes shimmer { to { left: 100%; } }
+.topbar-center {
+  display: flex; align-items: center; gap: 24px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text3);
+}
+.status-dot { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+.topbar-right { display:flex; align-items:center; gap:16px; }
+.time-display {
+  font-family: var(--mono); font-size:13px; color:var(--accent);
+  padding: 4px 10px;
+  border: 1px solid var(--border2);
+  background: var(--bg3);
+}
+.user-badge {
+  display:flex; align-items:center; gap:8px;
+  font-size:12px; color:var(--text2);
+  cursor:pointer;
+}
+.avatar {
+  width:28px; height:28px; border-radius:2px;
+  background: linear-gradient(135deg, var(--accent2), var(--green2));
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:11px; font-weight:600; color:#fff;
+}
+
+/* ── LAYOUT ── */
+.main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+}
+.nav-section { padding: 16px 16px 6px; }
+.nav-section-label {
+  font-family:var(--mono); font-size:9px; letter-spacing:2px;
+  color:var(--text3); text-transform:uppercase; margin-bottom:8px;
+}
+.nav-item {
+  display:flex; align-items:center; gap:10px;
+  padding: 8px 12px;
+  border-radius:2px; cursor:pointer;
+  font-size:12.5px; color:var(--text2);
+  border: 1px solid transparent;
+  transition: all .15s;
+  margin-bottom: 2px;
+}
+.nav-item:hover { background:var(--bg3); color:var(--text); border-color:var(--border); }
+.nav-item.active {
+  background: rgba(0,200,255,.08);
+  color: var(--accent);
+  border-color: var(--accent2);
+}
+.nav-item svg { flex-shrink:0; }
+.nav-badge {
+  margin-left:auto; font-family:var(--mono); font-size:10px;
+  background:var(--red); color:#fff; padding:1px 5px;
+  border-radius:2px;
+}
+.nav-badge.warn { background:var(--yellow); color:#000; }
+.sidebar-bottom {
+  margin-top:auto; padding:16px;
+  border-top:1px solid var(--border);
+}
+.gas-flow {
+  font-family:var(--mono); font-size:10px; color:var(--text3);
+  margin-bottom:8px;
+}
+.flow-bar { height:4px; background:var(--border2); border-radius:2px; overflow:hidden; }
+.flow-fill {
+  height:100%; width:73%;
+  background: linear-gradient(90deg, var(--accent2), var(--green));
+  animation: flowAnim 3s ease-in-out infinite;
+}
+@keyframes flowAnim { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+/* ── CONTENT ── */
+.content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* ── PAGE HEADER ── */
+.page-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 16px 24px 12px;
+  border-bottom: 1px solid var(--border);
+  background:var(--bg2);
+  flex-shrink:0;
+}
+.page-title { font-family:var(--mono); font-size:13px; color:var(--accent); letter-spacing:1px; }
+.page-subtitle { font-size:11px; color:var(--text3); margin-top:2px; }
+.header-actions { display:flex; gap:8px; }
+.btn {
+  padding: 6px 14px;
+  font-family:var(--mono); font-size:11px; letter-spacing:.5px;
+  border:1px solid var(--border2); background:var(--bg3);
+  color:var(--text2); cursor:pointer; transition:all .15s;
+}
+.btn:hover { border-color:var(--accent); color:var(--accent); background:rgba(0,200,255,.05); }
+.btn.primary { border-color:var(--accent); color:var(--accent); background:rgba(0,200,255,.08); }
+.btn.danger { border-color:var(--red); color:var(--red); background:rgba(255,77,109,.08); }
+.btn.success { border-color:var(--green); color:var(--green); background:rgba(0,229,160,.08); }
+
+/* ── TABS ── */
+.tabs {
+  display:flex; gap:0;
+  padding: 12px 24px 0;
+  border-bottom:1px solid var(--border);
+  background:var(--bg2);
+  flex-shrink:0;
+}
+.tab {
+  padding:8px 18px 10px;
+  font-family:var(--mono); font-size:11px; letter-spacing:.5px;
+  color:var(--text3); cursor:pointer;
+  border-bottom:2px solid transparent;
+  border-top:2px solid transparent;
+  transition: all .15s;
+  position:relative;
+}
+.tab:hover { color:var(--text); }
+.tab.active {
+  color:var(--accent);
+  border-bottom-color:var(--accent);
+}
+.tab-count {
+  display:inline-block; margin-left:6px;
+  background:var(--border2); color:var(--text3);
+  font-size:9px; padding:1px 5px; border-radius:1px;
+}
+.tab.active .tab-count { background:rgba(0,200,255,.2); color:var(--accent); }
+
+/* ── SCROLL AREA ── */
+.scroll-area {
+  flex:1; overflow-y:auto; padding:20px 24px;
+}
+.scroll-area::-webkit-scrollbar { width:4px; }
+.scroll-area::-webkit-scrollbar-track { background:var(--bg); }
+.scroll-area::-webkit-scrollbar-thumb { background:var(--border2); }
+
+/* ── GRID LAYOUTS ── */
+.kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.kpi-card {
+  background:var(--panel);
+  border:1px solid var(--border);
+  padding: 16px;
+  position:relative;
+  overflow:hidden;
+}
+.kpi-card::before {
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0;
+  height:2px;
+}
+.kpi-card.blue::before { background:linear-gradient(90deg,var(--accent),transparent); }
+.kpi-card.green::before { background:linear-gradient(90deg,var(--green),transparent); }
+.kpi-card.red::before { background:linear-gradient(90deg,var(--red),transparent); }
+.kpi-card.yellow::before { background:linear-gradient(90deg,var(--yellow),transparent); }
+.kpi-label { font-family:var(--mono); font-size:9px; letter-spacing:1.5px; color:var(--text3); text-transform:uppercase; margin-bottom:10px; }
+.kpi-value { font-family:var(--mono); font-size:22px; font-weight:600; color:var(--text); line-height:1; margin-bottom:6px; }
+.kpi-value span { font-size:12px; color:var(--text3); font-weight:400; }
+.kpi-change { font-family:var(--mono); font-size:10px; }
+.kpi-change.up { color:var(--green); }
+.kpi-change.down { color:var(--red); }
+.kpi-icon { position:absolute; right:14px; top:14px; opacity:.3; }
+
+/* ── TABLE ── */
+.table-wrap {
+  background:var(--panel);
+  border:1px solid var(--border);
+  overflow:hidden;
+  margin-bottom:20px;
+}
+.table-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg2);
+}
+.table-title { font-family:var(--mono); font-size:11px; letter-spacing:.5px; color:var(--text2); }
+.search-input {
+  background:var(--bg3); border:1px solid var(--border2);
+  color:var(--text); padding:4px 10px;
+  font-family:var(--mono); font-size:11px;
+  width:200px; outline:none;
+}
+.search-input:focus { border-color:var(--accent); }
+table { width:100%; border-collapse:collapse; }
+th {
+  padding:9px 14px;
+  font-family:var(--mono); font-size:9px; letter-spacing:1.5px;
+  color:var(--text3); text-align:left; text-transform:uppercase;
+  border-bottom:1px solid var(--border2);
+  white-space:nowrap;
+}
+td {
+  padding:10px 14px;
+  font-size:12px; color:var(--text);
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(255,255,255,.02); }
+.mono { font-family:var(--mono); }
+.badge {
+  display:inline-block;
+  padding:2px 8px;
+  font-family:var(--mono); font-size:9px; letter-spacing:.5px;
+  border-radius:1px; border:1px solid;
+}
+.badge.active { color:var(--green); border-color:var(--green2); background:rgba(0,229,160,.08); }
+.badge.pending { color:var(--yellow); border-color:#aa8800; background:rgba(255,209,102,.08); }
+.badge.matched { color:var(--accent); border-color:var(--accent2); background:rgba(0,200,255,.08); }
+.badge.rejected { color:var(--red); border-color:var(--red2); background:rgba(255,77,109,.08); }
+.badge.expired { color:var(--text3); border-color:var(--border2); }
+.badge.warning { color:var(--orange); border-color:#aa5500; background:rgba(255,140,66,.08); }
+.badge.ok { color:var(--green); border-color:var(--green2); background:rgba(0,229,160,.08); }
+.badge.critical { color:var(--red); border-color:var(--red2); background:rgba(255,77,109,.12); animation:alertPulse 1s infinite; }
+@keyframes alertPulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.text-green { color:var(--green); }
+.text-red { color:var(--red); }
+.text-yellow { color:var(--yellow); }
+.text-accent { color:var(--accent); }
+.text-muted { color:var(--text3); }
+.action-btn {
+  font-family:var(--mono); font-size:10px;
+  padding:3px 8px; border:1px solid var(--border2);
+  background:transparent; color:var(--text3); cursor:pointer;
+  transition:all .15s;
+}
+.action-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* ── PROGRESS BAR ── */
+.progress-wrap { display:flex; align-items:center; gap:8px; }
+.progress-bar { flex:1; height:6px; background:var(--border2); border-radius:1px; overflow:hidden; }
+.progress-fill { height:100%; border-radius:1px; transition:width .3s; }
+.progress-fill.green { background:var(--green); }
+.progress-fill.yellow { background:var(--yellow); }
+.progress-fill.red { background:var(--red); }
+.progress-fill.blue { background:var(--accent); }
+.progress-pct { font-family:var(--mono); font-size:10px; color:var(--text3); width:32px; text-align:right; }
+
+/* ── PANELS ── */
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+.three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:20px; }
+.panel {
+  background:var(--panel); border:1px solid var(--border);
+  padding:16px;
+}
+.panel-title { font-family:var(--mono); font-size:10px; letter-spacing:1px; color:var(--text3); text-transform:uppercase; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+.info-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.info-label { font-size:11px; color:var(--text3); }
+.info-value { font-family:var(--mono); font-size:11px; color:var(--text); }
+
+/* ── MINI CHART (CSS bars) ── */
+.mini-chart { display:flex; align-items:flex-end; gap:3px; height:48px; }
+.bar { flex:1; border-radius:1px; transition:height .5s; position:relative; }
+.bar:hover::after {
+  content:attr(data-v);
+  position:absolute; bottom:100%; left:50%; transform:translateX(-50%);
+  background:var(--bg2); border:1px solid var(--border2);
+  font-family:var(--mono); font-size:9px; color:var(--text);
+  padding:2px 5px; white-space:nowrap;
+}
+
+/* ── ALERT BOX ── */
+.alert-box {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:12px 16px;
+  border-radius:2px; margin-bottom:10px;
+  border-left:3px solid;
+  font-size:12px;
+  background:var(--bg3);
+}
+.alert-box.danger { border-color:var(--red); color:var(--text); }
+.alert-box.warning { border-color:var(--yellow); color:var(--text); }
+.alert-box.info { border-color:var(--accent); color:var(--text); }
+.alert-title { font-weight:600; margin-bottom:2px; }
+.alert-time { font-family:var(--mono); font-size:10px; color:var(--text3); margin-left:auto; flex-shrink:0; }
+
+/* ── MODAL ── */
+.modal-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.8); z-index:1000;
+  align-items:center; justify-content:center;
+}
+.modal-overlay.open { display:flex; }
+.modal {
+  background:var(--bg2); border:1px solid var(--border2);
+  width:560px; max-height:80vh;
+  overflow-y:auto;
+}
+.modal-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px; border-bottom:1px solid var(--border);
+}
+.modal-title { font-family:var(--mono); font-size:13px; color:var(--accent); letter-spacing:.5px; }
+.modal-close { background:none; border:1px solid var(--border2); color:var(--text3); width:28px; height:28px; cursor:pointer; font-size:14px; }
+.modal-close:hover { border-color:var(--red); color:var(--red); }
+.modal-body { padding:20px; }
+.form-group { margin-bottom:16px; }
+.form-label { display:block; font-family:var(--mono); font-size:10px; letter-spacing:.5px; color:var(--text3); text-transform:uppercase; margin-bottom:6px; }
+.form-input, .form-select {
+  width:100%; padding:8px 12px;
+  background:var(--bg3); border:1px solid var(--border2);
+  color:var(--text); font-family:var(--mono); font-size:12px;
+  outline:none; transition:border .15s;
+}
+.form-input:focus, .form-select:focus { border-color:var(--accent); }
+.form-select option { background:var(--bg2); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.modal-footer { display:flex; justify-content:flex-end; gap:10px; padding:16px 20px; border-top:1px solid var(--border); }
+
+/* ── PAGE VISIBILITY ── */
+.page { display:none; height:100%; flex-direction:column; overflow:hidden; }
+.page.active { display:flex; }
+
+/* ── ALERT COUNTER ── */
+.alert-counter {
+  position:fixed; bottom:24px; right:24px;
+  background:var(--red); color:#fff;
+  font-family:var(--mono); font-size:11px;
+  padding:8px 14px; border-radius:2px;
+  display:flex; align-items:center; gap:8px;
+  cursor:pointer; z-index:500;
+  box-shadow:0 0 20px rgba(255,77,109,.4);
+  animation:alertCounterPulse 2s infinite;
+}
+@keyframes alertCounterPulse { 0%,100%{box-shadow:0 0 20px rgba(255,77,109,.4)} 50%{box-shadow:0 0 30px rgba(255,77,109,.7)} }
+
+/* ── BALANCE METER ── */
+.balance-meter {
+  position:relative;
+  height:24px; background:var(--border2); border-radius:2px; overflow:hidden; margin-bottom:6px;
+}
+.balance-fill {
+  position:absolute; top:0; left:0; height:100%;
+  transition:width .5s; border-radius:2px;
+}
+.balance-label {
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  font-family:var(--mono); font-size:10px; font-weight:600; z-index:1;
+}
+
+/* ── TOOLTIP ── */
+[data-tooltip] { position:relative; cursor:help; }
+[data-tooltip]:hover::after {
+  content:attr(data-tooltip);
+  position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+  background:var(--bg2); border:1px solid var(--border2);
+  font-family:var(--mono); font-size:10px; color:var(--text);
+  padding:5px 10px; white-space:nowrap; z-index:99;
+  pointer-events:none;
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">GT</div>
+    GTCP
+  </div>
+  <div class="topbar-center">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div class="status-dot"></div>
+      <span>СИСТЕМА АКТИВНА</span>
+    </div>
+    <span>ГАЗ ТРАНС ООО</span>
+    <span>Сетевой Кодекс v2.4</span>
+  </div>
+  <div class="topbar-right">
+    <div class="time-display" id="clock">--:--:--</div>
+    <div class="user-badge">
+      <div class="avatar">КЛ</div>
+      <span>Коммерческий диспетчер</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="nav-section">
+      <div class="nav-section-label">Главная</div>
+      <div class="nav-item active" onclick="showPage('dashboard')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Дашборд
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Коммерция</div>
+      <div class="nav-item" onclick="showPage('nominations')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Номинации
+        <span class="nav-badge">3</span>
+      </div>
+      <div class="nav-item" onclick="showPage('credit')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Кредитные лимиты
+        <span class="nav-badge warn">1</span>
+      </div>
+      <div class="nav-item" onclick="showPage('balance')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Балансировка
+      </div>
+      <div class="nav-item" onclick="showPage('billing')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+        Биллинг
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-section-label">Договоры</div>
+      <div class="nav-item" onclick="showPage('contracts')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20 14.66V20a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2h5.34"/><polygon points="18 2 22 6 12 16 8 16 8 12 18 2"/></svg>
+        Договоры GTA
+      </div>
+      <div class="nav-item" onclick="showPage('capacity')">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Мощности
+      </div>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="gas-flow">ПОТОК ХОРГОШ: <span class="text-accent">73%</span></div>
+      <div class="flow-bar"><div class="flow-fill"></div></div>
+      <div class="gas-flow" style="margin-top:8px;">ПОТОК ГОСПОДЖИНЦЫ: <span class="text-green">91%</span></div>
+      <div class="flow-bar"><div class="flow-fill" style="width:91%;background:linear-gradient(90deg,var(--green2),var(--green))"></div></div>
+    </div>
+  </div>
+
+  <!-- CONTENT AREA -->
+  <div class="content">
+
+    <!-- ══════════════════════════════════════════ DASHBOARD ══ -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">ОПЕРАТИВНЫЙ ДАШБОРД</div>
+          <div class="page-subtitle">Газовый день: <span class="mono text-accent" id="gasday">--</span> · 06:00–06:00 UTC+3</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn">Экспорт XML</button>
+          <button class="btn primary">Обновить данные</button>
+        </div>
+      </div>
+      <div class="scroll-area">
+
+        <!-- KPIs -->
+        <div class="kpi-row">
+          <div class="kpi-card blue">
+            <div class="kpi-label">Суммарная номинация</div>
+            <div class="kpi-value">847.3 <span>тыс. м³/ч</span></div>
+            <div class="kpi-change up">▲ +2.4% к вчера</div>
+            <div class="kpi-icon"><svg width="28" height="28" fill="none" stroke="var(--accent)" stroke-width="1" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+          </div>
+          <div class="kpi-card green">
+            <div class="kpi-label">Подтверждённые объёмы</div>
+            <div class="kpi-value">812.1 <span>тыс. м³/ч</span></div>
+            <div class="kpi-change up">▲ 95.8% матчинг</div>
+            <div class="kpi-icon"><svg width="28" height="28" fill="none" stroke="var(--green)" stroke-width="1" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+          </div>
+          <div class="kpi-card red">
+            <div class="kpi-label">Небаланс системы</div>
+            <div class="kpi-value">35.2 <span>тыс. м³/ч</span></div>
+            <div class="kpi-change down">▼ -1.2% к норме</div>
+            <div class="kpi-icon"><svg width="28" height="28" fill="none" stroke="var(--red)" stroke-width="1" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+          </div>
+          <div class="kpi-card yellow">
+            <div class="kpi-label">Выручка (текущий м-ц)</div>
+            <div class="kpi-value">€ 4.2М</div>
+            <div class="kpi-change up">▲ +8.1% план</div>
+            <div class="kpi-icon"><svg width="28" height="28" fill="none" stroke="var(--yellow)" stroke-width="1" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <!-- Alerts -->
+          <div>
+            <div class="panel-title" style="font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;margin-bottom:12px;">⚡ Активные события</div>
+            <div class="alert-box danger">
+              <div>
+                <div class="alert-title">MARGIN CALL — Газпром Маркетинг</div>
+                <div>Лимит превышен на 12%. Требуется дополнительное обеспечение €850 000 до 16:00</div>
+              </div>
+              <div class="alert-time">08:32</div>
+            </div>
+            <div class="alert-box warning">
+              <div>
+                <div class="alert-title">Ренноминация FGSZ — превышение</div>
+                <div>Запрошено +15% сверх законтрактованной мощности на IP Хоргош</div>
+              </div>
+              <div class="alert-time">09:14</div>
+            </div>
+            <div class="alert-box info">
+              <div>
+                <div class="alert-title">Аукцион мощностей завершён</div>
+                <div>Распределено 240 тыс. м³/ч прерываемой мощности на апрель</div>
+              </div>
+              <div class="alert-time">09:45</div>
+            </div>
+          </div>
+
+          <!-- IP Load -->
+          <div class="panel">
+            <div class="panel-title">Загрузка межсистемных точек (IP)</div>
+            <div class="info-row">
+              <span class="info-label">IP Хоргош (VY) · Выход → HU</span>
+              <span class="info-value text-accent">73%</span>
+            </div>
+            <div class="progress-wrap" style="margin-bottom:14px;">
+              <div class="progress-bar"><div class="progress-fill blue" style="width:73%"></div></div>
+            </div>
+            <div class="info-row">
+              <span class="info-label">IP Господжинцы · Вход ← BG</span>
+              <span class="info-value text-green">91%</span>
+            </div>
+            <div class="progress-wrap" style="margin-bottom:14px;">
+              <div class="progress-bar"><div class="progress-fill green" style="width:91%"></div></div>
+            </div>
+            <div class="info-row">
+              <span class="info-label">VTP Сербия · Виртуальная точка</span>
+              <span class="info-value text-yellow">48%</span>
+            </div>
+            <div class="progress-wrap" style="margin-bottom:14px;">
+              <div class="progress-bar"><div class="progress-fill yellow" style="width:48%"></div></div>
+            </div>
+            <div class="info-row">
+              <span class="info-label">КС Велика-Плана · Компрессор</span>
+              <span class="info-value text-green">62%</span>
+            </div>
+            <div class="progress-wrap">
+              <div class="progress-bar"><div class="progress-fill green" style="width:62%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Users table -->
+        <div class="table-wrap">
+          <div class="table-header">
+            <span class="table-title">АКТИВНЫЕ ГРУЗООТПРАВИТЕЛИ</span>
+            <input class="search-input" placeholder="Поиск..." oninput="filterTable(this,'t-users')">
+          </div>
+          <table id="t-users">
+            <thead><tr>
+              <th>Грузоотправитель</th><th>Тип</th><th>Мощность (тыс.м³/ч)</th><th>Номин.</th><th>Матчинг</th><th>Кредит</th><th>Статус</th>
+            </tr></thead>
+            <tbody>
+              <tr><td class="mono">Газпром Маркетинг</td><td>Firm</td><td class="mono">320.0</td><td class="mono text-accent">318.4</td><td><span class="badge matched">99.5%</span></td><td class="mono text-red">▼ 12%</td><td><span class="badge warning">MARGIN CALL</span></td></tr>
+              <tr><td class="mono">Wintershall Дея</td><td>Firm</td><td class="mono">180.0</td><td class="mono text-accent">176.2</td><td><span class="badge matched">97.9%</span></td><td class="mono text-green">OK</td><td><span class="badge active">АКТИВЕН</span></td></tr>
+              <tr><td class="mono">Engie S.A.</td><td>Interruptible</td><td class="mono">95.0</td><td class="mono text-accent">88.7</td><td><span class="badge matched">93.4%</span></td><td class="mono text-green">OK</td><td><span class="badge active">АКТИВЕН</span></td></tr>
+              <tr><td class="mono">RWE Supply</td><td>Firm</td><td class="mono">142.0</td><td class="mono text-accent">142.0</td><td><span class="badge matched">100%</span></td><td class="mono text-green">OK</td><td><span class="badge active">АКТИВЕН</span></td></tr>
+              <tr><td class="mono">OMV Gas</td><td>Interruptible</td><td class="mono">75.0</td><td class="mono text-accent">68.1</td><td><span class="badge pending">90.8%</span></td><td class="mono text-yellow">≈ 85%</td><td><span class="badge pending">ОЖИДАНИЕ</span></td></tr>
+              <tr><td class="mono">Axpo Trading</td><td>Firm</td><td class="mono">35.3</td><td class="mono text-accent">18.7</td><td><span class="badge rejected">53%</span></td><td class="mono text-green">OK</td><td><span class="badge rejected">ОТКЛ.</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ NOMINATIONS ══ -->
+    <div class="page" id="page-nominations">
+      <div class="page-header">
+        <div>
+          <div class="page-title">УПРАВЛЕНИЕ НОМИНАЦИЯМИ</div>
+          <div class="page-subtitle">Газовый день · Deadline матчинга: <span class="mono text-red" id="countdown">--</span></div>
+        </div>
+        <div class="header-actions">
+          <button class="btn" onclick="openModal('modal-nom')">+ Новая номинация</button>
+          <button class="btn success" onclick="matchAll()">⚡ Запустить матчинг</button>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab(this,'nom')">Входящие <span class="tab-count">8</span></div>
+        <div class="tab" onclick="switchTab(this,'nom')">На матчинге <span class="tab-count">3</span></div>
+        <div class="tab" onclick="switchTab(this,'nom')">Подтверждённые <span class="tab-count">5</span></div>
+        <div class="tab" onclick="switchTab(this,'nom')">Ренноминации <span class="tab-count">2</span></div>
+      </div>
+      <div class="scroll-area">
+
+        <div class="kpi-row">
+          <div class="kpi-card blue"><div class="kpi-label">Всего входящих</div><div class="kpi-value">847.3 <span>тыс.м³/ч</span></div><div class="kpi-change">8 номинаций</div></div>
+          <div class="kpi-card green"><div class="kpi-label">Подтверждено</div><div class="kpi-value">812.1 <span>тыс.м³/ч</span></div><div class="kpi-change up">5 матчей</div></div>
+          <div class="kpi-card yellow"><div class="kpi-label">На рассмотрении</div><div class="kpi-value">35.2 <span>тыс.м³/ч</span></div><div class="kpi-change">3 в очереди</div></div>
+          <div class="kpi-card red"><div class="kpi-label">Отклонено</div><div class="kpi-value">0 <span>тыс.м³/ч</span></div><div class="kpi-change">0 сегодня</div></div>
+        </div>
+
+        <!-- Матчинг визуализация -->
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-title">Матчинг с AFO — IP Хоргош</div>
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:16px;">
+              <div style="text-align:center;padding:10px;border:1px solid var(--border2);background:var(--bg3)">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px;">ГАЗ ТРАНС (EXIT)</div>
+                <div style="font-family:var(--mono);font-size:18px;color:var(--accent)">480.2</div>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3)">тыс. м³/ч</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3)">≈</div>
+                <div style="font-family:var(--mono);font-size:11px;color:var(--green);margin:4px 0">МАТЧ</div>
+                <svg width="24" height="12" fill="none" viewBox="0 0 24 12"><path d="M0 6h24M18 1l5 5-5 5" stroke="var(--green)" stroke-width="1.5"/><path d="M24 6H0M6 11l-5-5 5-5" stroke="var(--green)" stroke-width="1.5"/></svg>
+              </div>
+              <div style="text-align:center;padding:10px;border:1px solid var(--border2);background:var(--bg3)">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px;">FGSZ (ENTRY)</div>
+                <div style="font-family:var(--mono);font-size:18px;color:var(--green)">480.2</div>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3)">тыс. м³/ч</div>
+              </div>
+            </div>
+            <div style="text-align:center;padding:8px;background:rgba(0,229,160,.08);border:1px solid var(--green2);font-family:var(--mono);font-size:11px;color:var(--green)">✓ ПОДТВЕРЖДЁН · 09:15 UTC+3</div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Матчинг с AFO — IP Господжинцы</div>
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:16px;">
+              <div style="text-align:center;padding:10px;border:1px solid var(--border2);background:var(--bg3)">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px;">BULGARTRANSGAS</div>
+                <div style="font-family:var(--mono);font-size:18px;color:var(--accent)">367.1</div>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3)">тыс. м³/ч</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3)">≠</div>
+                <div style="font-family:var(--mono);font-size:11px;color:var(--yellow);margin:4px 0">РАСХ.</div>
+                <svg width="24" height="12" fill="none" viewBox="0 0 24 12"><path d="M0 6h24M18 1l5 5-5 5" stroke="var(--yellow)" stroke-width="1.5"/><path d="M24 6H0M6 11l-5-5 5-5" stroke="var(--yellow)" stroke-width="1.5"/></svg>
+              </div>
+              <div style="text-align:center;padding:10px;border:1px solid var(--border2);background:var(--bg3)">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:4px;">ГАЗ ТРАНС (ENTRY)</div>
+                <div style="font-family:var(--mono);font-size:18px;color:var(--yellow)">354.4</div>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text3)">тыс. м³/ч</div>
+              </div>
+            </div>
+            <div style="text-align:center;padding:8px;background:rgba(255,209,102,.08);border:1px solid #aa8800;font-family:var(--mono);font-size:11px;color:var(--yellow)">⚠ РАСХОЖДЕНИЕ 12.7 тыс.м³/ч · РАЗБОР</div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <div class="table-header">
+            <span class="table-title">ЖУРНАЛ НОМИНАЦИЙ</span>
+            <input class="search-input" placeholder="Поиск..." oninput="filterTable(this,'t-nom')">
+          </div>
+          <table id="t-nom">
+            <thead><tr>
+              <th>ID</th><th>Грузоотправитель</th><th>IP</th><th>Направление</th><th>Объём (тыс.м³/ч)</th><th>Тип</th><th>Получено</th><th>Статус</th><th></th>
+            </tr></thead>
+            <tbody>
+              <tr><td class="mono text-accent">NOM-2026-04881</td><td>Газпром Маркетинг</td><td>Хоргош</td><td>→ EXIT</td><td class="mono">318.4</td><td>FIRM</td><td class="mono">08:02</td><td><span class="badge matched">ПОДТВ.</span></td><td><button class="action-btn">Детали</button></td></tr>
+              <tr><td class="mono text-accent">NOM-2026-04882</td><td>Wintershall Дея</td><td>Хоргош</td><td>→ EXIT</td><td class="mono">176.2</td><td>FIRM</td><td class="mono">08:15</td><td><span class="badge matched">ПОДТВ.</span></td><td><button class="action-btn">Детали</button></td></tr>
+              <tr><td class="mono text-accent">NOM-2026-04883</td><td>Engie S.A.</td><td>Господжинцы</td><td>← ENTRY</td><td class="mono">88.7</td><td>INT</td><td class="mono">08:31</td><td><span class="badge pending">МАТЧИНГ</span></td><td><button class="action-btn">Детали</button></td></tr>
+              <tr><td class="mono text-accent">NOM-2026-04884</td><td>RWE Supply</td><td>Господжинцы</td><td>← ENTRY</td><td class="mono">142.0</td><td>FIRM</td><td class="mono">08:44</td><td><span class="badge matched">ПОДТВ.</span></td><td><button class="action-btn">Детали</button></td></tr>
+              <tr><td class="mono text-accent">NOM-2026-04885</td><td>OMV Gas</td><td>Хоргош</td><td>→ EXIT</td><td class="mono">68.1</td><td>INT</td><td class="mono">09:02</td><td><span class="badge pending">ОЖИДАНИЕ</span></td><td><button class="action-btn">Детали</button></td></tr>
+              <tr><td class="mono text-accent">RNM-2026-00041</td><td>FGSZ</td><td>Хоргош</td><td>← ENTRY</td><td class="mono">+15.0</td><td>RENOM</td><td class="mono">09:44</td><td><span class="badge warning">ПРЕВЫШЕНИЕ</span></td><td><button class="action-btn" onclick="alert('Ренноминация ожидает одобрения диспетчера')">Одобрить</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ CREDIT ══ -->
+    <div class="page" id="page-credit">
+      <div class="page-header">
+        <div>
+          <div class="page-title">КРЕДИТНЫЕ ЛИМИТЫ И MARGIN CALL</div>
+          <div class="page-subtitle">Расчёт кредитного риска в режиме реального времени · NC Ст. 5</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn danger" onclick="openModal('modal-mc')">⚡ Оформить Margin Call</button>
+          <button class="btn primary">Пересчитать лимиты</button>
+        </div>
+      </div>
+      <div class="scroll-area">
+
+        <!-- Margin Call Alert -->
+        <div class="alert-box danger" style="margin-bottom:20px">
+          <div style="flex:1">
+            <div class="alert-title" style="color:var(--red);font-size:14px">⚠ MARGIN CALL АКТИВЕН — Газпром Маркетинг</div>
+            <div style="margin-top:4px">Совокупный кредитный риск превышает предоставленное обеспечение на <strong style="color:var(--red)">€ 850 000 (12.1%)</strong>. Срок предоставления дополнительного обеспечения: <strong>16:00 МСК</strong></div>
+          </div>
+          <button class="btn danger" style="flex-shrink:0" onclick="openModal('modal-mc')">Уведомить</button>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi-card blue"><div class="kpi-label">Суммарный лимит портфеля</div><div class="kpi-value">€ 42.5М</div><div class="kpi-change">6 грузоотправителей</div></div>
+          <div class="kpi-card green"><div class="kpi-label">Использовано</div><div class="kpi-value">€ 35.8М</div><div class="kpi-change up">84.2% от лимита</div></div>
+          <div class="kpi-card red"><div class="kpi-label">Margin Call (активных)</div><div class="kpi-value">1</div><div class="kpi-change down">€ 850К дефицит</div></div>
+          <div class="kpi-card yellow"><div class="kpi-label">Свободный лимит</div><div class="kpi-value">€ 6.7М</div><div class="kpi-change">15.8% резерв</div></div>
+        </div>
+
+        <div class="table-wrap">
+          <div class="table-header">
+            <span class="table-title">КРЕДИТНЫЙ МОНИТОР · REAL-TIME</span>
+            <span class="mono" style="font-size:10px;color:var(--text3)">Обновлено: <span id="credit-time">--</span></span>
+          </div>
+          <table>
+            <thead><tr>
+              <th>Грузоотправитель</th>
+              <th data-tooltip="Firm + Interruptible мощность">1. Мощность</th>
+              <th data-tooltip="Аукционные заявки (pending)">2. Аукцион</th>
+              <th data-tooltip="Открытая дебиторская задолженность">3. Деб. задолж.</th>
+              <th data-tooltip="Расчётный небаланс">4. Небаланс</th>
+              <th>Итого риск</th>
+              <th>Обеспечение</th>
+              <th>Доступно</th>
+              <th>Статус</th>
+            </tr></thead>
+            <tbody>
+              <tr style="background:rgba(255,77,109,.04)">
+                <td class="mono"><strong>Газпром Маркетинг</strong></td>
+                <td class="mono">€5,120К</td><td class="mono">€380К</td><td class="mono">€1,200К</td><td class="mono">€300К</td>
+                <td class="mono text-red"><strong>€7,000К</strong></td>
+                <td class="mono">€6,150К</td>
+                <td class="mono text-red">-€850К</td>
+                <td><span class="badge critical">MARGIN CALL</span></td>
+              </tr>
+              <tr>
+                <td class="mono">Wintershall Дея</td>
+                <td class="mono">€2,880К</td><td class="mono">€0</td><td class="mono">€450К</td><td class="mono">€70К</td>
+                <td class="mono">€3,400К</td>
+                <td class="mono">€5,000К</td>
+                <td class="mono text-green">+€1,600К</td>
+                <td><span class="badge active">НОРМА</span></td>
+              </tr>
+              <tr>
+                <td class="mono">Engie S.A.</td>
+                <td class="mono">€1,520К</td><td class="mono">€120К</td><td class="mono">€280К</td><td class="mono">€45К</td>
+                <td class="mono">€1,965К</td>
+                <td class="mono">€2,500К</td>
+                <td class="mono text-green">+€535К</td>
+                <td><span class="badge active">НОРМА</span></td>
+              </tr>
+              <tr>
+                <td class="mono">RWE Supply</td>
+                <td class="mono">€2,272К</td><td class="mono">€0</td><td class="mono">€620К</td><td class="mono">€0</td>
+                <td class="mono">€2,892К</td>
+                <td class="mono">€4,000К</td>
+                <td class="mono text-green">+€1,108К</td>
+                <td><span class="badge active">НОРМА</span></td>
+              </tr>
+              <tr>
+                <td class="mono">OMV Gas</td>
+                <td class="mono">€1,200К</td><td class="mono">€200К</td><td class="mono">€180К</td><td class="mono">€90К</td>
+                <td class="mono text-yellow">€1,670К</td>
+                <td class="mono">€1,800К</td>
+                <td class="mono text-yellow">+€130К</td>
+                <td><span class="badge warning">ВНИМАНИЕ</span></td>
+              </tr>
+              <tr>
+                <td class="mono">Axpo Trading</td>
+                <td class="mono">€565К</td><td class="mono">€0</td><td class="mono">€95К</td><td class="mono">€12К</td>
+                <td class="mono">€672К</td>
+                <td class="mono">€1,000К</td>
+                <td class="mono text-green">+€328К</td>
+                <td><span class="badge active">НОРМА</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Margin Call logic -->
+        <div class="panel" style="margin-bottom:16px">
+          <div class="panel-title">ЛОГИКА MARGIN CALL (NC Ст. 5.4)</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)">
+            <div style="background:var(--bg3);padding:14px;text-align:center">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:8px;">ШАГ 1</div>
+              <div style="font-size:11px;color:var(--text)">Риск превышает обеспечение</div>
+              <div style="font-family:var(--mono);font-size:13px;color:var(--red);margin-top:8px">→ ТРИГГЕР</div>
+            </div>
+            <div style="background:var(--bg3);padding:14px;text-align:center">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:8px;">ШАГ 2</div>
+              <div style="font-size:11px;color:var(--text)">Автоуведомление + срок 4 часа</div>
+              <div style="font-family:var(--mono);font-size:13px;color:var(--yellow);margin-top:8px">→ УВЕДОМЛЕНИЕ</div>
+            </div>
+            <div style="background:var(--bg3);padding:14px;text-align:center">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:8px;">ШАГ 3</div>
+              <div style="font-size:11px;color:var(--text)">Мониторинг поступления обеспечения</div>
+              <div style="font-family:var(--mono);font-size:13px;color:var(--accent);margin-top:8px">→ ОЖИДАНИЕ</div>
+            </div>
+            <div style="background:var(--bg3);padding:14px;text-align:center">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-bottom:8px;">ШАГ 4</div>
+              <div style="font-size:11px;color:var(--text)">Не выполнено → блокировка операций</div>
+              <div style="font-family:var(--mono);font-size:13px;color:var(--red);margin-top:8px">→ БЛОКИРОВКА</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ BALANCE ══ -->
+    <div class="page" id="page-balance">
+      <div class="page-header">
+        <div>
+          <div class="page-title">БАЛАНСИРОВКА И АЛЛОКАЦИИ</div>
+          <div class="page-subtitle">OBA — Операционный балансирующий счёт · NC Ст. 15</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn">Рассчитать OBA</button>
+          <button class="btn primary">Аллокация</button>
+        </div>
+      </div>
+      <div class="scroll-area">
+
+        <div class="kpi-row">
+          <div class="kpi-card blue"><div class="kpi-label">Вход в систему</div><div class="kpi-value">812.5 <span>тыс.м³/ч</span></div><div class="kpi-change">IP Господжинцы</div></div>
+          <div class="kpi-card green"><div class="kpi-label">Выход из системы</div><div class="kpi-value">777.3 <span>тыс.м³/ч</span></div><div class="kpi-change">IP Хоргош</div></div>
+          <div class="kpi-card red"><div class="kpi-label">Системный небаланс</div><div class="kpi-value">35.2 <span>тыс.м³/ч</span></div><div class="kpi-change down">+4.3% норма</div></div>
+          <div class="kpi-card yellow"><div class="kpi-label">Тех. газ компрессора</div><div class="kpi-value">8.7 <span>тыс.м³/ч</span></div><div class="kpi-change">КС Велика-Плана</div></div>
+        </div>
+
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-title">Балансирующий счёт OBA (часовой)</div>
+            <div style="margin-bottom:14px;">
+              <div class="info-row"><span class="info-label">Начальный остаток (06:00)</span><span class="info-value mono">+12.4 тыс.м³</span></div>
+              <div class="info-row"><span class="info-label">Накоплено за 4 часа</span><span class="info-value mono text-red">+35.2 тыс.м³</span></div>
+              <div class="info-row"><span class="info-label">Балансирующий газ (покупка)</span><span class="info-value mono text-yellow">-28.0 тыс.м³</span></div>
+              <div class="info-row"><span class="info-label">Текущий остаток OBA</span><span class="info-value mono text-green">+19.6 тыс.м³</span></div>
+            </div>
+            <div class="balance-meter">
+              <div class="balance-fill" style="width:65%;background:linear-gradient(90deg,var(--green2),var(--green))"></div>
+              <div class="balance-label" style="color:#000">OBA: 65% NORM</div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:4px">
+              <span>-100%</span><span>НОРМА</span><span>+100%</span>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">Почасовая балансировка (тыс.м³/ч)</div>
+            <div class="mini-chart" style="height:80px">
+              <div class="bar" style="height:60%;background:var(--accent2)" data-v="780"></div>
+              <div class="bar" style="height:65%;background:var(--accent2)" data-v="795"></div>
+              <div class="bar" style="height:72%;background:var(--accent2)" data-v="808"></div>
+              <div class="bar" style="height:80%;background:var(--accent)" data-v="820"></div>
+              <div class="bar" style="height:75%;background:var(--accent)" data-v="812"></div>
+              <div class="bar" style="height:70%;background:rgba(0,200,255,.4)" data-v="800"></div>
+              <div class="bar" style="height:68%;background:rgba(0,200,255,.3)" data-v="795"></div>
+              <div class="bar" style="height:65%;background:rgba(0,200,255,.3)" data-v="790"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:6px">
+              <span>06:00</span><span>08:00</span><span>10:00</span><span>12:00</span><span>→ прогноз</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <div class="table-header"><span class="table-title">АЛЛОКАЦИИ ПО ГРУЗООТПРАВИТЕЛЯМ (текущий газ. день)</span></div>
+          <table>
+            <thead><tr>
+              <th>Грузоотправитель</th><th>IP</th><th>Тип</th><th>Законтракт.</th><th>Номинировано</th><th>Подтверждено</th><th>Аллоцировано</th><th>Небаланс</th><th>Штраф</th>
+            </tr></thead>
+            <tbody>
+              <tr><td class="mono">Газпром Маркетинг</td><td>Хоргош</td><td>FIRM</td><td class="mono">320.0</td><td class="mono">318.4</td><td class="mono">318.4</td><td class="mono text-green">316.8</td><td class="mono text-yellow">-1.6</td><td class="mono text-yellow">€420</td></tr>
+              <tr><td class="mono">Wintershall Дея</td><td>Хоргош</td><td>FIRM</td><td class="mono">180.0</td><td class="mono">176.2</td><td class="mono">176.2</td><td class="mono text-green">175.9</td><td class="mono text-green">-0.3</td><td class="mono">—</td></tr>
+              <tr><td class="mono">Engie S.A.</td><td>Господжинцы</td><td>INT</td><td class="mono">95.0</td><td class="mono">88.7</td><td class="mono">85.2</td><td class="mono text-yellow">84.1</td><td class="mono text-red">-4.6</td><td class="mono text-red">€1,840</td></tr>
+              <tr><td class="mono">RWE Supply</td><td>Господжинцы</td><td>FIRM</td><td class="mono">142.0</td><td class="mono">142.0</td><td class="mono">142.0</td><td class="mono text-green">142.0</td><td class="mono text-green">0.0</td><td class="mono">—</td></tr>
+              <tr><td class="mono">OMV Gas</td><td>Хоргош</td><td>INT</td><td class="mono">75.0</td><td class="mono">68.1</td><td class="mono">64.0</td><td class="mono text-yellow">63.5</td><td class="mono text-red">-4.6</td><td class="mono text-red">€1,380</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════ BILLING ══ -->
+    <div class="page" id="page-billing">
+      <div class="page-header">
+        <div>
+          <div class="page-title">БИЛЛИНГ И СЧЁТА-ФАКТУРЫ</div>
+          <div class="page-subtitle">Март 2026 · Расчётный период закрыт · NC Ст. 20</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn" onclick="openModal('modal-inv')">+ Создать счёт</button>
+          <button class="btn primary">Выгрузить в 1С ERP</button>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab(this,'bill')">Выставленные <span class="tab-count">12</span></div>
+        <div class="tab" onclick="switchTab(this,'bill')">Ожидают оплаты <span class="tab-count">4</span></div>
+        <div class="tab" onclick="switchTab(this,'bill')">Оплачены <span class="tab-count">8</span></div>
+        <div class="tab" onclick="switchTab(this,'bill')">Просроченные <span class="tab-count warn">1</span></div>
+      </div>
+      <div class="scroll-area">
+
+        <div class="kpi-row">
+          <div class="kpi-card green"><div class="kpi-label">Начислено (март)</div><div class="kpi-value">€ 4.21М</div><div class="kpi-change up">▲ +8.1% к плану</div></div>
+          <div class="kpi-card blue"><div class="kpi-label">Оплачено</div><div class="kpi-value">€ 3.45М</div><div class="kpi-change">82% погашено</div></div>
+          <div class="kpi-card yellow"><div class="kpi-label">К оплате</div><div class="kpi-value">€ 0.76М</div><div class="kpi-change">4 счёта</div></div>
+          <div class="kpi-card red"><div class="kpi-label">Просрочено</div><div class="kpi-value">€ 0.12М</div><div class="kpi-change down">1 контрагент</div></div>
+        </div>
+
+        <div class="table-wrap">
+          <div class="table-header">
+            <span class="table-title">ЖУРНАЛ СЧЁТОВ-ФАКТУР</span>
+            <input class="search-input" placeholder="Поиск..." oninput="filterTable(this,'t-bill')">
+          </div>
+          <table id="t-bill">
+            <thead><tr>
+              <th>Номер счёта</th><th>Грузоотправитель</th><th>Период</th><th>Услуга</th><th>Объём (тыс.м³)</th><th>Тариф (€/тыс.м³)</th><th>Сумма</th><th>Срок оплаты</th><th>Статус</th><th></th>
+            </tr></thead>
+            <tbody>
+              <tr><td class="mono text-accent">INV-2026-0381</td><td>Газпром Маркетинг</td><td>Март</td><td>Транспорт FIRM</td><td class="mono">9,450.2</td><td class="mono">118.50</td><td class="mono"><strong>€1,119К</strong></td><td class="mono">10.04.26</td><td><span class="badge active">ОПЛАЧЕН</span></td><td><button class="action-btn">PDF</button></td></tr>
+              <tr><td class="mono text-accent">INV-2026-0382</td><td>Wintershall Дея</td><td>Март</td><td>Транспорт FIRM</td><td class="mono">5,320.8</td><td class="mono">118.50</td><td class="mono"><strong>€630К</strong></td><td class="mono">10.04.26</td><td><span class="badge active">ОПЛАЧЕН</span></td><td><button class="action-btn">PDF</button></td></tr>
+              <tr><td class="mono text-accent">INV-2026-0383</td><td>Engie S.A.</td><td>Март</td><td>Транспорт INT</td><td class="mono">2,661.0</td><td class="mono">95.20</td><td class="mono"><strong>€253К</strong></td><td class="mono">10.04.26</td><td><span class="badge pending">ОЖИДАНИЕ</span></td><td><button class="action-btn">PDF</button></td></tr>
+              <tr><td class="mono text-accent">INV-2026-0384</td><td>RWE Supply</td><td>Март</td><td>Транспорт FIRM</td><td class="mono">4,260.0</td><td class="mono">118.50</td><td class="mono"><strong>€505К</strong></td><td class="mono">10.04.26</td><td><span class="badge active">ОПЛАЧЕН</span></td><td><button class="action-btn">PDF</button></td></tr>
+              <tr><td class="mono text-accent">INV-2026-0385</td><td>OMV Gas</td><td>Март</td><td>Транспорт INT</td><td class="mono">2,043.0</td><td class="mono">95.20</td><td class="mono"><strong>€195К</strong></td><td class="mono">10.04.26</td><td><span class="badge pending">ОЖИДАНИЕ</span></td><td><button class="action-btn">PDF</button></td></tr>
+              <tr style="background:rgba(255,77,109,.03)"><td class="mono text-accent">INV-2026-0386</td><td>Axpo Trading</td><td>Март</td><td>Небаланс</td><td class="mono">—</td><td class="mono">—</td><td class="mono text-red"><strong>€124К</strong></td><td class="mono text-red">01.04.26</td><td><span class="badge rejected">ПРОСРОЧЕН</span></td><td><button class="action-btn" style="border-color:var(--red);color:var(--red)">Взыскать</button></td></tr>
+              <tr><td class="mono text-accent">INV-2026-0387</td><td>Газпром Маркетинг</td><td>Март</td><td>Штраф небаланс</td><td class="mono">—</td><td class="mono">—</td><td class="mono"><strong>€42К</strong></td><td class="mono">10.04.26</td><td><span class="badge pending">ОЖИДАНИЕ</span></td><td><button class="action-btn">PDF</button></td></tr>
+              <tr><td class="mono text-accent">INV-2026-0388</td><td>Engie S.A.</td><td>Март</td><td>Штраф небаланс</td><td class="mono">—</td><td class="mono">—</td><td class="mono"><strong>€55К</strong></td><td class="mono">10.04.26</td><td><span class="badge pending">ОЖИДАНИЕ</span></td><td><button class="action-btn">PDF</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-title">Выручка по услугам (март)</div>
+            <div class="info-row"><span class="info-label">Транспорт FIRM</span><span class="info-value mono text-green">€3,612К (85.8%)</span></div>
+            <div class="progress-wrap" style="margin-bottom:12px"><div class="progress-bar"><div class="progress-fill green" style="width:86%"></div></div></div>
+            <div class="info-row"><span class="info-label">Транспорт Interruptible</span><span class="info-value mono text-accent">€448К (10.6%)</span></div>
+            <div class="progress-wrap" style="margin-bottom:12px"><div class="progress-bar"><div class="progress-fill blue" style="width:11%"></div></div></div>
+            <div class="info-row"><span class="info-label">Штрафы небаланс</span><span class="info-value mono text-yellow">€97К (2.3%)</span></div>
+            <div class="progress-wrap" style="margin-bottom:12px"><div class="progress-bar"><div class="progress-fill yellow" style="width:2%"></div></div></div>
+            <div class="info-row"><span class="info-label">Прочие услуги</span><span class="info-value mono text-muted">€53К (1.3%)</span></div>
+            <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:1%;background:var(--text3)"></div></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Интеграция с 1С ERP</div>
+            <div class="info-row"><span class="info-label">Последняя синхронизация</span><span class="info-value mono text-green">сегодня 08:00</span></div>
+            <div class="info-row"><span class="info-label">Статус подключения</span><span class="info-value"><span class="badge active">ONLINE</span></span></div>
+            <div class="info-row"><span class="info-label">Передано документов</span><span class="info-value mono">8</span></div>
+            <div class="info-row"><span class="info-label">Ошибок синхронизации</span><span class="info-value mono text-green">0</span></div>
+            <div class="info-row"><span class="info-label">Следующая синхронизация</span><span class="info-value mono">18:00 МСК</span></div>
+            <div style="margin-top:14px">
+              <button class="btn success" style="width:100%" onclick="alert('Синхронизация с 1С ERP запущена...')">Синхронизировать сейчас</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PLACEHOLDER pages -->
+    <div class="page" id="page-contracts">
+      <div class="page-header"><div><div class="page-title">ДОГОВОРЫ GTA</div><div class="page-subtitle">Gas Transit/Transportation Agreements</div></div></div>
+      <div class="scroll-area"><div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--text3);font-family:var(--mono)">МОДУЛЬ В РАЗРАБОТКЕ · M5 ROADMAP</div></div>
+    </div>
+    <div class="page" id="page-capacity">
+      <div class="page-header"><div><div class="page-title">УПРАВЛЕНИЕ МОЩНОСТЯМИ</div><div class="page-subtitle">Аукционы · RBP платформа</div></div></div>
+      <div class="scroll-area"><div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--text3);font-family:var(--mono)">МОДУЛЬ В РАЗРАБОТКЕ · M6 ROADMAP</div></div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- Alert counter -->
+<div class="alert-counter" onclick="showPage('credit')">
+  ⚡ MARGIN CALL · Газпром Маркетинг · 3ч 12м
+</div>
+
+<!-- ══ MODALS ══ -->
+<div class="modal-overlay" id="modal-nom">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">НОВАЯ НОМИНАЦИЯ</span><button class="modal-close" onclick="closeModal('modal-nom')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Грузоотправитель</label><select class="form-select"><option>Газпром Маркетинг</option><option>Wintershall Дея</option><option>Engie S.A.</option><option>RWE Supply</option><option>OMV Gas</option></select></div>
+        <div class="form-group"><label class="form-label">Тип номинации</label><select class="form-select"><option>Номинация</option><option>Ренноминация</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">IP — Точка подключения</label><select class="form-select"><option>IP Хоргош (EXIT → HU)</option><option>IP Господжинцы (ENTRY ← BG)</option><option>VTP Сербия</option></select></div>
+        <div class="form-group"><label class="form-label">Направление</label><select class="form-select"><option>ENTRY (вход)</option><option>EXIT (выход)</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Объём (тыс. м³/ч)</label><input class="form-input" type="number" placeholder="0.0" /></div>
+        <div class="form-group"><label class="form-label">Газовый день</label><input class="form-input" type="date" /></div>
+      </div>
+      <div class="form-group"><label class="form-label">Договор GTA</label><select class="form-select"><option>GTA-2024-001 (Газпром / 10 лет FIRM)</option><option>GTA-2024-002 (Wintershall / 5 лет FIRM)</option><option>GTA-2025-003 (Engie / 2 года INT)</option></select></div>
+      <div class="form-group"><label class="form-label">Примечание</label><input class="form-input" type="text" placeholder="Необязательно..." /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-nom')">Отмена</button>
+      <button class="btn primary" onclick="submitNom()">Подать номинацию</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-mc">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title" style="color:var(--red)">⚡ MARGIN CALL УВЕДОМЛЕНИЕ</span><button class="modal-close" onclick="closeModal('modal-mc')">✕</button></div>
+    <div class="modal-body">
+      <div class="alert-box danger" style="margin-bottom:16px">
+        <div><div class="alert-title">Газпром Маркетинг — дефицит обеспечения</div><div>Текущий риск: €7,000К / Обеспечение: €6,150К / Дефицит: €850К (12.1%)</div></div>
+      </div>
+      <div class="form-group"><label class="form-label">Тип уведомления</label><select class="form-select"><option>Margin Call (требование обеспечения)</option><option>Предупреждение (85% лимита)</option><option>Блокировка операций</option></select></div>
+      <div class="form-group"><label class="form-label">Требуемое обеспечение (€)</label><input class="form-input" type="number" value="850000" /></div>
+      <div class="form-group"><label class="form-label">Срок исполнения</label><input class="form-input" type="datetime-local" /></div>
+      <div class="form-group"><label class="form-label">Способ уведомления</label><select class="form-select"><option>Email + GTCP Portal</option><option>Email</option><option>GTCP Portal</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-mc')">Отмена</button>
+      <button class="btn danger" onclick="sendMC()">Отправить Margin Call</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-inv">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">СОЗДАТЬ СЧЁТ-ФАКТУРУ</span><button class="modal-close" onclick="closeModal('modal-inv')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Грузоотправитель</label><select class="form-select"><option>Газпром Маркетинг</option><option>Wintershall Дея</option><option>Engie S.A.</option></select></div>
+        <div class="form-group"><label class="form-label">Тип услуги</label><select class="form-select"><option>Транспортировка FIRM</option><option>Транспортировка INT</option><option>Штраф небаланс</option><option>Прочее</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Объём (тыс. м³)</label><input class="form-input" type="number" placeholder="0.0" /></div>
+        <div class="form-group"><label class="form-label">Тариф (€/тыс. м³)</label><input class="form-input" type="number" value="118.50" /></div>
+      </div>
+      <div class="form-group"><label class="form-label">Расчётный период</label><input class="form-input" value="Март 2026" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-inv')">Отмена</button>
+      <button class="btn success" onclick="createInvoice()">Создать счёт</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Clock
+function updateClock(){
+  const n=new Date();
+  const t=[n.getHours(),n.getMinutes(),n.getSeconds()].map(v=>String(v).padStart(2,'0')).join(':');
+  document.getElementById('clock').textContent=t+' МСК';
+  document.getElementById('credit-time').textContent=t;
+  // Gas day
+  const gd=new Date(n);
+  if(n.getHours()<6) gd.setDate(gd.getDate()-1);
+  document.getElementById('gasday').textContent=gd.toLocaleDateString('ru',{day:'2-digit',month:'2-digit',year:'numeric'});
+  // Countdown to 14:00 (matching deadline)
+  const deadline=new Date(n); deadline.setHours(14,0,0,0);
+  const diff=deadline-n;
+  if(diff>0){
+    const h=Math.floor(diff/3600000); const m=Math.floor((diff%3600000)/60000);
+    const cd=document.getElementById('countdown');
+    if(cd) cd.textContent=`${h}ч ${String(m).padStart(2,'0')}м (14:00 МСК)`;
+  }
+}
+setInterval(updateClock,1000); updateClock();
+
+// Navigation
+function showPage(p){
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// Tab switching
+function switchTab(el,group){
+  el.closest('.tabs').querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// Modals
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); }));
+
+// Filter tables
+function filterTable(inp,tid){
+  const q=inp.value.toLowerCase();
+  document.querySelectorAll('#'+tid+' tbody tr').forEach(tr=>{
+    tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';
+  });
+}
+
+// Actions
+function submitNom(){
+  closeModal('modal-nom');
+  const n={id:'NOM-2026-0'+Math.floor(4888+Math.random()*100),status:'ОЖИДАНИЕ'};
+  alert(`✓ Номинация ${n.id} успешно подана!\nСтатус: ${n.status}\nОжидайте подтверждения AFO в течение 30 минут.`);
+}
+function sendMC(){
+  closeModal('modal-mc');
+  alert('✓ Margin Call направлен!\n\nГазпром Маркетинг уведомлён по email и через GTCP Portal.\nСрок исполнения: 4 часа.\nПри невыполнении — автоблокировка операций.');
+}
+function createInvoice(){
+  closeModal('modal-inv');
+  alert('✓ Счёт-фактура INV-2026-0389 создана!\n\nДокумент передан в очередь синхронизации с 1С ERP.\nНомер для отслеживания: INV-2026-0389');
+}
+function matchAll(){
+  alert('⚡ Матчинг запущен!\n\nАвтоматическое сопоставление номинаций с AFO:\n→ IP Хоргош: сопоставление с FGSZ...\n→ IP Господжинцы: сопоставление с Bulgartransgas...\n\nОжидайте результатов через 2-5 минут.');
+}
+</script>
+</body>
+</html>

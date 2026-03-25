@@ -1,0 +1,1399 @@
+openapi: 3.0.3
+info:
+  title: GTCP — Gas Trading & Commercial Platform API
+  description: |
+    **Gastrans Serbia · Backend REST API**
+
+    Система управления газовыми транзитными потоками, договорами мощности, биллингом и аукционами.
+
+    ### Нормативная база
+    - **CAM NC EU 2017/459** — механизмы распределения мощности
+    - **АЕРС 05-145** — официальные тарифы Gastrans
+    - **Gastrans Network Code** — NC Art. 5 (Credit Support), Art. 6.3.1 (EXIT-SERBIA),
+      Art. 8.3 (Surrender), Art. 18 (Fuel Gas), Art. 20 (Billing & Late Payment)
+    - **MAR0277-24** — расписание аукционов CAM NC 2025-2026 (ENTSOG)
+
+    ### Аутентификация
+    Все endpoints (кроме `/auth/login`) требуют JWT Bearer token.
+
+    ### Lifecycle аукциона
+    ```
+    Free Capacity → POST /auctions/bids (DRAFT)
+                  → POST /auctions/bids/{id}/submit (SUBMITTED)
+                  → POST /auctions/bids/{id}/result (WON/LOST)
+                  → POST /auctions/bids/{id}/create-contract (CONTRACT_CREATED)
+                  → POST /billing (Invoice)
+    ```
+  version: 5.0.0
+  contact:
+    name: GTCP Backend
+    email: krav4ukleo@gmail.com
+  license:
+    name: Proprietary — Gastrans Serbia
+    url: https://gastrans.rs
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local Development
+  - url: https://gtcp.gastrans.rs/api/v1
+    description: Production (Sprint 6)
+
+tags:
+  - name: auth
+    description: Аутентификация — JWT + Argon2id (NC Art. 3 — регистрация шипперов)
+  - name: shippers
+    description: Шипперы (грузоотправители) — участники транзита
+  - name: contracts
+    description: Договоры CAM NC (7 типов, GTA-YYYY-NNN, 3 направления потока)
+  - name: nominations
+    description: Номинации — суточные заявки на транзит (ENTRY/EXIT матчинг)
+  - name: capacity
+    description: Мощности — Tracker, RBP витрина, UIOLI, Surrender (CAM NC Art. 13-16)
+  - name: auctions
+    description: Аукционы CAM NC — полный lifecycle (MAR0277-24, 2025-2026)
+  - name: billing
+    description: Биллинг — capacity fee (АЕРС 05-145), Fuel Gas (NC Art.18), Late Payment
+  - name: credits
+    description: Кредитная поддержка — NC Art.5 (URDG 758, рейтинг, Margin Call)
+  - name: balance
+    description: Баланс газа — суточный, месячный, имбаланс
+  - name: audit
+    description: Журнал аудита — все действия пользователей
+  - name: system
+    description: Системные параметры — тарифы, правила NC
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token, срок действия 24 часа.
+        Получить: `POST /auth/login` → `{ token }`.
+
+  schemas:
+    # ─── Общие ───────────────────────────────────────────────
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Shipper not found"
+
+    ValidationError:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              msg:   { type: string }
+              param: { type: string }
+              value: { type: string }
+
+    # ─── Auth ─────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, example: admin }
+        password: { type: string, example: secret123 }
+
+    LoginResponse:
+      type: object
+      properties:
+        token:        { type: string, description: JWT access token (24h) }
+        refreshToken: { type: string, description: JWT refresh token (7d) }
+        user:
+          type: object
+          properties:
+            id:       { type: integer }
+            username: { type: string }
+            role:     { type: string, enum: [ADMIN, OPERATOR, TRADER, VIEWER, FINANCE] }
+
+    # ─── Shipper ──────────────────────────────────────────────
+    Shipper:
+      type: object
+      properties:
+        id:               { type: integer }
+        code:             { type: string, example: GAZPROM-EXP }
+        name:             { type: string, example: Gazprom Export LLC }
+        credit_limit:     { type: number, example: 45000000.00 }
+        current_exposure: { type: number, example: 12500000.00 }
+        credit_status:    { type: string, enum: [NORMAL, WARNING, BLOCKED, MARGIN_CALL] }
+        is_active:        { type: boolean }
+
+    # ─── Contract ─────────────────────────────────────────────
+    Contract:
+      type: object
+      properties:
+        id:                     { type: integer }
+        contract_number:        { type: string, example: GTA-2026-001 }
+        shipper_id:             { type: integer }
+        product_type:           { type: string, enum: [ANNUAL, QUARTERLY, MONTHLY, DAILY, WITHIN_DAY] }
+        capacity_type:          { type: string, enum: [FIRM, INTERRUPTIBLE] }
+        flow_direction:
+          type: string
+          enum: [GOSPODJINCI_HORGOS, HORGOS_GOSPODJINCI, KIREVO_EXIT_SERBIA]
+          description: |
+            GOSPODJINCI_HORGOS  = Firm Transit: Kirevo ENTRY → Horgoš EXIT (tariff 4.19+6.85)
+            HORGOS_GOSPODJINCI  = Commercial Reverse: Horgoš ENTRY → Kirevo EXIT (3.25)
+            KIREVO_EXIT_SERBIA  = Domestic Delivery: Kirevo ENTRY → EXIT-SERBIA (6.00+4.19)
+        cap_entry_kwh_h:        { type: number, example: 13752230 }
+        cap_exit_kwh_h:         { type: number, example: 9216209 }
+        tariff_entry_eur_kwh_h_yr: { type: number, example: 4.19 }
+        tariff_exit_eur_kwh_h_yr:  { type: number, example: 6.85 }
+        start_date:             { type: string, format: date }
+        end_date:               { type: string, format: date }
+        status:                 { type: string, enum: [ACTIVE, EXPIRED, PENDING, CANCELLED] }
+
+    ContractCreate:
+      type: object
+      required: [shipper_id, product_type, flow_direction, cap_entry_kwh_h, cap_exit_kwh_h, start_date, end_date]
+      properties:
+        shipper_id:         { type: integer }
+        product_type:       { type: string, enum: [ANNUAL, QUARTERLY, MONTHLY, DAILY, WITHIN_DAY] }
+        capacity_type:      { type: string, enum: [FIRM, INTERRUPTIBLE], default: FIRM }
+        flow_direction:
+          type: string
+          enum: [GOSPODJINCI_HORGOS, HORGOS_GOSPODJINCI, KIREVO_EXIT_SERBIA]
+        cap_entry_kwh_h:    { type: number, example: 13752230 }
+        cap_exit_kwh_h:     { type: number, example: 9216209 }
+        start_date:         { type: string, format: date, example: "2025-10-01" }
+        end_date:           { type: string, format: date, example: "2026-10-01" }
+
+    # ─── Nomination ───────────────────────────────────────────
+    Nomination:
+      type: object
+      properties:
+        id:             { type: integer }
+        shipper_id:     { type: integer }
+        gas_date:       { type: string, format: date }
+        direction:      { type: string, enum: [ENTRY, EXIT] }
+        quantity_kwh:   { type: number, example: 221000000 }
+        status:         { type: string, enum: [PENDING, MATCHED, CONFIRMED, RENOMINATED, REJECTED] }
+        matched_qty:    { type: number }
+        imbalance_kwh:  { type: number }
+
+    # ─── Capacity ─────────────────────────────────────────────
+    CapacityPoint:
+      type: object
+      properties:
+        point_code:     { type: string, example: KIREVO-ENTRY }
+        point_name:     { type: string }
+        technical_kwh_h:   { type: number, example: 15280488 }
+        reserved_kwh_h:    { type: number, example: 13752230 }
+        contracted_kwh_h:  { type: number }
+        free_kwh_h:        { type: number }
+        utilization_pct:   { type: number }
+
+    # ─── Auction ──────────────────────────────────────────────
+    AuctionCalendar:
+      type: object
+      properties:
+        id:               { type: integer }
+        product_type:     { type: string, enum: [ANNUAL, QUARTERLY, MONTHLY, DAILY, WITHIN_DAY] }
+        capacity_type:    { type: string, enum: [FIRM, INTERRUPTIBLE] }
+        auction_round:    { type: string, example: AQC1-Q4-2025 }
+        gas_year:         { type: integer, example: 2025 }
+        publication_date: { type: string, format: date }
+        auction_start_date: { type: string, format: date }
+        auction_start_utc:  { type: string, example: "07:00:00" }
+        delivery_start:   { type: string, format: date-time }
+        delivery_end:     { type: string, format: date-time }
+        schedule_rule:    { type: string, example: "1st Monday of July" }
+        status:
+          type: string
+          enum: [UPCOMING, OPEN, CLOSED, RESULTS_PUBLISHED, CANCELLED]
+        days_until_open:  { type: integer }
+        total_bids:       { type: integer }
+
+    AuctionBid:
+      type: object
+      properties:
+        id:                   { type: integer }
+        auction_id:           { type: integer }
+        shipper_id:           { type: integer }
+        point_code:           { type: string }
+        flow_direction:       { type: string }
+        bid_capacity_kwh_h:   { type: number, example: 500000 }
+        bid_price_eur_kwh_h_yr: { type: number }
+        status:
+          type: string
+          enum: [DRAFT, SUBMITTED, UNDER_REVIEW, WON, PARTIALLY_WON, LOST, CANCELLED, CONTRACT_CREATED]
+        submitted_at:         { type: string, format: date-time }
+        rbp_bid_ref:          { type: string, example: RBP-2025-00123 }
+        allocated_capacity_kwh_h: { type: number }
+        clearing_price_eur_kwh_h_yr: { type: number }
+        auction_premium_eur:  { type: number }
+        contract_id:          { type: integer }
+        credit_blocked_eur:   { type: number }
+
+    AuctionBidCreate:
+      type: object
+      required: [auction_id, shipper_id, point_code, flow_direction, bid_capacity_kwh_h]
+      properties:
+        auction_id:           { type: integer }
+        shipper_id:           { type: integer }
+        point_code:           { type: string, example: KIREVO-ENTRY }
+        flow_direction:
+          type: string
+          enum: [GOSPODJINCI_HORGOS, HORGOS_GOSPODJINCI, KIREVO_EXIT_SERBIA]
+        bid_capacity_kwh_h:   { type: number, example: 500000, minimum: 1 }
+        bid_price_eur_kwh_h_yr: { type: number, minimum: 0 }
+        notes:                { type: string }
+
+    # ─── Invoice ──────────────────────────────────────────────
+    Invoice:
+      type: object
+      properties:
+        id:               { type: integer }
+        shipper_id:       { type: integer }
+        contract_id:      { type: integer }
+        billing_month:    { type: string, format: date, example: "2025-10-01" }
+        billing_days:     { type: integer, example: 31 }
+        cap_entry_kwh_h:  { type: number }
+        cap_exit_kwh_h:   { type: number }
+        cap_entry_fee_eur: { type: number }
+        cap_exit_fee_eur:  { type: number }
+        fuel_gas_kwh:      { type: number }
+        fuel_gas_volume_nm3: { type: number }
+        total_amount_eur:  { type: number, example: 10255724.00 }
+        due_date:          { type: string, format: date }
+        status:
+          type: string
+          enum: [DRAFT, ISSUED, PAID, OVERDUE, CANCELLED]
+        late_payment_interest_eur: { type: number }
+
+    # ─── Credit Support ───────────────────────────────────────
+    CreditSupport:
+      type: object
+      properties:
+        id:               { type: integer }
+        shipper_id:       { type: integer }
+        support_type:
+          type: string
+          enum: [BANK_GUARANTEE, ESCROW, PARENT_GUARANTEE]
+          description: NC Art.5.2 — допустимые формы кредитной поддержки
+        guarantee_number: { type: string }
+        bank_name:        { type: string }
+        bank_swift:       { type: string }
+        amount_eur:       { type: number, example: 45000000 }
+        valid_from:       { type: string, format: date }
+        valid_to:         { type: string, format: date }
+        status:           { type: string, enum: [ACTIVE, EXPIRED, CANCELLED, PENDING, CALLED] }
+        rating_exempt:    { type: boolean }
+        sp_rating:        { type: string, example: BBB- }
+        moodys_rating:    { type: string, example: Baa3 }
+        creditreform_score: { type: integer, example: 198 }
+
+    AvailableCredit:
+      type: object
+      properties:
+        shipper_id:           { type: integer }
+        shipper_code:         { type: string }
+        total_credit_eur:     { type: number }
+        available_credit_eur: { type: number }
+        open_invoices_eur:    { type: number }
+        min_required_eur:     { type: number }
+        shortfall_eur:        { type: number }
+        coverage_status:
+          type: string
+          enum: [EXEMPT, SUFFICIENT, INSUFFICIENT, MISSING]
+          description: NC Art.5.3.1 — достаточность кредитной поддержки
+        risk_level:
+          type: string
+          enum: [OK, WARNING, CRITICAL]
+        is_rating_exempt:     { type: boolean }
+        utilization_pct:      { type: number }
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ════════════════════════════════════════════════════════════
+  # AUTH
+  # ════════════════════════════════════════════════════════════
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Получить JWT токен
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            example:
+              username: admin
+              password: admin123
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401':
+          description: Неверные учётные данные
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Обновить access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: Новый access token
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Инвалидировать refresh token
+      responses:
+        '200':
+          description: Выход выполнен
+
+  # ════════════════════════════════════════════════════════════
+  # CONTRACTS
+  # ════════════════════════════════════════════════════════════
+  /contracts:
+    get:
+      tags: [contracts]
+      summary: Список договоров
+      description: Договоры CAM NC — 7 типов (Annual/Quarterly/Monthly/Daily/WithinDay × Firm/Interruptible), 3 направления потока.
+      parameters:
+        - in: query
+          name: shipper_id
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string, enum: [ACTIVE, EXPIRED, PENDING, CANCELLED] }
+        - in: query
+          name: flow_direction
+          schema: { type: string, enum: [GOSPODJINCI_HORGOS, HORGOS_GOSPODJINCI, KIREVO_EXIT_SERBIA] }
+        - in: query
+          name: product_type
+          schema: { type: string, enum: [ANNUAL, QUARTERLY, MONTHLY, DAILY, WITHIN_DAY] }
+      responses:
+        '200':
+          description: Список договоров
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Contract' }
+
+    post:
+      tags: [contracts]
+      summary: Создать договор
+      description: |
+        Нумерация GTA-YYYY-NNN. Тарифы АЕРС 05-145 подставляются автоматически по flow_direction.
+        Cap entry/exit billing: `fee = cap_entry × t_entry/365 × days + cap_exit × t_exit/365 × days`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContractCreate' }
+      responses:
+        '201':
+          description: Договор создан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+
+  /contracts/{id}:
+    get:
+      tags: [contracts]
+      summary: Детальная карточка договора
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+    patch:
+      tags: [contracts]
+      summary: Обновить договор
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [ACTIVE, EXPIRED, PENDING, CANCELLED] }
+                cap_entry_kwh_h: { type: number }
+                cap_exit_kwh_h:  { type: number }
+                notes:           { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+
+  # ════════════════════════════════════════════════════════════
+  # CAPACITY
+  # ════════════════════════════════════════════════════════════
+  /capacity/tracker:
+    get:
+      tags: [capacity]
+      summary: Общий трекер мощностей по всем IP
+      description: |
+        Рассчитывает `free = GREATEST(0, reserved − contracted + surrendered)` по каждому IP.
+        IP Gastrans: KIREVO-ENTRY (13,752,230 kWh/h), HORGOS-EXIT (9,216,209), EXIT-SERBIA (4,536,021).
+      responses:
+        '200':
+          description: Сводка по 3 interconnection points
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: object
+                    properties:
+                      total_ips:        { type: integer }
+                      rbp_offerable_count: { type: integer }
+                  points:
+                    type: array
+                    items: { $ref: '#/components/schemas/CapacityPoint' }
+
+  /capacity/tracker/rbp-offerings:
+    get:
+      tags: [capacity]
+      summary: Свободные мощности для RBP.EU (по IP × продукту)
+      description: |
+        Для каждого IP и продукта показывает: free_kwh_h, offering_value_eur.
+        Includes `next_auctions` из MAR0277-24 auction calendar.
+      responses:
+        '200':
+          description: RBP offerings matrix + ближайшие аукционы
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    type: object
+                    properties:
+                      annual_free_value_eur: { type: number }
+                      cam_nc_source:         { type: string, example: MAR0277-24 Final }
+                  next_auctions:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuctionCalendar' }
+                  by_point:
+                    type: array
+
+  /capacity/tracker/uioli:
+    get:
+      tags: [capacity]
+      summary: UIOLI — ежесуточный пул (CAM NC Art.13-16)
+      description: |
+        Unutilized annual contracts → daily FCFS pool.
+        При отсутствии MDAP данных возвращает estimate на основе 72% утилизации (апрель 2025).
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, default: 30 }
+      responses:
+        '200':
+          description: UIOLI daily pool
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estimated: { type: boolean }
+                  days:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        gas_date:    { type: string, format: date }
+                        uioli_kwh_h: { type: number }
+
+  /capacity/surrender:
+    post:
+      tags: [capacity]
+      summary: Инициировать Surrender (NC Art.8.3)
+      description: |
+        Шиппер возвращает мощность TSO.
+        При выставлении на RBP.EU — расчёт Uncovered Auction Premium:
+        `premium = reserve_revenue − resale_revenue` (NC Art.20.3.2.4)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contract_id, capacity_kwh_h, surrender_date]
+              properties:
+                contract_id:     { type: integer }
+                capacity_kwh_h:  { type: number }
+                surrender_date:  { type: string, format: date }
+                reason:          { type: string }
+      responses:
+        '201':
+          description: Surrender зарегистрирован + оценка премии
+
+  /capacity/surrender/{id}/rbp:
+    patch:
+      tags: [capacity]
+      summary: Записать результат продажи Surrender на RBP.EU
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:                 { type: string, enum: [SOLD, PARTIALLY_SOLD, UNSOLD] }
+                resalePriceEurKwhH:     { type: number }
+                soldKwhH:               { type: number }
+                rbpListingRef:          { type: string }
+      responses:
+        '200':
+          description: Обновлён + рассчитан Uncovered Auction Premium
+
+  # ════════════════════════════════════════════════════════════
+  # AUCTIONS — Full Lifecycle
+  # ════════════════════════════════════════════════════════════
+  /auctions/calendar:
+    get:
+      tags: [auctions]
+      summary: Расписание аукционов CAM NC (MAR0277-24)
+      description: |
+        47 строк официального расписания на 2025-2026 из MAR0277-24 (ENTSOG, October 2024).
+        Annual (1st Monday July) / Quarterly (AQC-1..4) / Monthly (3rd Monday M-1) / Daily / Within-Day.
+      parameters:
+        - in: query
+          name: product_type
+          schema: { type: string, enum: [ANNUAL, QUARTERLY, MONTHLY, DAILY, WITHIN_DAY] }
+        - in: query
+          name: capacity_type
+          schema: { type: string, enum: [FIRM, INTERRUPTIBLE] }
+        - in: query
+          name: upcoming_only
+          schema: { type: boolean, default: true }
+        - in: query
+          name: gas_year
+          schema: { type: integer, example: 2026 }
+      responses:
+        '200':
+          description: Список аукционов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  auctions:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuctionCalendar' }
+
+  /auctions/calendar/upcoming:
+    get:
+      tags: [auctions]
+      summary: Ближайший аукцион по каждому типу продукта
+      responses:
+        '200':
+          description: Сгруппировано по product_type
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  next_auction: { $ref: '#/components/schemas/AuctionCalendar' }
+                  by_product_type:
+                    type: object
+                    additionalProperties:
+                      type: array
+                      items: { $ref: '#/components/schemas/AuctionCalendar' }
+
+  /auctions/calendar/next:
+    get:
+      tags: [auctions]
+      summary: Следующий аукцион по типу (quick lookup)
+      parameters:
+        - in: query
+          name: product_type
+          schema: { type: string, enum: [ANNUAL, QUARTERLY, MONTHLY, DAILY, WITHIN_DAY], default: MONTHLY }
+        - in: query
+          name: capacity_type
+          schema: { type: string, enum: [FIRM, INTERRUPTIBLE], default: FIRM }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuctionCalendar' }
+
+  /auctions/calendar/{id}:
+    get:
+      tags: [auctions]
+      summary: Карточка аукциона с заявками и доступной мощностью
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Аукцион + bids + capacity_available по IP
+    patch:
+      tags: [auctions]
+      summary: Обновить статус аукциона (+ RBP auction ID)
+
+  /auctions/calendar/{id}/status:
+    patch:
+      tags: [auctions]
+      summary: Установить статус аукциона
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [UPCOMING, OPEN, CLOSED, RESULTS_PUBLISHED, CANCELLED]
+                rbp_auction_id:
+                  type: string
+                  example: RBP-AUC-2025-M04
+                reserve_price_eur_kwh_h:
+                  type: number
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuctionCalendar' }
+
+  /auctions/bids:
+    get:
+      tags: [auctions]
+      summary: Список заявок (с фильтрами)
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [DRAFT, SUBMITTED, WON, PARTIALLY_WON, LOST, CANCELLED, CONTRACT_CREATED]
+        - in: query
+          name: shipper_id
+          schema: { type: integer }
+        - in: query
+          name: product_type
+          schema: { type: string, enum: [ANNUAL, QUARTERLY, MONTHLY, DAILY, WITHIN_DAY] }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  bids:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuctionBid' }
+
+    post:
+      tags: [auctions]
+      summary: Создать заявку DRAFT
+      description: |
+        **Шаг 1** из lifecycle аукциона.
+        Автоматически проверяет кредитную поддержку (NC Art.5).
+        Рассчитывает `credit_blocked_eur` по мультипликатору NC Art.5.3.1.
+        Возвращает `financial_estimate` + `credit_assessment` + `next_step`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AuctionBidCreate' }
+            example:
+              auction_id: 12
+              shipper_id: 1
+              point_code: KIREVO-ENTRY
+              flow_direction: GOSPODJINCI_HORGOS
+              bid_capacity_kwh_h: 500000
+              bid_price_eur_kwh_h_yr: 11.04
+      responses:
+        '201':
+          description: Заявка создана (DRAFT)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bid: { $ref: '#/components/schemas/AuctionBid' }
+                  financial_estimate:
+                    type: object
+                    properties:
+                      delivery_days:           { type: integer }
+                      est_period_revenue_eur:  { type: number }
+                      est_annual_revenue_eur:  { type: number }
+                  credit_assessment:
+                    type: object
+                    properties:
+                      credit_sufficient:   { type: boolean }
+                      credit_blocked_eur:  { type: number }
+                      nc_reference:        { type: string }
+                  next_step: { type: string }
+
+  /auctions/bids/{id}:
+    get:
+      tags: [auctions]
+      summary: Полный lifecycle заявки + кредитная позиция
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/AuctionBid' }
+                  - type: object
+                    properties:
+                      credit_position: { $ref: '#/components/schemas/AvailableCredit' }
+
+    patch:
+      tags: [auctions]
+      summary: Обновить параметры заявки (только DRAFT)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bid_capacity_kwh_h:     { type: number }
+                bid_price_eur_kwh_h_yr: { type: number }
+                flow_direction:         { type: string }
+                notes:                  { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuctionBid' }
+
+    delete:
+      tags: [auctions]
+      summary: Отозвать заявку (только DRAFT/SUBMITTED)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Заявка отменена (CANCELLED)
+
+  /auctions/bids/{id}/submit:
+    post:
+      tags: [auctions]
+      summary: "Шаг 2: DRAFT → SUBMITTED (отправка на RBP.EU)"
+      description: |
+        Выполняет финальную проверку кредитной поддержки (NC Art.5).
+        Блокирует отправку при `coverage_status = INSUFFICIENT`.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rbp_bid_ref: { type: string, example: RBP-2025-00123 }
+                notes:       { type: string }
+      responses:
+        '200':
+          description: Заявка отправлена
+        '422':
+          description: Недостаточно кредитной поддержки (NC Art.5) или аукцион закрыт
+
+  /auctions/bids/{id}/result:
+    post:
+      tags: [auctions]
+      summary: "Шаг 3: Записать результат (WON / PARTIALLY_WON / LOST)"
+      description: |
+        При WON/PARTIALLY_WON — возвращает `financial_outcome` и `next_step` с ссылкой на create-contract.
+        Также переводит auction_calendar → RESULTS_PUBLISHED.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [outcome]
+              properties:
+                outcome:
+                  type: string
+                  enum: [WON, PARTIALLY_WON, LOST]
+                allocated_capacity_kwh_h:
+                  type: number
+                  description: Обязательно при PARTIALLY_WON
+                clearing_price_eur_kwh_h_yr:
+                  type: number
+                auction_premium_eur:
+                  type: number
+                  description: Аукционная надбавка (Annual/Quarterly)
+                result_notes: { type: string }
+      responses:
+        '200':
+          description: Результат зафиксирован
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  outcome: { type: string }
+                  financial_outcome:
+                    type: object
+                    properties:
+                      allocated_capacity_kwh_h:     { type: number }
+                      est_period_revenue_eur:        { type: number }
+                  next_step: { type: string, example: "POST /auctions/bids/42/create-contract" }
+
+  /auctions/bids/{id}/create-contract:
+    post:
+      tags: [auctions]
+      summary: "Шаг 4: Создать контракт из победы (fn_create_contract_from_bid)"
+      description: |
+        Вызывает `fn_create_contract_from_bid(bid_id)` — PostgreSQL функция.
+        Автоматически генерирует `GTA-YYYY-NNN`, устанавливает тарифы АЕРС по flow_direction,
+        период поставки = delivery_start..delivery_end аукциона.
+        После этого контракт доступен в стандартном billing flow.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '201':
+          description: Контракт создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contract:        { $ref: '#/components/schemas/Contract' }
+                  contract_number: { type: string, example: GTA-2026-007 }
+                  next_steps:
+                    type: array
+                    items: { type: string }
+
+  /auctions/summary:
+    get:
+      tags: [auctions]
+      summary: Дашборд — статистика по всем заявкам
+      responses:
+        '200':
+          description: Аукционный дашборд
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  auction_calendar:
+                    type: object
+                    properties:
+                      upcoming_count:       { type: integer }
+                      open_count:           { type: integer }
+                      next_auction_date:    { type: string, format: date }
+                  bids:
+                    type: object
+                    properties:
+                      draft_count:          { type: integer }
+                      submitted_count:      { type: integer }
+                      won_count:            { type: integer }
+                      won_pending_contract: { type: integer }
+
+  /auctions/timeline:
+    get:
+      tags: [auctions]
+      summary: Timeline предстоящих событий (аукционы + начало поставки)
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, default: 90, minimum: 7, maximum: 365 }
+      responses:
+        '200':
+          description: Хронология событий по неделям
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  horizon_days:  { type: integer }
+                  total_events:  { type: integer }
+                  timeline:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        event_date:   { type: string, format: date }
+                        event_type:   { type: string, enum: [AUCTION_OPEN, DELIVERY_START] }
+                        title:        { type: string }
+                        days_away:    { type: integer }
+                  by_week:
+                    type: object
+                    additionalProperties:
+                      type: array
+
+  # ════════════════════════════════════════════════════════════
+  # BILLING
+  # ════════════════════════════════════════════════════════════
+  /billing:
+    get:
+      tags: [billing]
+      summary: Список счетов
+      parameters:
+        - in: query
+          name: shipper_id
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string, enum: [DRAFT, ISSUED, PAID, OVERDUE, CANCELLED] }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Invoice' }
+
+    post:
+      tags: [billing]
+      summary: Создать счёт
+      description: |
+        **Формула capacity fee (АЕРС 05-145):**
+        ```
+        fee = cap_entry × tariff_entry / 365 × days
+            + cap_exit  × tariff_exit  / 365 × days
+        ```
+        **Fuel Gas (NC Art.18):**
+        ```
+        FG = X1 × Q_horgos + X2 × Q_serbia − KN
+        (X1=0.42%, X2=0.08%, GCV=11.523 kWh/Nm³)
+        ```
+        **Late Payment (NC Art.20.4.2):** rate = EURIBOR_6M + 3%, 360-day basis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipper_id, contract_id, billing_month]
+              properties:
+                shipper_id:      { type: integer }
+                contract_id:     { type: integer }
+                billing_month:   { type: string, format: date, example: "2025-10-01" }
+                billing_days:    { type: integer, default: 31 }
+                q_horgos_kwh:    { type: number, description: "Объём через Horgoš (для Fuel Gas)" }
+                q_serbia_kwh:    { type: number, description: "Объём domestic (для Fuel Gas)" }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invoice' }
+
+  /billing/gas-quality:
+    get:
+      tags: [billing]
+      summary: Качество газа Horgoš (Annex 3A)
+      description: |
+        Данные GMS Kiskundorozsma 2, апрель 2025. GCV avg 11.523 kWh/Nm³.
+      parameters:
+        - in: query
+          name: month
+          schema: { type: string, format: date, example: "2025-04-01" }
+      responses:
+        '200':
+          description: Ежесуточные параметры качества
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: object
+                    properties:
+                      gcv_avg_kwh_nm3:  { type: number, example: 11.523 }
+                      wobbe_avg:        { type: number, example: 14.975 }
+                      methane_avg_pct:  { type: number, example: 94.38 }
+                      density_avg:      { type: number, example: 0.7656 }
+                  data:
+                    type: array
+
+  /billing/{id}/statement:
+    get:
+      tags: [billing]
+      summary: Расшифровка счёта (monthly statement)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Полная расшифровка с капацити-fee, fuel gas, поздние платежи
+
+  # ════════════════════════════════════════════════════════════
+  # CREDITS — NC Art.5
+  # ════════════════════════════════════════════════════════════
+  /credits:
+    get:
+      tags: [credits]
+      summary: Dashboard — кредитные позиции всех шипперов
+      description: |
+        v_available_credit: total/available/shortfall/risk_level/coverage_status.
+        coverage_status: EXEMPT (рейтинг ≥BBB-/Baa3/Creditreform≤235) | SUFFICIENT | INSUFFICIENT | MISSING
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AvailableCredit' }
+
+  /credits/summary:
+    get:
+      tags: [credits]
+      summary: Агрегированная статистика по платформе
+      responses:
+        '200':
+          description: Суммарные данные + open_margin_calls
+
+  /credits/expiring:
+    get:
+      tags: [credits]
+      summary: Инструменты с истекающим сроком действия
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, default: 30 }
+      responses:
+        '200':
+          description: Список инструментов, истекающих в течение N дней
+
+  /credits/{shipperId}:
+    get:
+      tags: [credits]
+      summary: Детальная позиция шиппера
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: v_available_credit + contracts_by_product + recent_margin_calls
+
+  /credits/{shipperId}/instruments:
+    get:
+      tags: [credits]
+      summary: Инструменты кредитной поддержки шиппера
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+    post:
+      tags: [credits]
+      summary: Добавить инструмент кредитной поддержки
+      description: |
+        NC Art.5.2: BANK_GUARANTEE (URDG 758, банк ≥BBB-) или ESCROW.
+        Автоматически проверяет рейтинговое освобождение (NC Art.5.4).
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [support_type, amount_eur, valid_from]
+              properties:
+                support_type:  { type: string, enum: [BANK_GUARANTEE, ESCROW, PARENT_GUARANTEE] }
+                amount_eur:    { type: number, example: 45000000 }
+                valid_from:    { type: string, format: date }
+                valid_to:      { type: string, format: date }
+                bank_name:     { type: string }
+                bank_swift:    { type: string }
+                guarantee_number: { type: string }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreditSupport' }
+
+  /credits/{shipperId}/by-product:
+    get:
+      tags: [credits]
+      summary: Минимальный кредит по типу продукта (NC Art.5.3.1)
+      description: |
+        Мультипликаторы:
+        - Annual: 2/12 годовой суммы (16.7%)
+        - Quarterly: 2/3 квартальной (22.2%)
+        - Monthly: 100% месяца (8.3%)
+        - Daily: 100% суток (0.27%)
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Breakdown по контрактам и мультипликаторам NC 5.3.1
+
+  /credits/{shipperId}/eligibility:
+    get:
+      tags: [credits]
+      summary: Проверить право на участие в аукционе RBP.EU
+      description: |
+        Возвращает `eligible_for_auction` + blocking_reasons.
+        Опционально: передать product_type + cap_kwh_h для bid assessment.
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+        - in: query
+          name: product_type
+          schema: { type: string }
+        - in: query
+          name: cap_kwh_h
+          schema: { type: number }
+      responses:
+        '200':
+          description: Eligibility check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  eligible_for_auction: { type: boolean }
+                  blocking_reasons:     { type: array, items: { type: string } }
+                  credit_summary:       { $ref: '#/components/schemas/AvailableCredit' }
+                  bid_assessment:
+                    type: object
+                    properties:
+                      eligible_for_bid:       { type: boolean }
+                      additional_required_eur: { type: number }
+
+  /credits/{shipperId}/margin-call:
+    post:
+      tags: [credits]
+      summary: Выдать Margin Call (NC Art.5.5)
+      description: |
+        2 рабочих дня на доплнение (NC Art.5.5).
+        Только при coverage_status = INSUFFICIENT/MISSING.
+        Возвращает deadline (следующий рабочий день + 2).
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      responses:
+        '201':
+          description: Margin Call выдан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  margin_call:     { type: object }
+                  shortfall_eur:   { type: number }
+                  deadline_iso:    { type: string, format: date-time }
+                  nc_reference:    { type: string, example: "NC Art. 5.5 — 2 рабочих дня" }
+
+  /credits/{shipperId}/instruments/{id}/call:
+    post:
+      tags: [credits]
+      summary: Вызвать банковскую гарантию
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [call_amount_eur, call_reason]
+              properties:
+                call_amount_eur: { type: number }
+                call_reason:     { type: string }
+      responses:
+        '200':
+          description: Гарантия вызвана + остаток
+
+  /credits/{shipperId}/rating:
+    post:
+      tags: [credits]
+      summary: Обновить рейтинг шиппера + история
+      description: |
+        NC Art.5.4 — освобождение при S&P/Fitch ≥ BBB- ИЛИ Moody's ≥ Baa3 ИЛИ Creditreform ≤ 235.
+        Автоматически пересчитывает `rating_exempt` и сохраняет историческую запись.
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sp_rating:           { type: string, example: BBB- }
+                moodys_rating:       { type: string, example: Baa3 }
+                creditreform_score:  { type: integer, example: 198 }
+      responses:
+        '201':
+          description: Рейтинг обновлён
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  is_rating_exempt: { type: boolean }
+                  exempt_reason:    { type: string }
+
+  # ════════════════════════════════════════════════════════════
+  # NOMINATIONS
+  # ════════════════════════════════════════════════════════════
+  /nominations:
+    get:
+      tags: [nominations]
+      summary: Список номинаций
+      parameters:
+        - in: query
+          name: gas_date
+          schema: { type: string, format: date }
+        - in: query
+          name: shipper_id
+          schema: { type: integer }
+        - in: query
+          name: status
+          schema: { type: string, enum: [PENDING, MATCHED, CONFIRMED, RENOMINATED, REJECTED] }
+    post:
+      tags: [nominations]
+      summary: Создать номинацию
+      description: ENTRY/EXIT матчинг ±10% tolerance, алгоритм min(entry, exit).
+
+  /nominations/{id}/match:
+    post:
+      tags: [nominations]
+      summary: Выполнить матчинг номинации
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+
+  /nominations/{id}/renominate:
+    post:
+      tags: [nominations]
+      summary: Реноминация (±10% от исходного объёма)
+
+  # ════════════════════════════════════════════════════════════
+  # BALANCE
+  # ════════════════════════════════════════════════════════════
+  /balance:
+    get:
+      tags: [balance]
+      summary: Газовый баланс по периодам
+      parameters:
+        - in: query
+          name: shipper_id
+          schema: { type: integer }
+        - in: query
+          name: period_start
+          schema: { type: string, format: date }
+
+  # ════════════════════════════════════════════════════════════
+  # SYSTEM
+  # ════════════════════════════════════════════════════════════
+  /system-params:
+    get:
+      tags: [system]
+      summary: Системные параметры (тарифы АЕРС, NC параметры)
+      description: |
+        Включает: тарифы АЕРС 05-145, Fuel Gas коэффициенты (NC Art.18),
+        EURIBOR 6M (NC Art.20.4.2), параметры аукционов (MAR0277-24),
+        NC Art.5 кредитные мультипликаторы.
+    put:
+      tags: [system]
+      summary: Обновить системный параметр
+
+  /audit:
+    get:
+      tags: [audit]
+      summary: Журнал аудита
+      parameters:
+        - in: query
+          name: entity_type
+          schema: { type: string, enum: [contract, invoice, margin_call, auction_bid, credit_support] }
+        - in: query
+          name: user_id
+          schema: { type: integer }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }

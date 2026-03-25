@@ -1,0 +1,1998 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GTCP — Gas Trading & Commercial Platform v1.0 MVP</title>
+<style>
+
+:root {
+  --bg:#0a0e14; --bg2:#0f1520; --bg3:#141c2a; --panel:#131b28;
+  --border:#1e2d42; --border2:#243549;
+  --accent:#00c8ff; --accent2:#0088bb;
+  --green:#00e5a0; --green2:#00b07a;
+  --red:#ff4d6d; --red2:#cc3355;
+  --yellow:#ffd166; --orange:#ff8c42;
+  --text:#c8d8e8; --text2:#7a99b8; --text3:#4a6a88;
+  --mono:"IBM Plex Mono",monospace; --sans:"IBM Plex Sans",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{font-size:14px;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+/* LOGIN */
+#login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000;}
+.login-box{background:var(--bg2);border:1px solid var(--border2);padding:48px 40px;width:420px;}
+.login-logo{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent);letter-spacing:3px;margin-bottom:4px;}
+.login-sub{font-size:12px;color:var(--text3);margin-bottom:32px;}
+.login-box label{display:block;font-size:11px;letter-spacing:.8px;color:var(--text3);margin-bottom:6px;margin-top:16px;}
+.login-box input,.login-box select{width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:10px 12px;font-family:var(--sans);font-size:13px;outline:none;}
+.login-box input:focus,.login-box select:focus{border-color:var(--accent);}
+.btn-login{width:100%;margin-top:24px;background:var(--accent);color:#000;font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:1px;padding:12px;border:none;cursor:pointer;}
+.btn-login:hover{background:var(--accent2);color:#fff;}
+.login-error{color:var(--red);font-size:12px;margin-top:8px;display:none;}
+.login-roles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;}
+.role-chip{padding:6px 10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:11px;cursor:pointer;text-align:center;}
+.role-chip.selected{border-color:var(--accent);color:var(--accent);background:rgba(0,200,255,.08);}
+
+/* APP SHELL */
+#app{display:none;flex:1;flex-direction:column;height:100vh;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;z-index:100;}
+.logo{font-family:var(--mono);font-size:15px;font-weight:700;letter-spacing:2px;color:var(--accent);display:flex;align-items:center;gap:10px;}
+.logo-box{width:30px;height:30px;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px;}
+.topbar-center{display:flex;align-items:center;gap:20px;font-family:var(--mono);font-size:11px;color:var(--text3);}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar-right{display:flex;align-items:center;gap:14px;}
+.time-disp{font-family:var(--mono);font-size:13px;color:var(--accent);padding:4px 10px;border:1px solid var(--border2);background:var(--bg3);}
+.user-badge{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);cursor:pointer;padding:6px 10px;border:1px solid transparent;}
+.user-badge:hover{border-color:var(--border2);}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;}
+.role-tag{font-size:10px;color:var(--text3);font-family:var(--mono);}
+
+/* LAYOUT */
+.app-body{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;}
+.nav-section{padding:16px 16px 6px;}
+.nav-section-label{font-size:10px;letter-spacing:1px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 14px;margin:1px 0;cursor:pointer;color:var(--text2);font-size:13px;border:1px solid transparent;border-radius:2px;}
+.nav-item:hover{background:var(--bg3);color:var(--text);border-color:var(--border);}
+.nav-item.active{background:rgba(0,200,255,.08);color:var(--accent);border-color:rgba(0,200,255,.2);}
+.nav-item svg{flex-shrink:0;width:15px;height:15px;}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:10px;}
+.nav-badge.yellow{background:var(--yellow);color:#000;}
+.nav-badge.green{background:var(--green);color:#000;}
+.main{flex:1;overflow-y:auto;background:var(--bg);}
+.page{display:none;padding:24px;}
+.page.active{display:block;}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.page-title{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--text);letter-spacing:.5px;}
+.page-sub{font-size:11px;color:var(--text3);margin-top:2px;}
+.actions{display:flex;gap:8px;}
+
+/* BUTTONS */
+.btn{padding:8px 16px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:12px;font-family:var(--mono);cursor:pointer;letter-spacing:.5px;}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;}
+.btn.primary:hover{background:var(--accent2);color:#fff;}
+.btn.success{background:rgba(0,229,160,.12);color:var(--green);border-color:var(--green2);}
+.btn.success:hover{background:rgba(0,229,160,.2);}
+.btn.danger{background:rgba(255,77,109,.12);color:var(--red);border-color:var(--red2);}
+.btn.danger:hover{background:rgba(255,77,109,.2);}
+.btn.warning{background:rgba(255,209,102,.12);color:var(--yellow);border-color:var(--yellow);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* CARDS */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.kpi-card{background:var(--panel);border:1px solid var(--border);padding:16px 18px;}
+.kpi-label{font-size:10px;letter-spacing:.8px;color:var(--text3);font-family:var(--mono);margin-bottom:8px;}
+.kpi-value{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--text);}
+.kpi-value.green{color:var(--green);}
+.kpi-value.red{color:var(--red);}
+.kpi-value.yellow{color:var(--yellow);}
+.kpi-value.accent{color:var(--accent);}
+.kpi-delta{font-size:11px;color:var(--text3);margin-top:4px;}
+
+/* TABLES */
+.section-wrap{background:var(--panel);border:1px solid var(--border);margin-bottom:16px;}
+.section-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);}
+.section-title{font-family:var(--mono);font-size:11px;letter-spacing:.8px;color:var(--text2);}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;}
+th{background:var(--bg3);padding:10px 14px;text-align:left;font-size:10px;letter-spacing:.8px;color:var(--text3);font-family:var(--mono);border-bottom:1px solid var(--border2);font-weight:400;}
+td{padding:10px 14px;font-size:12px;border-bottom:1px solid var(--border);color:var(--text2);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.02);}
+.mono{font-family:var(--mono);}
+.text-accent{color:var(--accent);}
+.text-green{color:var(--green);}
+.text-red{color:var(--red);}
+.text-yellow{color:var(--yellow);}
+.text-dim{color:var(--text3);}
+.fw7{font-weight:700;}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;font-size:10px;font-family:var(--mono);letter-spacing:.5px;border-radius:2px;}
+.badge.pending{background:rgba(255,209,102,.15);color:var(--yellow);border:1px solid rgba(255,209,102,.3);}
+.badge.matching{background:rgba(0,200,255,.12);color:var(--accent);border:1px solid rgba(0,200,255,.25);}
+.badge.confirmed{background:rgba(0,229,160,.12);color:var(--green);border:1px solid rgba(0,229,160,.25);}
+.badge.rejected{background:rgba(255,77,109,.12);color:var(--red);border:1px solid rgba(255,77,109,.25);}
+.badge.renom{background:rgba(255,140,66,.12);color:var(--orange);border:1px solid rgba(255,140,66,.25);}
+.badge.active{background:rgba(0,229,160,.12);color:var(--green);border:1px solid rgba(0,229,160,.25);}
+.badge.expiring{background:rgba(255,209,102,.15);color:var(--yellow);border:1px solid rgba(255,209,102,.3);}
+.badge.expired{background:rgba(255,77,109,.12);color:var(--red);border:1px solid rgba(255,77,109,.25);}
+.badge.paid{background:rgba(0,229,160,.12);color:var(--green);border:1px solid rgba(0,229,160,.25);}
+.badge.issued{background:rgba(0,200,255,.12);color:var(--accent);border:1px solid rgba(0,200,255,.25);}
+.badge.overdue{background:rgba(255,77,109,.12);color:var(--red);border:1px solid rgba(255,77,109,.25);}
+.badge.waiting{background:rgba(255,209,102,.15);color:var(--yellow);border:1px solid rgba(255,209,102,.3);}
+.badge.firm{background:rgba(0,200,255,.1);color:var(--accent);}
+.badge.int{background:rgba(255,209,102,.1);color:var(--yellow);}
+.badge.ok{background:rgba(0,229,160,.1);color:var(--green);}
+.badge.warn{background:rgba(255,209,102,.15);color:var(--yellow);}
+.badge.crit{background:rgba(255,77,109,.12);color:var(--red);}
+
+/* PROGRESS BAR */
+.progress-wrap{background:var(--bg3);height:8px;border-radius:2px;overflow:hidden;}
+.progress-bar{height:100%;border-radius:2px;transition:width .3s;}
+.progress-bar.green{background:var(--green);}
+.progress-bar.yellow{background:var(--yellow);}
+.progress-bar.red{background:var(--red);}
+
+/* TABS */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:0;padding:0 16px;}
+.tab{padding:10px 14px;font-size:12px;font-family:var(--mono);color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-count{background:var(--bg3);color:var(--text3);font-size:10px;padding:1px 6px;border-radius:10px;margin-left:6px;}
+.tab.active .tab-count{background:rgba(0,200,255,.15);color:var(--accent);}
+
+/* MODALS */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;display:none;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border2);width:520px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.modal-title{font-family:var(--mono);font-size:13px;letter-spacing:.8px;color:var(--text);}
+.modal-close{background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;}
+.modal-close:hover{color:var(--red);}
+.modal-body{padding:20px;}
+.modal-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 20px;border-top:1px solid var(--border);}
+.form-row{margin-bottom:14px;}
+.form-row label{display:block;font-size:11px;letter-spacing:.5px;color:var(--text3);margin-bottom:6px;}
+.form-row input,.form-row select,.form-row textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:9px 12px;font-family:var(--sans);font-size:12px;outline:none;}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--accent);}
+.form-row textarea{resize:vertical;min-height:80px;}
+.form-row select option{background:var(--bg3);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.info-box{background:var(--bg3);border:1px solid var(--border);padding:12px 14px;margin-bottom:12px;font-size:12px;}
+.info-box .ib-row{display:flex;justify-content:space-between;margin-bottom:4px;}
+.info-box .ib-row:last-child{margin-bottom:0;}
+.info-box .ib-label{color:var(--text3);}
+.info-box .ib-val{font-family:var(--mono);color:var(--text);}
+
+/* CREDIT BAR */
+.credit-row td .cbar{height:6px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-top:4px;width:120px;}
+.cbar-fill{height:100%;border-radius:2px;}
+
+/* BALANCE */
+.balance-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.balance-card{background:var(--panel);border:1px solid var(--border);padding:20px;}
+.balance-point{font-family:var(--mono);font-size:13px;color:var(--accent);margin-bottom:16px;letter-spacing:.5px;}
+.balance-row{margin-bottom:10px;}
+.balance-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:4px;}
+.balance-val{font-family:var(--mono);font-size:12px;color:var(--text);}
+
+/* ALERTS */
+.alert-banner{background:rgba(255,77,109,.1);border:1px solid rgba(255,77,109,.3);padding:10px 16px;display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.alert-banner .ab-icon{color:var(--red);font-size:16px;}
+.alert-banner .ab-text{font-size:12px;color:var(--text);}
+.alert-banner .ab-action{margin-left:auto;font-size:11px;color:var(--red);cursor:pointer;text-decoration:underline;font-family:var(--mono);}
+.warn-banner{background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.25);padding:8px 14px;font-size:12px;color:var(--yellow);margin-bottom:12px;}
+
+/* TOAST */
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
+.toast{background:var(--bg2);border:1px solid var(--border2);padding:12px 16px;min-width:280px;font-size:12px;display:flex;align-items:center;gap:10px;animation:slideIn .2s ease;}
+.toast.success{border-left:3px solid var(--green);}
+.toast.error{border-left:3px solid var(--red);}
+.toast.info{border-left:3px solid var(--accent);}
+.toast.warning{border-left:3px solid var(--yellow);}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+/* ACTION BTN */
+.action-btn{padding:3px 10px;font-size:10px;font-family:var(--mono);border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;}
+.action-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* AUDIT */
+.audit-row{display:flex;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;}
+.audit-time{font-family:var(--mono);font-size:11px;color:var(--text3);flex-shrink:0;width:130px;}
+.audit-user{font-family:var(--mono);font-size:11px;color:var(--accent);flex-shrink:0;width:120px;}
+.audit-action{color:var(--text2);flex:1;}
+.audit-module{font-size:10px;padding:1px 6px;background:var(--bg3);color:var(--text3);flex-shrink:0;}
+
+</style>
+<!-- GTCP API Client — Sprint 4 backend integration -->
+<!-- Set GTCP_API_URL before loading api.js to point to your backend -->
+<script>window.GTCP_API_URL = window.GTCP_API_URL || 'http://localhost:3000/api/v1';</script>
+<script src="../backend/frontend/api.js"></script>
+</head>
+<body>
+
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">GTCP</div>
+    <div class="login-sub">Gas Trading &amp; Commercial Platform · v1.0 MVP</div>
+    <label>ВЫБЕРИТЕ РОЛЬ</label>
+    <div class="login-roles">
+      <div class="role-chip selected" onclick="selectRole(this,'dispatcher')" data-role="dispatcher">Диспетчер</div>
+      <div class="role-chip" onclick="selectRole(this,'credit')" data-role="credit">Кред. менеджер</div>
+      <div class="role-chip" onclick="selectRole(this,'billing')" data-role="billing">Биллинг</div>
+      <div class="role-chip" onclick="selectRole(this,'contracts')" data-role="contracts">Договоры</div>
+      <div class="role-chip" onclick="selectRole(this,'admin')" data-role="admin">Администратор</div>
+    </div>
+    <label>ЛОГИН</label>
+    <input type="text" id="li-user" value="dispatcher" placeholder="username">
+    <label>ПАРОЛЬ</label>
+    <input type="password" id="li-pass" value="gtcp2026" placeholder="password" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="login-error" id="li-err">Неверный логин или пароль</div>
+    <button class="btn-login" onclick="doLogin()">ВОЙТИ В СИСТЕМУ</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="logo"><div class="logo-box">GT</div>GTCP</div>
+    <div class="topbar-center">
+      <div class="status-dot"></div>
+      <span id="sys-status">ONLINE · CET</span>
+      <span style="color:var(--border2)">|</span>
+      <span>GAS DAY <span id="gas-day" class="mono" style="color:var(--text2)"></span></span>
+      <span style="color:var(--border2)">|</span>
+      <span>ХОРГОШ ▸ ГОСПОДЖИНЦЫ</span>
+    </div>
+    <div class="topbar-right">
+      <span id="alert-pill" onclick="nav('audit')" style="cursor:pointer;display:none;background:rgba(255,77,109,.15);border:1px solid var(--red2);color:var(--red);font-family:var(--mono);font-size:11px;padding:3px 10px;">⚠ <span id="alert-count">0</span> ALERT</span>
+      <div class="time-disp" id="clock">--:--:--</div>
+      <div class="user-badge" onclick="doLogout()">
+        <div class="avatar" id="user-avatar">--</div>
+        <div><div style="font-size:12px" id="user-name">—</div><div class="role-tag" id="user-role-tag">—</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="app-body">
+    <div class="sidebar">
+      <div class="nav-section">
+        <div class="nav-section-label">ГЛАВНАЯ</div>
+        <div class="nav-item active" onclick="nav('dashboard')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Dashboard
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">КОММЕРЦИЯ</div>
+        <div class="nav-item" onclick="nav('nominations')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          Номинации <span class="nav-badge yellow" id="nb-nom">0</span>
+        </div>
+        <div class="nav-item" onclick="nav('credit')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Кредит <span class="nav-badge" id="nb-credit" style="display:none">!</span>
+        </div>
+        <div class="nav-item" onclick="nav('balance')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Баланс
+        </div>
+        <div class="nav-item" onclick="nav('billing')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          Биллинг <span class="nav-badge" id="nb-billing" style="display:none">!</span>
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">ДОГОВОРЫ</div>
+        <div class="nav-item" onclick="nav('contracts')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Договоры <span class="nav-badge yellow" id="nb-contracts" style="display:none">!</span>
+        </div>
+        <div class="nav-item" onclick="nav('capacity')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Мощности
+        </div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">СИСТЕМА</div>
+        <div class="nav-item" onclick="nav('audit')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Журнал аудита
+        </div>
+      </div>
+    </div>
+    <div class="main" id="main-content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-header">
+          <div><div class="page-title">DASHBOARD</div><div class="page-sub">Оперативный обзор · обновление каждые 30 сек</div></div>
+          <div class="actions"><button class="btn" onclick="refreshDash()">↻ Обновить</button></div>
+        </div>
+        <div id="dash-alerts"></div>
+        <div class="kpi-grid" id="kpi-grid"></div>
+        <div class="section-wrap">
+          <div class="section-head"><span class="section-title">АКТИВНЫЕ ГРУЗООТПРАВИТЕЛИ</span></div>
+          <div class="table-wrap"><table id="t-shippers"><thead><tr><th>ID</th><th>НАИМЕНОВАНИЕ</th><th>ДОГОВОР</th><th>МОЩНОСТЬ МВт/ч</th><th>КРЕДИТНЫЙ ЛИМИТ EUR</th><th>ЭКСПОЗИЦИЯ EUR</th><th>ОСТАТОК EUR</th><th>СТАТУС</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="section-wrap">
+            <div class="section-head"><span class="section-title">ПОСЛЕДНИЕ НОМИНАЦИИ</span></div>
+            <div class="table-wrap"><table id="t-dash-noms"><thead><tr><th>ID</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>ТОЧКА</th><th>ОБЪЁМ МВт/ч</th><th>СТАТУС</th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <div class="section-wrap">
+            <div class="section-head"><span class="section-title">СЧЕТА К ОПЛАТЕ</span></div>
+            <div class="table-wrap"><table id="t-dash-inv"><thead><tr><th>НОМЕР</th><th>КОНТРАГЕНТ</th><th>СУММА EUR</th><th>СТАТУС</th></tr></thead><tbody></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOMINATIONS -->
+      <div class="page" id="page-nominations">
+        <div class="page-header">
+          <div><div class="page-title">УПРАВЛЕНИЕ НОМИНАЦИЯМИ</div><div class="page-sub">FR-04 · FR-05 · FR-06 · FR-07</div></div>
+          <div class="actions">
+            <button class="btn" onclick="openModal('modal-nom')">+ Новая номинация</button>
+            <button class="btn success" onclick="runMatching()">⚡ Запустить матчинг</button>
+          </div>
+        </div>
+        <div id="nom-credit-warn"></div>
+        <div class="section-wrap">
+          <div class="tabs" id="nom-tabs">
+            <div class="tab active" onclick="nomTab(this,'all')">Все <span class="tab-count" id="tc-all">0</span></div>
+            <div class="tab" onclick="nomTab(this,'PENDING')">Входящие <span class="tab-count" id="tc-pending">0</span></div>
+            <div class="tab" onclick="nomTab(this,'MATCHING')">На матчинге <span class="tab-count" id="tc-matching">0</span></div>
+            <div class="tab" onclick="nomTab(this,'CONFIRMED')">Подтверждены <span class="tab-count" id="tc-confirmed">0</span></div>
+            <div class="tab" onclick="nomTab(this,'RENOM')">Реноминации <span class="tab-count" id="tc-renom">0</span></div>
+            <div class="tab" onclick="nomTab(this,'REJECTED')">Отклонены <span class="tab-count" id="tc-rejected">0</span></div>
+          </div>
+          <div class="table-wrap">
+            <table id="t-nominations">
+              <thead><tr><th>ID НОМИНАЦИИ</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>ТОЧКА</th><th>НАПР.</th><th>ОБЪЁМ МВт/ч</th><th>ГАЗ. СУТКИ</th><th>СТАТУС</th><th>ОБНОВЛЕНО</th><th>ДЕЙСТВИЯ</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CREDIT -->
+      <div class="page" id="page-credit">
+        <div class="page-header">
+          <div><div class="page-title">КРЕДИТНЫЙ МОНИТОР</div><div class="page-sub">FR-08 · FR-09 · Мониторинг в реальном времени</div></div>
+          <div class="actions">
+            <button class="btn danger" onclick="openModal('modal-mc')">⚡ Margin Call</button>
+          </div>
+        </div>
+        <div id="credit-alerts"></div>
+        <div class="section-wrap">
+          <div class="section-head"><span class="section-title">КРЕДИТНЫЕ ПОЗИЦИИ · REAL-TIME</span><span style="font-family:var(--mono);font-size:10px;color:var(--text3)" id="credit-ts"></span></div>
+          <div class="table-wrap">
+            <table id="t-credit">
+              <thead><tr><th>КОНТРАГЕНТ</th><th>ЛИМИТ EUR</th><th>ЭКСПОЗИЦИЯ EUR</th><th>ОСТАТОК EUR</th><th>ИСПОЛЬЗОВАНО %</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="section-wrap">
+          <div class="section-head"><span class="section-title">ИСТОРИЯ MARGIN CALL</span></div>
+          <div class="table-wrap">
+            <table id="t-mc-history">
+              <thead><tr><th>ДАТА</th><th>КОНТРАГЕНТ</th><th>СУММА EUR</th><th>СРОК</th><th>ОСНОВАНИЕ</th><th>СТАТУС</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- BALANCE -->
+      <div class="page" id="page-balance">
+        <div class="page-header">
+          <div><div class="page-title">БАЛАНС МОЩНОСТЕЙ</div><div class="page-sub">FR-10 · Суточный баланс по точкам входа/выхода</div></div>
+          <div class="actions"><button class="btn" onclick="renderBalance()">↻ Пересчитать</button></div>
+        </div>
+        <div class="balance-grid" id="balance-cards"></div>
+        <div class="section-wrap">
+          <div class="section-head"><span class="section-title">ДЕТАЛИЗАЦИЯ ПО ГРУЗООТПРАВИТЕЛЯМ</span></div>
+          <div class="table-wrap">
+            <table id="t-balance-detail">
+              <thead><tr><th>ГРУЗООТПРАВИТЕЛЬ</th><th>ТОЧКА ВХОДА МВт/ч</th><th>ТОЧКА ВЫХОДА МВт/ч</th><th>ИМБАЛАНС МВт/ч</th><th>СТАТУС</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- BILLING -->
+      <div class="page" id="page-billing">
+        <div class="page-header">
+          <div><div class="page-title">БИЛЛИНГ</div><div class="page-sub">FR-11 · FR-12 · Счета-фактуры и интеграция с ERP</div></div>
+          <div class="actions">
+            <button class="btn" onclick="openModal('modal-inv')">+ Создать счёт</button>
+            <button class="btn success" onclick="erpSync()">⇄ Синхр. с 1С ERP</button>
+            <button class="btn" onclick="openModal('modal-fuel-gas')" style="background:var(--accent2,#ff9800);color:#000">⚙ Топливный газ</button>
+          </div>
+        </div>
+        <div id="billing-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>
+        <div class="section-wrap">
+          <div class="tabs">
+            <div class="tab active" onclick="billingTab(this,'all')">Все <span class="tab-count" id="btc-all">0</span></div>
+            <div class="tab" onclick="billingTab(this,'ISSUED')">Выставлены <span class="tab-count" id="btc-issued">0</span></div>
+            <div class="tab" onclick="billingTab(this,'WAITING')">Ожидают оплаты <span class="tab-count" id="btc-waiting">0</span></div>
+            <div class="tab" onclick="billingTab(this,'PAID')">Оплачены <span class="tab-count" id="btc-paid">0</span></div>
+            <div class="tab" onclick="billingTab(this,'OVERDUE')">Просроченные <span class="tab-count" id="btc-overdue">0</span></div>
+          </div>
+          <div class="table-wrap">
+            <table id="t-billing">
+              <thead><tr><th>НОМЕР СЧЁТА</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>ПЕРИОД</th><th>ОБЪЁМ МВт/ч</th><th>ТАРИФ EUR/МВт/ч</th><th>СУММА EUR</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTRACTS -->
+      <div class="page" id="page-contracts">
+        <div class="page-header">
+          <div><div class="page-title">ДОГОВОРЫ (GTA)</div><div class="page-sub">FR-13 · Реестр GTA · CAM NC EU 2017/459 · Gastrans NC</div></div>
+          <div class="actions">
+            <select id="ctr-filter-type" onchange="renderContracts()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:11px;">
+              <option value="all">Все типы</option>
+              <option value="TSA_FIRM_ANNUAL">Firm Annual</option>
+              <option value="TSA_FIRM_QUARTERLY">Firm Quarterly</option>
+              <option value="TSA_FIRM_MONTHLY">Firm Monthly</option>
+              <option value="TSA_FIRM_DAILY">Firm Daily</option>
+              <option value="TSA_INTERRUPTIBLE">Interruptible</option>
+              <option value="TSA_COMMERCIAL_REVERSE">Commercial Reverse</option>
+            </select>
+            <select id="ctr-filter-dir" onchange="renderContracts()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:11px;margin-left:6px;">
+              <option value="all">Все направления</option>
+              <option value="GOSPODJINCI_HORGOS">Господжинцы → Хоргош (Firm)</option>
+              <option value="HORGOS_GOSPODJINCI">Хоргош → Господжинцы (Rev.)</option>
+            </select>
+            <button class="btn" style="margin-left:6px;" onclick="openModal('modal-contract')">+ Добавить GTA</button>
+          </div>
+        </div>
+        <div class="section-wrap">
+          <div class="section-head"><span class="section-title">РЕЕСТР ДОГОВОРОВ GTA</span></div>
+          <div class="table-wrap">
+            <table id="t-contracts">
+              <thead><tr><th>НОМЕР GTA</th><th>ТИП ДОГОВОРА</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>НАПРАВЛЕНИЕ</th><th>МОЩНОСТЬ кВт/ч/д</th><th>ТАРИФ вх+вых</th><th>ОКОНЧАНИЕ</th><th>ОСТАЛОСЬ</th><th>СТАТУС</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPACITY -->
+      <div class="page" id="page-capacity">
+        <div class="page-header">
+          <div><div class="page-title">МОЩНОСТИ (CAPACITY)</div><div class="page-sub">FR-14 · Бронирования мощностей CAM NC</div></div>
+          <div class="actions">
+            <select id="cap-filter-point" onchange="renderCapacity()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:11px;">
+              <option value="all">Все точки</option>
+              <option value="HORGOS">ХОРГОШ</option>
+              <option value="GOSPODJINCI">ГОСПОДЖИНЦЫ</option>
+            </select>
+          </div>
+        </div>
+        <div class="section-wrap">
+          <div class="section-head"><span class="section-title">ЖУРНАЛ БРОНИРОВАНИЙ</span></div>
+          <div class="table-wrap">
+            <table id="t-capacity">
+              <thead><tr><th>ID</th><th>КОНТРАГЕНТ</th><th>ТОЧКА</th><th>ТИП</th><th>ПЕРИОД</th><th>ОБЪЁМ МВт/ч</th><th>ОСТАЛОСЬ ДНЕЙ</th><th>СТАТУС</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUDIT -->
+      <div class="page" id="page-audit">
+        <div class="page-header">
+          <div><div class="page-title">ЖУРНАЛ АУДИТА</div><div class="page-sub">FR-15 · Все действия пользователей зафиксированы</div></div>
+          <div class="actions">
+            <select id="audit-filter" onchange="renderAudit()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:7px 10px;font-family:var(--mono);font-size:11px;">
+              <option value="all">Все модули</option>
+              <option value="AUTH">Аутентификация</option>
+              <option value="NOM">Номинации</option>
+              <option value="CREDIT">Кредит</option>
+              <option value="BILLING">Биллинг</option>
+              <option value="CONTRACTS">Договоры</option>
+              <option value="SYSTEM">Система</option>
+            </select>
+          </div>
+        </div>
+        <div class="section-wrap">
+          <div style="padding:10px 14px 0;display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;color:var(--text3);">
+            <span>ВРЕМЯ (CET)</span><span style="margin-left:48px">ПОЛЬЗОВАТЕЛЬ</span><span style="margin-left:66px">ДЕЙСТВИЕ</span><span style="margin-left:auto">МОДУЛЬ</span>
+          </div>
+          <div id="audit-log"></div>
+        </div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /app-body -->
+</div><!-- /app -->
+
+<!-- MODALS -->
+<!-- New Nomination -->
+<div class="overlay" id="modal-nom">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">НОВАЯ НОМИНАЦИЯ</span><button class="modal-close" onclick="closeModal('modal-nom')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row"><label>ГРУЗООТПРАВИТЕЛЬ</label><select id="nom-shipper" onchange="checkNomCredit()"></select></div>
+      <div class="form-grid">
+        <div class="form-row"><label>ТОЧКА</label>
+          <select id="nom-point"><option value="HORGOS">Хоргош (ENTRY)</option><option value="GOSPODJINCI">Господжинцы (EXIT)</option></select>
+        </div>
+        <div class="form-row"><label>НАПРАВЛЕНИЕ</label>
+          <select id="nom-dir"><option value="ENTRY">ENTRY →</option><option value="EXIT">← EXIT</option></select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row"><label>ОБЪЁМ (МВт/ч)</label><input type="number" id="nom-vol" placeholder="1000" min="1"></div>
+        <div class="form-row"><label>ГАЗОВЫЕ СУТКИ</label><input type="date" id="nom-date"></div>
+      </div>
+      <div id="nom-credit-check" style="display:none" class="warn-banner"></div>
+      <div class="form-row"><label>КОММЕНТАРИЙ</label><textarea id="nom-comment" placeholder="Необязательно..."></textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-nom')">Отмена</button><button class="btn primary" onclick="createNomination()">Подать номинацию</button></div>
+  </div>
+</div>
+
+<!-- Renomination -->
+<div class="overlay" id="modal-renom">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">РЕНОМИНАЦИЯ</span><button class="modal-close" onclick="closeModal('modal-renom')">✕</button></div>
+    <div class="modal-body">
+      <div class="info-box" id="renom-info"></div>
+      <div class="form-row"><label>НОВЫЙ ОБЪЁМ (МВт/ч)</label><input type="number" id="renom-vol" placeholder="0" oninput="checkRenom()"></div>
+      <div id="renom-warn" style="display:none" class="warn-banner"></div>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-renom')">Отмена</button><button class="btn warning" id="renom-submit" onclick="submitRenom()">Подать реноминацию</button></div>
+  </div>
+</div>
+
+<!-- Margin Call -->
+<div class="overlay" id="modal-mc">
+  <div class="modal">
+    <div class="modal-head" style="border-color:var(--red2)"><span class="modal-title" style="color:var(--red)">⚡ MARGIN CALL УВЕДОМЛЕНИЕ</span><button class="modal-close" onclick="closeModal('modal-mc')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row"><label>КОНТРАГЕНТ</label><select id="mc-counterparty"></select></div>
+      <div id="mc-exposure-info" class="info-box"></div>
+      <div class="form-grid">
+        <div class="form-row"><label>СУММА ТРЕБОВАНИЯ (EUR)</label><input type="number" id="mc-amount" placeholder="0.00"></div>
+        <div class="form-row"><label>СРОК ИСПОЛНЕНИЯ</label><input type="date" id="mc-deadline"></div>
+      </div>
+      <div class="form-row"><label>ПРАВОВОЕ ОСНОВАНИЕ</label><input type="text" id="mc-basis" placeholder="Договор №... п. ..."></div>
+      <div class="form-row"><label>ПОЛУЧАТЕЛЬ УВЕДОМЛЕНИЯ</label><input type="text" id="mc-recipient" placeholder="email@counterparty.com"></div>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-mc')">Отмена</button><button class="btn danger" onclick="sendMarginCall()">Отправить Margin Call</button></div>
+  </div>
+</div>
+
+<!-- Invoice -->
+<div class="overlay" id="modal-inv">
+  <div class="modal" style="width:580px;max-width:98vw;">
+    <div class="modal-head"><span class="modal-title">СОЗДАТЬ СЧЁТ-ФАКТУРУ (GTA)</span><button class="modal-close" onclick="closeModal('modal-inv')">✕</button></div>
+    <div class="modal-body">
+
+      <div class="form-row"><label>ГРУЗООТПРАВИТЕЛЬ *</label><select id="inv-shipper" onchange="onInvShipperChange()"></select></div>
+
+      <!-- Billing model toggle -->
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+        <span style="font-size:10px;color:var(--text3);font-family:var(--mono);">МОДЕЛЬ БИЛЛИНГА:</span>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;">
+          <input type="radio" name="inv-model" value="CAPACITY" checked onchange="onInvModelChange()"> Мощность (CAM NC / Gastrans)
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;">
+          <input type="radio" name="inv-model" value="VOLUME" onchange="onInvModelChange()"> Объём (EUR/МВт·ч)
+        </label>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-row"><label>ПЕРИОД (С) *</label><input type="date" id="inv-from" oninput="calcInvoice()"></div>
+        <div class="form-row"><label>ПЕРИОД (ПО) *</label><input type="date" id="inv-to" oninput="calcInvoice()"></div>
+      </div>
+
+      <!-- CAPACITY model fields -->
+      <div id="inv-capacity-fields">
+        <div class="form-grid">
+          <div class="form-row">
+            <label>ЗАРЕЗЕРВИРОВАННАЯ МОЩНОСТЬ (кВт·ч/ч) *</label>
+            <input type="number" id="inv-cap-kwh-h" placeholder="напр. 9185000" min="0" oninput="calcInvoice()">
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;">= contracted kWh/h from GTA</div>
+          </div>
+          <div class="form-row">
+            <label>ТАРИФ EUR/(кВт·ч/ч)/год</label>
+            <input type="number" id="inv-tariff-kwh-h" placeholder="11.04" step="0.01" oninput="calcInvoice()"
+              title="Bundled: 4.19 (entry Господж.) + 6.85 (exit Хоргош) = 11.04 EUR/(kWh/h)/year">
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;">Firm annual: вход 4.19 + выход 6.85 = <b>11.04</b></div>
+          </div>
+        </div>
+        <div style="font-size:10px;background:var(--bg3);border:1px solid var(--border2);padding:6px 10px;border-radius:4px;color:var(--text2);font-family:var(--mono);margin-bottom:10px;">
+          📋 AERS 05-145 | GY2025/26 | Firm Annual: вход Господж. 4.19 + выход Хоргош 6.85 = 11.04 EUR/(кВт·ч/ч)/год<br>
+          <span style="color:var(--yellow);">Commercial Reverse: 3.25 EUR/(кВт·ч/ч)/год</span> &nbsp;|&nbsp;
+          Daily: 0.0230 + 0.0375 = 0.0605 EUR/(кВт·ч/ч)/д
+        </div>
+      </div>
+
+      <!-- VOLUME model fields (legacy) -->
+      <div id="inv-volume-fields" style="display:none;">
+        <div class="form-grid">
+          <div class="form-row"><label>ОБЪЁМ ТРАНЗИТА (МВт·ч)</label><input type="number" id="inv-vol" placeholder="0" oninput="calcInvoice()"></div>
+          <div class="form-row"><label>ТАРИФ (EUR/МВт·ч)</label><input type="number" id="inv-tariff" value="2.85" oninput="calcInvoice()"></div>
+        </div>
+      </div>
+
+      <div class="form-row"><label>ГАЗ БАЛАНСИРОВКИ (МВт·ч, если есть)</label>
+        <input type="number" id="inv-bal-gas" value="0" placeholder="0" oninput="calcInvoice()">
+      </div>
+
+      <!-- Calculation preview -->
+      <div class="info-box" id="inv-calc" style="font-size:12px">
+        <div class="ib-row"><span class="ib-label" id="inv-line1-label">1. Плата за мощность:</span><span class="ib-val" id="inv-line-transit">0.00 EUR</span></div>
+        <div class="ib-row" style="font-size:11px;color:var(--text3);padding-left:14px;" id="inv-line1-detail"></div>
+        <div class="ib-row" style="color:var(--text-muted,#8a9bb0)"><span class="ib-label">2. Топливный газ (<span id="inv-fg-pct">0.50</span>% × <span id="inv-fg-price">32.50</span> EUR/МВт·ч):</span><span class="ib-val text-yellow" id="inv-line-fuel">0.00 EUR</span></div>
+        <div class="ib-row" style="color:var(--text-muted,#8a9bb0)"><span class="ib-label">3. Газ балансировки (<span id="inv-bal-rate">5.00</span> EUR/МВт·ч):</span><span class="ib-val text-yellow" id="inv-line-bal">0.00 EUR</span></div>
+        <div class="ib-row" style="border-top:1px solid #2a3a50;margin-top:6px;padding-top:6px"><span class="ib-label" style="font-weight:700">ИТОГО К ОПЛАТЕ:</span><span class="ib-val" id="inv-total" style="font-size:15px;font-weight:700">0.00 EUR</span></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-inv')">Отмена</button><button class="btn success" onclick="createInvoice()">Создать счёт</button></div>
+  </div>
+</div>
+
+<!-- Fuel Gas Settings -->
+<div class="overlay" id="modal-fuel-gas">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">⚙ ПАРАМЕТРЫ ТОПЛИВНОГО И БАЛАНСИРУЮЩЕГО ГАЗА</span><button class="modal-close" onclick="closeModal('modal-fuel-gas')">✕</button></div>
+    <div class="modal-body">
+      <div style="color:var(--text-muted,#8a9bb0);font-size:11px;margin-bottom:12px">
+        Топливный газ — расход газа на работу компрессорных станций (% от номинированного объёма).<br>
+        Газ балансировки — используется TSO для выравнивания дисбалансов в системе.<br>
+        VTP Сербия — виртуальная торговая точка для торговли топливным газом (EDIGAS IP).
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-row">
+          <label>СТАВКА ТОПЛИВНОГО ГАЗА (%)</label>
+          <input type="number" id="fg-rate-pct" step="0.01" min="0" max="5" value="0.50" oninput="previewFuelCalc()">
+          <div style="font-size:10px;color:var(--text-muted,#8a9bb0);margin-top:2px">% от номинированного объёма · CAM NC типовой диапазон 0.3–0.8%</div>
+        </div>
+        <div class="form-row">
+          <label>ЦЕНА ТОПЛИВНОГО ГАЗА (EUR/МВт/ч)</label>
+          <input type="number" id="fg-price-eur" step="0.01" min="0" value="32.50" oninput="previewFuelCalc()">
+          <div style="font-size:10px;color:var(--text-muted,#8a9bb0);margin-top:2px">Рыночная цена газа · VTP Serbia / TTF</div>
+        </div>
+        <div class="form-row">
+          <label>СТАВКА БАЛАНСИРУЮЩЕГО ГАЗА (EUR/МВт/ч)</label>
+          <input type="number" id="fg-bal-rate" step="0.01" min="0" value="5.00" oninput="previewFuelCalc()">
+          <div style="font-size:10px;color:var(--text-muted,#8a9bb0);margin-top:2px">Надбавка к рыночной цене за балансировку</div>
+        </div>
+        <div class="form-row">
+          <label>ЦЕНА VTP СЕРБИЯ (EUR/МВт/ч)</label>
+          <input type="number" id="fg-vtp-price" step="0.01" min="0" value="31.80" oninput="previewFuelCalc()">
+          <div style="font-size:10px;color:var(--text-muted,#8a9bb0);margin-top:2px">Реф. цена виртуальной торговой точки</div>
+        </div>
+      </div>
+      <div style="margin:12px 0 4px;font-size:11px;color:var(--text-muted,#8a9bb0);font-weight:600">ТОЧКИ ПОДКЛЮЧЕНИЯ (EDIGAS IP)</div>
+      <table style="width:100%;font-size:11px;border-collapse:collapse">
+        <thead><tr style="color:var(--text-muted,#8a9bb0)"><th style="text-align:left;padding:4px">КОД</th><th style="text-align:left;padding:4px">НАИМЕНОВАНИЕ</th><th style="text-align:left;padding:4px">EIC</th><th style="text-align:left;padding:4px">ТИП</th></tr></thead>
+        <tbody id="fg-points-tbody">
+          <tr><td style="padding:3px 4px" class="mono">HORGOS-ENTRY</td><td style="padding:3px 4px">Хоргош — ВХОД (из Венгрии)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-HORGOS-ENTR-Y</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
+          <tr style="background:#0d1520"><td style="padding:3px 4px" class="mono">HORGOS-EXIT</td><td style="padding:3px 4px">Хоргош — ВЫХОД (реверс в Венгрию)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-HORGOS-EXIT-Y</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
+          <tr><td style="padding:3px 4px" class="mono">GOSPODJINCI-EXIT</td><td style="padding:3px 4px">Господжинцы — ВЫХОД (на юг)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-GOSPO-EXIT--Y</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
+          <tr style="background:#0d1520"><td style="padding:3px 4px" class="mono">GOSPODJINCI-ENTRY</td><td style="padding:3px 4px">Господжинцы — ВХОД (реверс с юга)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-GOSPO-ENTR-Y</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
+          <tr><td style="padding:3px 4px" class="mono">VTP-SERBIA</td><td style="padding:3px 4px">VTP Сербия — виртуальная торговая точка</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-VTP-SERBIA-Y</td><td style="padding:3px 4px"><span style="color:#2196f3">VTP</span></td></tr>
+        </tbody>
+      </table>
+      <div class="info-box" id="fg-preview" style="margin-top:12px;font-size:12px">
+        <div style="font-size:10px;color:var(--text-muted,#8a9bb0);margin-bottom:6px">ПРИМЕР: транзит 100 000 МВт/ч</div>
+        <div class="ib-row"><span class="ib-label">Топливный газ (объём):</span><span class="ib-val text-yellow" id="fg-prev-vol">500 МВт/ч</span></div>
+        <div class="ib-row"><span class="ib-label">Топливный газ (стоимость):</span><span class="ib-val text-yellow" id="fg-prev-cost">16 250 EUR</span></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('modal-fuel-gas')">Отмена</button>
+      <button class="btn primary" onclick="saveFuelGasParams()">Сохранить параметры</button>
+    </div>
+  </div>
+</div>
+
+<!-- Contract (CAM NC / Gastrans GTA) -->
+<div class="overlay" id="modal-contract">
+  <div class="modal" style="width:640px;max-width:98vw;">
+    <div class="modal-head"><span class="modal-title">ДОБАВИТЬ ДОГОВОР GTA</span><button class="modal-close" onclick="closeModal('modal-contract')">✕</button></div>
+    <div class="modal-body">
+
+      <!-- Row 1: GTA number + Shipper -->
+      <div class="form-grid">
+        <div class="form-row">
+          <label>НОМЕР GTA <span style="color:var(--text3);font-weight:400">(авто)</span></label>
+          <input type="text" id="ctr-num" placeholder="GTA-2026-001 (оставьте пустым для авто)">
+        </div>
+        <div class="form-row">
+          <label>ГРУЗООТПРАВИТЕЛЬ *</label>
+          <select id="ctr-shipper"></select>
+        </div>
+      </div>
+
+      <!-- Row 2: Contract type + Flow direction -->
+      <div class="form-grid">
+        <div class="form-row">
+          <label>ТИП ДОГОВОРА (CAM NC) *</label>
+          <select id="ctr-type" onchange="onCtrTypeChange()">
+            <option value="TSA_FIRM_ANNUAL">Firm Annual — Годовой твёрдый</option>
+            <option value="TSA_FIRM_QUARTERLY">Firm Quarterly — Квартальный</option>
+            <option value="TSA_FIRM_MONTHLY">Firm Monthly — Месячный</option>
+            <option value="TSA_FIRM_DAILY">Firm Daily — Суточный</option>
+            <option value="TSA_FIRM_WITHIN_DAY">Firm Within-Day — Внутрисуточный</option>
+            <option value="TSA_INTERRUPTIBLE">Interruptible — Прерываемый</option>
+            <option value="TSA_COMMERCIAL_REVERSE">Commercial Reverse — Коммерческий реверс</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>НАПРАВЛЕНИЕ ПОТОКА *</label>
+          <select id="ctr-dir" onchange="onCtrDirChange()">
+            <option value="GOSPODJINCI_HORGOS">Господжинцы ВХОД → Хоргош ВЫХОД (Firm, TurkStream→HU)</option>
+            <option value="HORGOS_GOSPODJINCI">Хоргош ВХОД → Господжинцы ВЫХОД (Commercial Reverse)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Row 3: Direction info banner -->
+      <div id="ctr-dir-info" style="background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:var(--text2);font-family:var(--mono);">
+        <span id="ctr-dir-desc"></span>
+      </div>
+
+      <!-- Row 4: Dates -->
+      <div class="form-grid">
+        <div class="form-row"><label>ДАТА НАЧАЛА *</label><input type="date" id="ctr-start"></div>
+        <div class="form-row"><label>ДАТА ОКОНЧАНИЯ *</label><input type="date" id="ctr-end"></div>
+      </div>
+
+      <!-- Row 5: Capacity + tariffs -->
+      <div class="form-grid">
+        <div class="form-row">
+          <label>МОЩНОСТЬ кВт/ч/д *</label>
+          <input type="number" id="ctr-cap-kwh" placeholder="напр. 60483072" min="0" step="1">
+          <div style="font-size:10px;color:var(--text3);margin-top:3px;">
+            Ref: GMS-4 Господжинцы max = 60 483 072 кВт/ч/д
+          </div>
+        </div>
+        <div class="form-row">
+          <label>ТАРИФ ВХОД EUR/кВт/ч/д *</label>
+          <input type="number" id="ctr-tariff-entry" placeholder="0.004246" min="0" step="0.000001">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>ТАРИФ ВЫХОД EUR/кВт/ч/д *</label>
+          <input type="number" id="ctr-tariff-exit" placeholder="0.004246" min="0" step="0.000001">
+        </div>
+        <div class="form-row" id="ctr-tariff-total-row">
+          <label>ИТОГО ТАРИФ (вх+вых)</label>
+          <input type="text" id="ctr-tariff-total" readonly style="background:var(--bg1);color:var(--accent);">
+        </div>
+      </div>
+
+      <!-- Row 6: Optional fields -->
+      <div class="form-grid">
+        <div class="form-row">
+          <label>REF АУКЦИОНА RBP.EU</label>
+          <input type="text" id="ctr-auction" placeholder="RBP-2026-...">
+        </div>
+        <div class="form-row">
+          <label>ДАТА ПОДПИСАНИЯ</label>
+          <input type="date" id="ctr-signed">
+        </div>
+      </div>
+      <div class="form-row">
+        <label>ПРИМЕЧАНИЯ</label>
+        <input type="text" id="ctr-notes" placeholder="Дополнительная информация...">
+      </div>
+
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('modal-contract')">Отмена</button>
+      <button class="btn primary" onclick="addContract()">Сохранить GTA</button>
+    </div>
+  </div>
+</div>
+
+<!-- Status Change -->
+<div class="overlay" id="modal-status">
+  <div class="modal" style="width:400px">
+    <div class="modal-head"><span class="modal-title" id="status-modal-title">ИЗМЕНИТЬ СТАТУС</span><button class="modal-close" onclick="closeModal('modal-status')">✕</button></div>
+    <div class="modal-body" id="status-modal-body"></div>
+    <div class="modal-foot" id="status-modal-foot"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const ROLES = {
+  dispatcher:  { label:'Диспетчер',       initials:'ДП', access:['dashboard','nominations','credit','balance','billing','contracts','capacity','audit'] },
+  credit:      { label:'Кред. менеджер',  initials:'КМ', access:['dashboard','credit','audit'] },
+  billing:     { label:'Биллинг',         initials:'БЛ', access:['dashboard','billing','audit'] },
+  contracts:   { label:'Договоры',        initials:'ДМ', access:['dashboard','contracts','capacity','audit'] },
+  admin:       { label:'Администратор',   initials:'АД', access:['dashboard','nominations','credit','balance','billing','contracts','capacity','audit'] },
+};
+const USERS = {
+  dispatcher: 'gtcp2026', credit: 'gtcp2026',
+  billing: 'gtcp2026', contracts: 'gtcp2026', admin: 'admin2026'
+};
+
+let STATE = {
+  user: null, role: null,
+  currentPage: 'dashboard',
+  nomFilter: 'all',
+  billingFilter: 'all',
+  selectedRole: 'dispatcher',
+  renomTarget: null,
+  backendMode: false,   // true when connected to real backend API
+};
+
+let shippers = [
+  { id:'SHP-001', name:'Gazprom Export',    contract:'CTR-2024-001', capacity:2500, creditLimit:5000000, exposure:4750000 },
+  { id:'SHP-002', name:'Repower Gas',       contract:'CTR-2024-002', capacity:1800, creditLimit:3000000, exposure:1200000 },
+  { id:'SHP-003', name:'MET International', contract:'CTR-2023-003', capacity:2200, creditLimit:4000000, exposure:3900000 },
+  { id:'SHP-004', name:'Axpo Solutions',    contract:'CTR-2024-004', capacity:1500, creditLimit:2500000, exposure:450000  },
+  { id:'SHP-005', name:'Energo-Pro',        contract:'CTR-2024-005', capacity:1200, creditLimit:2000000, exposure:1100000 },
+];
+
+let nominations = [
+  { id:'NOM-2026-00001', shipperId:'SHP-002', point:'HORGOS',     dir:'ENTRY', volume:1200, gasDay:'2026-03-23', status:'CONFIRMED', ts:'06:12 CET', user:'dispatcher' },
+  { id:'NOM-2026-00002', shipperId:'SHP-002', point:'GOSPODJINCI', dir:'EXIT',  volume:1200, gasDay:'2026-03-23', status:'CONFIRMED', ts:'06:12 CET', user:'dispatcher' },
+  { id:'NOM-2026-00003', shipperId:'SHP-004', point:'HORGOS',     dir:'ENTRY', volume:900,  gasDay:'2026-03-23', status:'CONFIRMED', ts:'07:30 CET', user:'dispatcher' },
+  { id:'NOM-2026-00004', shipperId:'SHP-004', point:'GOSPODJINCI', dir:'EXIT',  volume:900,  gasDay:'2026-03-23', status:'CONFIRMED', ts:'07:31 CET', user:'dispatcher' },
+  { id:'NOM-2026-00005', shipperId:'SHP-005', point:'HORGOS',     dir:'ENTRY', volume:800,  gasDay:'2026-03-23', status:'PENDING',   ts:'08:44 CET', user:'dispatcher' },
+  { id:'NOM-2026-00006', shipperId:'SHP-005', point:'GOSPODJINCI', dir:'EXIT',  volume:750,  gasDay:'2026-03-23', status:'PENDING',   ts:'08:45 CET', user:'dispatcher' },
+  { id:'NOM-2026-00007', shipperId:'SHP-001', point:'HORGOS',     dir:'ENTRY', volume:2000, gasDay:'2026-03-23', status:'PENDING',   ts:'09:10 CET', user:'dispatcher' },
+  { id:'NOM-2026-00008', shipperId:'SHP-003', point:'HORGOS',     dir:'ENTRY', volume:1500, gasDay:'2026-03-23', status:'RENOM',     ts:'09:44 CET', user:'dispatcher' },
+];
+
+let invoices = [
+  { id:'INV-2026-0001', shipperId:'SHP-002', from:'2026-03-01', to:'2026-03-15', volume:18000, tariff:2.85, status:'PAID',    ts:'2026-03-16' },
+  { id:'INV-2026-0002', shipperId:'SHP-004', from:'2026-03-01', to:'2026-03-15', volume:13500, tariff:2.85, status:'PAID',    ts:'2026-03-16' },
+  { id:'INV-2026-0003', shipperId:'SHP-001', from:'2026-03-01', to:'2026-03-15', volume:30000, tariff:2.85, status:'WAITING', ts:'2026-03-16' },
+  { id:'INV-2026-0004', shipperId:'SHP-003', from:'2026-03-01', to:'2026-03-15', volume:22000, tariff:2.85, status:'WAITING', ts:'2026-03-17' },
+  { id:'INV-2026-0005', shipperId:'SHP-005', from:'2026-02-15', to:'2026-02-28', volume:14400, tariff:2.85, status:'OVERDUE', ts:'2026-03-01' },
+  { id:'INV-2026-0006', shipperId:'SHP-002', from:'2026-03-16', to:'2026-03-23', volume:8400,  tariff:2.85, status:'ISSUED',  ts:'2026-03-23' },
+];
+
+// CAM NC contract types metadata
+const CONTRACT_TYPE_LABELS = {
+  TSA_FIRM_ANNUAL:        'Firm Annual',
+  TSA_FIRM_QUARTERLY:     'Firm Quarterly',
+  TSA_FIRM_MONTHLY:       'Firm Monthly',
+  TSA_FIRM_DAILY:         'Firm Daily',
+  TSA_FIRM_WITHIN_DAY:    'Firm Within-Day',
+  TSA_INTERRUPTIBLE:      'Interruptible',
+  TSA_COMMERCIAL_REVERSE: 'Commercial Reverse',
+};
+const FLOW_DIR_LABELS = {
+  GOSPODJINCI_HORGOS: 'Господж.→Хоргош',
+  HORGOS_GOSPODJINCI: 'Хоргош→Господж.',
+};
+const FLOW_DIR_DESC = {
+  GOSPODJINCI_HORGOS: 'ВХОД: ГОСПОДЖИНЦЫ (GMS-4) → ВЫХОД: ХОРГОШ (IP Kiskundorozsma) | Твёрдая мощность, TurkStream → Венгрия',
+  HORGOS_GOSPODJINCI: 'ВХОД: ХОРГОШ → ВЫХОД: ГОСПОДЖИНЦЫ | Коммерческий реверс, прерываемый (CAM NC Art.23)',
+};
+
+let contracts = [
+  // id, contractType, flowDir, shipperId (demo=party name), start, end, capacityKwhDay, tariffEntry, tariffExit, status
+  { id:'GTA-2024-001', contractType:'TSA_FIRM_ANNUAL',    flowDir:'GOSPODJINCI_HORGOS', party:'Gazprom Export',    start:'2024-01-01', end:'2026-12-31', capacityKwhDay:60483072, tariffEntry:0.004246, tariffExit:0.004246, status:'ACTIVE' },
+  { id:'GTA-2024-002', contractType:'TSA_FIRM_ANNUAL',    flowDir:'GOSPODJINCI_HORGOS', party:'Repower Gas',       start:'2024-03-01', end:'2026-06-30', capacityKwhDay:43200000, tariffEntry:0.004246, tariffExit:0.004246, status:'ACTIVE' },
+  { id:'GTA-2023-003', contractType:'TSA_FIRM_ANNUAL',    flowDir:'GOSPODJINCI_HORGOS', party:'MET International', start:'2023-07-01', end:'2026-04-15', capacityKwhDay:52800000, tariffEntry:0.004246, tariffExit:0.004246, status:'ACTIVE' },
+  { id:'GTA-2024-004', contractType:'TSA_FIRM_QUARTERLY', flowDir:'GOSPODJINCI_HORGOS', party:'Axpo Solutions',    start:'2024-01-01', end:'2027-12-31', capacityKwhDay:36000000, tariffEntry:0.004246, tariffExit:0.004246, status:'ACTIVE' },
+  { id:'GTA-2024-005', contractType:'TSA_COMMERCIAL_REVERSE', flowDir:'HORGOS_GOSPODJINCI', party:'Energo-Pro',   start:'2024-06-01', end:'2026-05-31', capacityKwhDay:28800000, tariffEntry:0.002500, tariffExit:0.000000, status:'ACTIVE' },
+];
+
+let capacityBookings = [
+  { id:'CAP-001', party:'Gazprom Export',    point:'HORGOS',      type:'FIRM', from:'2026-01-01', to:'2026-12-31', volume:2500 },
+  { id:'CAP-002', party:'Gazprom Export',    point:'GOSPODJINCI', type:'FIRM', from:'2026-01-01', to:'2026-12-31', volume:2500 },
+  { id:'CAP-003', party:'Repower Gas',       point:'HORGOS',      type:'FIRM', from:'2026-01-01', to:'2026-06-30', volume:1800 },
+  { id:'CAP-004', party:'Repower Gas',       point:'GOSPODJINCI', type:'FIRM', from:'2026-01-01', to:'2026-06-30', volume:1800 },
+  { id:'CAP-005', party:'MET International', point:'HORGOS',      type:'INT',  from:'2026-01-01', to:'2026-04-15', volume:2200 },
+  { id:'CAP-006', party:'Axpo Solutions',    point:'HORGOS',      type:'FIRM', from:'2026-01-01', to:'2027-12-31', volume:1500 },
+  { id:'CAP-007', party:'Energo-Pro',        point:'HORGOS',      type:'INT',  from:'2026-01-01', to:'2026-05-31', volume:1200 },
+];
+
+let mcHistory = [];
+let auditLog = [];
+let nomCounter = 9;
+let invCounter = 7;
+
+const PHYS_CAP = { HORGOS: 12000, GOSPODJINCI: 12000 };
+
+// ═══════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════
+function fmt(n) { return Number(n).toLocaleString('de-DE'); }
+function fmtEur(n) { return Number(n).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function today() { return new Date().toISOString().slice(0,10); }
+function nowStr() {
+  const d = new Date();
+  return d.toLocaleTimeString('ru-RU',{hour12:false,timeZone:'Europe/Belgrade'}) + ' CET';
+}
+function daysLeft(dateStr) {
+  return Math.ceil((new Date(dateStr) - new Date()) / 86400000);
+}
+function shipperName(id) { return (shippers.find(s=>s.id===id)||{name:id}).name; }
+function badge(text, cls) { return `<span class="badge ${cls}">${text}</span>`; }
+function nomBadge(s) {
+  const m = {PENDING:'pending',MATCHING:'matching',CONFIRMED:'confirmed',REJECTED:'rejected',RENOM:'renom'};
+  const l = {PENDING:'PENDING',MATCHING:'MATCHING',CONFIRMED:'CONFIRMED',REJECTED:'REJECTED',RENOM:'RENOM'};
+  return badge(l[s]||s, m[s]||'');
+}
+function contractStatus(c) {
+  const d = daysLeft(c.end);
+  if (d < 0) return badge('ИСТЁК','expired');
+  if (d < 30) return badge('ИСТЕКАЕТ','expiring');
+  return badge('АКТИВЕН','active');
+}
+function capStatus(b) {
+  const d = daysLeft(b.to);
+  if (d < 0) return badge('ЗАВЕРШЕНО','expired');
+  if (d < 7) return badge('ИСТЕКАЕТ','expiring');
+  return badge('АКТИВНО','active');
+}
+
+function addAudit(module, action) {
+  auditLog.unshift({ ts: new Date().toLocaleString('ru-RU',{timeZone:'Europe/Belgrade'}), user: STATE.user||'system', module, action });
+  if (auditLog.length > 200) auditLog.pop();
+  updateNavBadges();
+}
+
+function toast(msg, type='info') {
+  const c = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span style="color:var(--${type==='success'?'green':type==='error'?'red':type==='warning'?'yellow':'accent'})">${type==='success'?'✓':type==='error'?'✗':type==='warning'?'⚠':'ℹ'}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(()=>el.remove(), 3500);
+}
+
+// ═══════════════════════════════════════════════════════
+// AUTH  FR-01
+// ═══════════════════════════════════════════════════════
+function selectRole(el, role) {
+  document.querySelectorAll('.role-chip').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  STATE.selectedRole = role;
+  document.getElementById('li-user').value = role;
+}
+
+// ── doLogin: supports real backend (api.js) + demo fallback ─────────────────
+async function doLogin() {
+  const username = document.getElementById('li-user').value.trim();
+  const pass     = document.getElementById('li-pass').value;
+  const err      = document.getElementById('li-err');
+  const btn      = document.querySelector('.btn-login');
+
+  // ── Backend mode (api.js present and backend reachable) ──────────────────
+  if (window.API) {
+    btn.disabled = true;
+    btn.textContent = 'ПОДКЛЮЧЕНИЕ...';
+    err.style.display = 'none';
+
+    const { data, error } = await API.auth.login(username, pass);
+
+    btn.disabled = false;
+    btn.textContent = 'ВОЙТИ В СИСТЕМУ';
+
+    if (error || !data) {
+      err.textContent = error || 'Ошибка подключения к серверу';
+      err.style.display = 'block';
+      return;
+    }
+
+    // Success — use role from JWT
+    const role = data.user.role;
+    if (!ROLES[role]) {
+      err.textContent = `Неизвестная роль: ${role}`;
+      err.style.display = 'block';
+      return;
+    }
+
+    STATE.user = username; STATE.role = role;
+    STATE.backendMode = true;
+
+    _loginSuccess(role, data.user.fullName || username);
+    return;
+  }
+
+  // ── Demo fallback (no backend) ───────────────────────────────────────────
+  const role = STATE.selectedRole;
+  if (USERS[username] && USERS[username] === pass && username === role) {
+    err.style.display = 'none';
+    STATE.user = username; STATE.role = role;
+    STATE.backendMode = false;
+    _loginSuccess(role, username);
+  } else {
+    err.textContent = 'Неверный логин или пароль';
+    err.style.display = 'block';
+  }
+}
+
+function _loginSuccess(role, displayName) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('user-name').textContent = ROLES[role].label;
+  document.getElementById('user-role-tag').textContent = role.toUpperCase();
+  document.getElementById('user-avatar').textContent = ROLES[role].initials;
+  filterNavByRole();
+  addAudit('AUTH', `Вход в систему · роль: ${ROLES[role].label}${STATE.backendMode ? ' [API]' : ' [DEMO]'}`);
+  nav('dashboard');
+  startClock();
+  startAutoRefresh();
+  populateSelects();
+  // If backend mode: refresh live data + load fuel gas params
+  if (STATE.backendMode) { _refreshFromBackend(); loadFuelGasParams(); }
+  else { previewFuelCalc(); }
+}
+
+// Show login screen (called by api.js on session expiry)
+function showLoginScreen(message) {
+  STATE.user = null; STATE.role = null; STATE.backendMode = false;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('li-pass').value = '';
+  if (message) {
+    const err = document.getElementById('li-err');
+    err.textContent = message;
+    err.style.display = 'block';
+  }
+}
+
+// Refresh in-memory state from backend API (non-blocking)
+async function _refreshFromBackend() {
+  if (!STATE.backendMode || !window.API) return;
+  try {
+    // Shippers
+    const { data: sData } = await API.shippers.list();
+    if (sData) {
+      shippers = sData.map(s => ({
+        id: s.code, name: s.name,
+        contract: s.code.replace('SHP', 'CTR'),
+        capacity: s.credit_limit / 2000,
+        creditLimit: parseFloat(s.credit_limit),
+        exposure:    parseFloat(s.current_exposure),
+      }));
+    }
+    // Nominations for today
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: nData } = await API.nominations.list({ gas_day: today });
+    if (nData) {
+      nominations = nData.map(n => ({
+        id: n.reference, shipperId: n.shipper_code,
+        point: n.point.toUpperCase().replace(/\s/g, ''),
+        dir: n.direction,
+        volume: parseFloat(n.volume_mwh),
+        gasDay: n.gas_day, status: n.status === 'MATCHED' ? 'CONFIRMED' : n.status,
+        ts: new Date(n.submitted_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ' CET',
+        user: n.username || 'system',
+      }));
+    }
+    // Invoices
+    const { data: iData } = await API.billing.list({ limit: 50 });
+    if (iData) {
+      invoices = iData.map(inv => ({
+        id: inv.invoice_no, shipperId: inv.shipper_code,
+        from: inv.period_from, to: inv.period_to,
+        volume: parseFloat(inv.volume_mwh),
+        tariff: parseFloat(inv.tariff_eur_mwh),
+        status: inv.status, ts: inv.created_at?.slice(0, 10) || '',
+      }));
+    }
+    // Contracts (GTA)
+    const { data: cData } = await API.contracts.list({ limit: 100 });
+    if (cData && cData.length) {
+      contracts = cData.map(c => ({
+        id:              c.contract_no,
+        contractType:    c.contract_type    || 'TSA_FIRM_ANNUAL',
+        flowDir:         c.flow_direction   || 'GOSPODJINCI_HORGOS',
+        party:           c.shipper_name     || c.shipper_code || '?',
+        start:           c.start_date?.slice(0,10)  || '',
+        end:             c.end_date?.slice(0,10)    || '',
+        capacityKwhDay:  parseFloat(c.capacity_kwh_day)         || 0,
+        tariffEntry:     parseFloat(c.tariff_entry_eur_kwh_day) || 0,
+        tariffExit:      parseFloat(c.tariff_exit_eur_kwh_day)  || 0,
+        status:          c.status || 'ACTIVE',
+      }));
+    }
+    // Re-render current page
+    nav(STATE.currentPage);
+  } catch (e) {
+    console.warn('[GTCP] Backend refresh failed, using in-memory data:', e.message);
+  }
+}
+
+async function doLogout() {
+  if (!confirm('Выйти из системы?')) return;
+  addAudit('AUTH', 'Выход из системы');
+  if (STATE.backendMode && window.API) {
+    await API.auth.logout().catch(() => {});
+  }
+  showLoginScreen();
+}
+
+function filterNavByRole() {
+  const access = ROLES[STATE.role].access;
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const onclick = item.getAttribute('onclick') || '';
+    const m = onclick.match(/nav\('(\w+)'\)/);
+    if (m && !access.includes(m[1])) item.style.display = 'none';
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════
+function nav(page) {
+  STATE.currentPage = page;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{
+    if ((n.getAttribute('onclick')||'').includes(`'${page}'`)) n.classList.add('active');
+  });
+  const renders = {dashboard:renderDashboard, nominations:renderNominations, credit:renderCredit,
+    balance:renderBalance, billing:renderBilling, contracts:renderContracts, capacity:renderCapacity, audit:renderAudit};
+  if (renders[page]) renders[page]();
+}
+
+// ═══════════════════════════════════════════════════════
+// CLOCK & AUTO REFRESH
+// ═══════════════════════════════════════════════════════
+function startClock() {
+  const tick = () => {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('ru-RU',{hour12:false,timeZone:'Europe/Belgrade'}) + ' CET';
+    const gd = now.toLocaleDateString('ru-RU',{timeZone:'Europe/Belgrade'});
+    document.getElementById('gas-day').textContent = gd;
+  };
+  tick(); setInterval(tick, 1000);
+}
+function startAutoRefresh() {
+  setInterval(()=>{ if(STATE.currentPage==='dashboard') renderDashboard(); updateNavBadges(); }, 30000);
+}
+
+function updateNavBadges() {
+  const pending = nominations.filter(n=>n.status==='PENDING').length;
+  document.getElementById('nb-nom').textContent = pending;
+  const creditViol = shippers.filter(s=>s.exposure/s.creditLimit>1).length;
+  const nb = document.getElementById('nb-credit');
+  nb.style.display = creditViol > 0 ? 'inline' : 'none';
+  nb.textContent = creditViol;
+  const overdue = invoices.filter(i=>i.status==='OVERDUE').length;
+  const nbi = document.getElementById('nb-billing');
+  nbi.style.display = overdue > 0 ? 'inline' : 'none';
+  nbi.textContent = overdue;
+  const expiring = contracts.filter(c=>{ const d=daysLeft(c.end); return d>=0&&d<30; }).length;
+  const nbc = document.getElementById('nb-contracts');
+  nbc.style.display = expiring > 0 ? 'inline' : 'none';
+  nbc.textContent = expiring;
+  const alertCount = creditViol + overdue;
+  const pill = document.getElementById('alert-pill');
+  pill.style.display = alertCount > 0 ? 'block' : 'none';
+  document.getElementById('alert-count').textContent = alertCount;
+}
+
+function populateSelects() {
+  ['nom-shipper','inv-shipper','mc-counterparty'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.innerHTML = shippers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  });
+  // dates
+  const td = today();
+  ['nom-date','inv-from','inv-to','mc-deadline'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = td;
+  });
+  ['ctr-start','ctr-end'].forEach(id=>{ const el=document.getElementById(id); if(el&&!el.value) el.value=td; });
+}
+
+// ═══════════════════════════════════════════════════════
+// DASHBOARD  FR-02 FR-03
+// ═══════════════════════════════════════════════════════
+function refreshDash() { renderDashboard(); toast('Dashboard обновлён','info'); }
+
+function renderDashboard() {
+  const totNom = nominations.filter(n=>n.status!=='REJECTED').reduce((s,n)=>s+n.volume,0);
+  const totInv = invoices.filter(i=>i.status!=='PAID').reduce((s,i)=>s+i.volume*i.tariff,0);
+  const violations = shippers.filter(s=>s.exposure>s.creditLimit).length;
+  const pending = nominations.filter(n=>n.status==='PENDING').length;
+
+  document.getElementById('kpi-grid').innerHTML = [
+    { label:'ОБЪЁМ НОМИНАЦИЙ МВт/ч', value:fmt(totNom), cls:'accent', delta:'Газовые сутки '+today() },
+    { label:'АКТИВНЫЕ ГРУЗООТПРАВИТЕЛИ', value:shippers.length, cls:'', delta:'Зарегистрированных в реестре' },
+    { label:'ВЫСТАВЛЕНО СЧЁТОВ EUR', value:fmtEur(totInv), cls: totInv>0?'yellow':'green', delta:'Не оплачено' },
+    { label:'НАРУШЕНИЙ КРЕДИТА', value:violations, cls:violations>0?'red':'green', delta:violations>0?'Требуется Margin Call':'Все лимиты в норме' },
+  ].map(k=>`<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls}">${k.value}</div><div class="kpi-delta">${k.delta}</div></div>`).join('');
+
+  // Alerts
+  const alerts = shippers.filter(s=>s.exposure>s.creditLimit);
+  document.getElementById('dash-alerts').innerHTML = alerts.map(s=>
+    `<div class="alert-banner"><span class="ab-icon">⚠</span><span class="ab-text">Превышен кредитный лимит: <strong>${s.name}</strong> — экспозиция ${fmtEur(s.exposure)} EUR из ${fmtEur(s.creditLimit)} EUR</span><span class="ab-action" onclick="nav('credit')">→ Кредитный монитор</span></div>`
+  ).join('');
+
+  // Shippers table
+  document.querySelector('#t-shippers tbody').innerHTML = shippers.map(s=>{
+    const pct = s.exposure/s.creditLimit;
+    const avail = s.creditLimit - s.exposure;
+    const sts = pct>1 ? badge('ПРЕВЫШЕН','crit') : pct>0.8 ? badge('ВНИМАНИЕ','warn') : badge('НОРМА','ok');
+    return `<tr><td class="mono text-accent">${s.id}</td><td class="fw7">${s.name}</td><td class="mono text-dim">${s.contract}</td><td class="mono">${fmt(s.capacity)}</td><td class="mono">${fmtEur(s.creditLimit)}</td><td class="mono ${pct>1?'text-red':pct>0.8?'text-yellow':''}">${fmtEur(s.exposure)}</td><td class="mono ${avail<0?'text-red':'text-green'}">${fmtEur(Math.max(0,avail))}</td><td>${sts}</td></tr>`;
+  }).join('');
+
+  // Recent nominations
+  document.querySelector('#t-dash-noms tbody').innerHTML = nominations.slice(0,5).map(n=>
+    `<tr><td class="mono text-accent">${n.id}</td><td>${shipperName(n.shipperId)}</td><td class="mono">${n.point}</td><td class="mono">${fmt(n.volume)}</td><td>${nomBadge(n.status)}</td></tr>`
+  ).join('');
+
+  // Recent invoices
+  const pendInv = invoices.filter(i=>i.status!=='PAID');
+  document.querySelector('#t-dash-inv tbody').innerHTML = pendInv.slice(0,5).map(i=>{
+    const cls = i.status==='OVERDUE'?'overdue':i.status==='WAITING'?'waiting':'issued';
+    return `<tr><td class="mono text-accent">${i.id}</td><td>${shipperName(i.shipperId)}</td><td class="mono text-yellow">${fmtEur(i.volume*i.tariff)}</td><td>${badge(i.status,cls)}</td></tr>`;
+  }).join('');
+
+  updateNavBadges();
+}
+
+// ═══════════════════════════════════════════════════════
+// NOMINATIONS  FR-04 FR-05 FR-06 FR-07
+// ═══════════════════════════════════════════════════════
+function nomTab(el, filter) {
+  document.querySelectorAll('#nom-tabs .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  STATE.nomFilter = filter;
+  renderNomTable();
+}
+
+function renderNominations() {
+  updateNomCounts();
+  renderNomTable();
+  // Credit warning check
+  const viol = shippers.filter(s=>s.exposure>s.creditLimit);
+  document.getElementById('nom-credit-warn').innerHTML = viol.length ?
+    `<div class="alert-banner"><span class="ab-icon">⚠</span><span class="ab-text">Блокировка: ${viol.map(s=>s.name).join(', ')} — превышен кредитный лимит. Номинации заблокированы.</span></div>` : '';
+}
+
+function updateNomCounts() {
+  const counts = {all:0,PENDING:0,MATCHING:0,CONFIRMED:0,RENOM:0,REJECTED:0};
+  nominations.forEach(n=>{ counts.all++; counts[n.status]=(counts[n.status]||0)+1; });
+  Object.entries(counts).forEach(([k,v])=>{
+    const el = document.getElementById('tc-'+k.toLowerCase());
+    if(el) el.textContent = v;
+  });
+}
+
+function renderNomTable() {
+  const filtered = STATE.nomFilter==='all' ? nominations : nominations.filter(n=>n.status===STATE.nomFilter);
+  document.querySelector('#t-nominations tbody').innerHTML = filtered.map(n=>{
+    let actions = '';
+    if (n.status==='PENDING') actions += `<button class="action-btn" onclick="confirmNom('${n.id}')">Подтвердить</button> <button class="action-btn" style="color:var(--red)" onclick="rejectNom('${n.id}')">Откл.</button>`;
+    if (n.status==='CONFIRMED') actions += `<button class="action-btn" onclick="openRenom('${n.id}')">Реном.</button>`;
+    if (n.status==='RENOM') actions += `<button class="action-btn" onclick="approveRenom('${n.id}')">Одобрить</button>`;
+    return `<tr><td class="mono text-accent">${n.id}</td><td>${shipperName(n.shipperId)}</td><td class="mono">${n.point}</td><td class="mono">${n.dir==='ENTRY'?'→ ENTRY':'← EXIT'}</td><td class="mono fw7">${fmt(n.volume)}</td><td class="mono">${n.gasDay}</td><td>${nomBadge(n.status)}</td><td class="mono text-dim">${n.ts}</td><td>${actions}</td></tr>`;
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px">Нет записей</td></tr>';
+}
+
+function checkNomCredit() {
+  const sid = document.getElementById('nom-shipper').value;
+  const s = shippers.find(x=>x.id===sid);
+  if (!s) return;
+  const pct = s.exposure/s.creditLimit;
+  const el = document.getElementById('nom-credit-check');
+  if (pct >= 1) {
+    el.style.display='block';
+    el.textContent = `⚠ Кредитный лимит исчерпан: ${fmtEur(s.exposure)} / ${fmtEur(s.creditLimit)} EUR. Номинация будет заблокирована.`;
+  } else if (pct >= 0.85) {
+    el.style.display='block';
+    el.textContent = `Предупреждение: использовано ${(pct*100).toFixed(1)}% кредитного лимита (${fmtEur(s.exposure)} / ${fmtEur(s.creditLimit)} EUR).`;
+  } else {
+    el.style.display='none';
+  }
+}
+
+function createNomination() {  // FR-04
+  const sid = document.getElementById('nom-shipper').value;
+  const s = shippers.find(x=>x.id===sid);
+  const vol = parseFloat(document.getElementById('nom-vol').value);
+  const gasDay = document.getElementById('nom-date').value;
+  const point = document.getElementById('nom-point').value;
+  const dir = document.getElementById('nom-dir').value;
+  if (!vol||vol<=0) { toast('Укажите объём > 0','error'); return; }
+  if (!gasDay) { toast('Укажите дату газовых суток','error'); return; }
+  if (s && s.exposure >= s.creditLimit) { toast('Номинация заблокирована: кредитный лимит исчерпан','error'); return; }
+  const nom = { id:`NOM-2026-${String(nomCounter++).padStart(5,'0')}`, shipperId:sid, point, dir, volume:vol, gasDay, status:'PENDING', ts:nowStr(), user:STATE.user };
+  nominations.unshift(nom);
+  addAudit('NOM', `Создана номинация ${nom.id} · ${shipperName(sid)} · ${vol} МВт/ч · ${point}`);
+  closeModal('modal-nom'); renderNominations(); updateNavBadges();
+  toast(`Номинация ${nom.id} подана успешно`,'success');
+}
+
+function confirmNom(id) {
+  const n = nominations.find(x=>x.id===id);
+  if (!n) return;
+  n.status='CONFIRMED'; n.ts=nowStr();
+  addAudit('NOM', `Номинация ${id} подтверждена`);
+  renderNominations(); updateNavBadges(); toast(`${id} подтверждена`,'success');
+}
+
+function rejectNom(id) {
+  if (!confirm(`Отклонить номинацию ${id}?`)) return;
+  const n = nominations.find(x=>x.id===id);
+  if (!n) return;
+  n.status='REJECTED'; n.ts=nowStr();
+  addAudit('NOM', `Номинация ${id} отклонена`);
+  renderNominations(); updateNavBadges(); toast(`${id} отклонена`,'warning');
+}
+
+function runMatching() {  // FR-06
+  const pending = nominations.filter(n=>n.status==='PENDING');
+  if (!pending.length) { toast('Нет номинаций в статусе PENDING','info'); return; }
+  let matched = 0;
+  // Group by shipper + gasDay
+  const groups = {};
+  pending.forEach(n=>{ const k=`${n.shipperId}-${n.gasDay}`; (groups[k]=groups[k]||[]).push(n); });
+  Object.values(groups).forEach(grp=>{
+    const entry = grp.filter(n=>n.dir==='ENTRY');
+    const exit  = grp.filter(n=>n.dir==='EXIT');
+    if (entry.length && exit.length) {
+      [...entry,...exit].forEach(n=>{ n.status='MATCHING'; n.ts=nowStr(); });
+      matched++;
+      setTimeout(()=>{
+        [...entry,...exit].forEach(n=>{ n.status='CONFIRMED'; n.ts=nowStr(); });
+        renderNominations(); updateNavBadges();
+      }, 1500);
+    }
+  });
+  addAudit('NOM', `Матчинг запущен · обработано групп: ${matched}`);
+  renderNominations(); updateNavBadges();
+  toast(matched>0 ? `Матчинг: ${matched} пар(ы) → MATCHING → CONFIRMED` : 'Нет полных пар ENTRY/EXIT', matched>0?'success':'warning');
+}
+
+function openRenom(id) {  // FR-07
+  STATE.renomTarget = id;
+  const n = nominations.find(x=>x.id===id);
+  document.getElementById('renom-info').innerHTML = `
+    <div class="ib-row"><span class="ib-label">Номинация:</span><span class="ib-val">${n.id}</span></div>
+    <div class="ib-row"><span class="ib-label">Грузоотправитель:</span><span class="ib-val">${shipperName(n.shipperId)}</span></div>
+    <div class="ib-row"><span class="ib-label">Текущий объём:</span><span class="ib-val">${fmt(n.volume)} МВт/ч</span></div>
+    <div class="ib-row"><span class="ib-label">Допустимый диапазон:</span><span class="ib-val">${fmt(Math.floor(n.volume*0.9))} — ${fmt(Math.ceil(n.volume*1.1))} МВт/ч (±10%)</span></div>`;
+  document.getElementById('renom-vol').value = n.volume;
+  document.getElementById('renom-warn').style.display='none';
+  openModal('modal-renom');
+}
+
+function checkRenom() {
+  const id = STATE.renomTarget;
+  const n = nominations.find(x=>x.id===id);
+  const newVol = parseFloat(document.getElementById('renom-vol').value)||0;
+  const pct = newVol/n.volume;
+  const warn = document.getElementById('renom-warn');
+  const btn = document.getElementById('renom-submit');
+  if (pct > 1.1) {
+    warn.style.display='block';
+    warn.textContent = `⚠ Объём превышает 110% от базового (${fmt(Math.ceil(n.volume*1.1))} МВт/ч). Требуется одобрение диспетчера.`;
+    btn.textContent = 'Отправить на одобрение'; btn.className='btn warning';
+  } else if (pct < 0.5) {
+    warn.style.display='block'; warn.textContent = `Объём менее 50% — подтвердите намерение.`;
+    btn.textContent = 'Подать реноминацию'; btn.className='btn warning';
+  } else {
+    warn.style.display='none'; btn.textContent='Подать реноминацию'; btn.className='btn warning';
+  }
+}
+
+function submitRenom() {
+  const id = STATE.renomTarget;
+  const n = nominations.find(x=>x.id===id);
+  const newVol = parseFloat(document.getElementById('renom-vol').value)||0;
+  if (!newVol||newVol<=0) { toast('Укажите новый объём','error'); return; }
+  const oldVol = n.volume;
+  n.volume = newVol; n.status='RENOM'; n.ts=nowStr();
+  addAudit('NOM', `Реноминация ${id}: ${fmt(oldVol)} → ${fmt(newVol)} МВт/ч`);
+  closeModal('modal-renom'); renderNominations(); updateNavBadges();
+  toast(`Реноминация ${id} подана · ${fmt(oldVol)} → ${fmt(newVol)} МВт/ч`, 'info');
+}
+
+function approveRenom(id) {
+  const n = nominations.find(x=>x.id===id);
+  n.status='CONFIRMED'; n.ts=nowStr();
+  addAudit('NOM', `Реноминация ${id} одобрена`);
+  renderNominations(); toast(`${id} одобрена`,'success');
+}
+
+// ═══════════════════════════════════════════════════════
+// CREDIT  FR-08 FR-09
+// ═══════════════════════════════════════════════════════
+function renderCredit() {
+  document.getElementById('credit-ts').textContent = 'Обновлено: ' + nowStr();
+  const violations = shippers.filter(s=>s.exposure>s.creditLimit);
+  document.getElementById('credit-alerts').innerHTML = violations.map(s=>
+    `<div class="alert-banner"><span class="ab-icon">⚠</span><span class="ab-text"><strong>${s.name}</strong>: лимит ${fmtEur(s.creditLimit)} EUR превышен на ${fmtEur(s.exposure-s.creditLimit)} EUR</span><span class="ab-action" onclick="openMcFor('${s.id}')">→ Margin Call</span></div>`
+  ).join('');
+
+  document.querySelector('#t-credit tbody').innerHTML = shippers.map(s=>{
+    const pct = Math.min(s.exposure/s.creditLimit, 1);
+    const pctVal = (s.exposure/s.creditLimit*100).toFixed(1);
+    const barCls = s.exposure>s.creditLimit?'red':s.exposure/s.creditLimit>0.8?'yellow':'green';
+    const sts = s.exposure>s.creditLimit ? badge('ПРЕВЫШЕН','crit') : s.exposure/s.creditLimit>0.8 ? badge('ВНИМАНИЕ','warn') : badge('НОРМА','ok');
+    return `<tr>
+      <td class="fw7">${s.name}</td>
+      <td class="mono">${fmtEur(s.creditLimit)}</td>
+      <td class="mono ${s.exposure>s.creditLimit?'text-red':s.exposure/s.creditLimit>0.8?'text-yellow':''}">${fmtEur(s.exposure)}</td>
+      <td class="mono ${s.exposure>s.creditLimit?'text-red':'text-green'}">${fmtEur(Math.max(0,s.creditLimit-s.exposure))}</td>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <div class="cbar" style="width:100px"><div class="cbar-fill" style="width:${Math.min(100,pct*100)}%;background:var(--${barCls})"></div></div>
+        <span class="mono" style="font-size:11px">${pctVal}%</span>
+      </div></td>
+      <td>${sts}</td>
+      <td><button class="action-btn" onclick="openMcFor('${s.id}')">Margin Call</button></td>
+    </tr>`;
+  }).join('');
+
+  document.querySelector('#t-mc-history tbody').innerHTML = mcHistory.length ?
+    mcHistory.map(m=>`<tr><td class="mono text-dim">${m.ts}</td><td>${m.party}</td><td class="mono text-yellow">${fmtEur(m.amount)}</td><td class="mono">${m.deadline}</td><td class="text-dim">${m.basis}</td><td>${badge('ОТПРАВЛЕН','matching')}</td></tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">Нет истории</td></tr>';
+}
+
+function openMcFor(shipperId) {
+  document.getElementById('mc-counterparty').value = shipperId;
+  const s = shippers.find(x=>x.id===shipperId);
+  if (s) {
+    document.getElementById('mc-exposure-info').innerHTML =
+      `<div class="ib-row"><span class="ib-label">Лимит:</span><span class="ib-val">${fmtEur(s.creditLimit)} EUR</span></div>
+       <div class="ib-row"><span class="ib-label">Экспозиция:</span><span class="ib-val text-red">${fmtEur(s.exposure)} EUR</span></div>
+       <div class="ib-row"><span class="ib-label">Превышение:</span><span class="ib-val text-red">${fmtEur(Math.max(0,s.exposure-s.creditLimit))} EUR</span></div>`;
+    document.getElementById('mc-amount').value = Math.max(0, s.exposure - s.creditLimit).toFixed(2);
+  }
+  openModal('modal-mc');
+}
+
+function sendMarginCall() {  // FR-09
+  const sid = document.getElementById('mc-counterparty').value;
+  const s = shippers.find(x=>x.id===sid);
+  const amount = parseFloat(document.getElementById('mc-amount').value)||0;
+  const deadline = document.getElementById('mc-deadline').value;
+  const basis = document.getElementById('mc-basis').value||'Договор транзита';
+  if (!amount) { toast('Укажите сумму','error'); return; }
+  mcHistory.unshift({ ts:today()+' '+nowStr().split(' ')[0], party:s?s.name:sid, amount, deadline, basis });
+  addAudit('CREDIT', `Margin Call отправлен: ${s?s.name:sid} · ${fmtEur(amount)} EUR · срок: ${deadline}`);
+  closeModal('modal-mc'); renderCredit(); toast('Margin Call успешно отправлен','success');
+}
+
+// ═══════════════════════════════════════════════════════
+// BALANCE  FR-10
+// ═══════════════════════════════════════════════════════
+function renderBalance() {
+  const points = ['HORGOS','GOSPODJINCI'];
+  const confirmed = nominations.filter(n=>n.status==='CONFIRMED'||n.status==='RENOM');
+  const cards = points.map(pt=>{
+    const ptNoms = confirmed.filter(n=>n.point===pt);
+    const nominated = ptNoms.reduce((s,n)=>s+n.volume,0);
+    const phys = PHYS_CAP[pt];
+    const free = phys - nominated;
+    const pct = nominated/phys;
+    const barCls = pct>0.9?'red':pct>0.7?'yellow':'green';
+    return `<div class="balance-card">
+      <div class="balance-point">◈ ${pt==='HORGOS'?'ХОРГОШ (ENTRY)':'ГОСПОДЖИНЦЫ (EXIT)'}</div>
+      <div class="balance-row">
+        <div class="balance-label"><span>Физическая мощность</span><span class="mono">${fmt(phys)} МВт/ч</span></div>
+        <div class="progress-wrap"><div class="progress-bar" style="width:100%;background:var(--border2)"></div></div>
+      </div>
+      <div class="balance-row">
+        <div class="balance-label"><span>Номинировано</span><span class="mono ${barCls==='red'?'text-red':barCls==='yellow'?'text-yellow':'text-green'}">${fmt(nominated)} МВт/ч (${(pct*100).toFixed(1)}%)</span></div>
+        <div class="progress-wrap"><div class="progress-bar ${barCls}" style="width:${Math.min(100,pct*100)}%"></div></div>
+      </div>
+      <div class="balance-row">
+        <div class="balance-label"><span>Свободный остаток</span><span class="mono text-green">${fmt(Math.max(0,free))} МВт/ч</span></div>
+      </div>
+      ${pct>0.9?'<div class="warn-banner" style="margin-top:8px">⚠ Загрузка точки > 90% — риск переполнения</div>':''}
+    </div>`;
+  });
+  document.getElementById('balance-cards').innerHTML = cards.join('');
+
+  // Detail by shipper
+  document.querySelector('#t-balance-detail tbody').innerHTML = shippers.map(s=>{
+    const entry = confirmed.filter(n=>n.shipperId===s.id&&n.dir==='ENTRY').reduce((a,n)=>a+n.volume,0);
+    const exit  = confirmed.filter(n=>n.shipperId===s.id&&n.dir==='EXIT' ).reduce((a,n)=>a+n.volume,0);
+    const imb = entry - exit;
+    const sts = Math.abs(imb)<50 ? badge('БАЛАНС','ok') : imb>0 ? badge('ПЕРЕКОС +','warn') : badge('ПЕРЕКОС −','warn');
+    return `<tr><td class="fw7">${s.name}</td><td class="mono">${fmt(entry)}</td><td class="mono">${fmt(exit)}</td><td class="mono ${Math.abs(imb)>=50?'text-yellow':''}">${imb>=0?'+':''}${fmt(imb)}</td><td>${sts}</td></tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// BILLING  FR-11 FR-12
+// ═══════════════════════════════════════════════════════
+function billingTab(el, filter) {
+  document.querySelectorAll('#page-billing .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  STATE.billingFilter = filter;
+  renderBillingTable();
+}
+
+function renderBilling() {
+  const total = invoices.reduce((s,i)=>s+i.volume*i.tariff,0);
+  const pending = invoices.filter(i=>i.status!=='PAID').reduce((s,i)=>s+i.volume*i.tariff,0);
+  const overdue = invoices.filter(i=>i.status==='OVERDUE').reduce((s,i)=>s+i.volume*i.tariff,0);
+  document.getElementById('billing-summary').innerHTML = [
+    { label:'ВСЕГО СЧЁТОВ EUR', val:fmtEur(total), cls:'' },
+    { label:'К ПОЛУЧЕНИЮ EUR',  val:fmtEur(pending), cls:'yellow' },
+    { label:'ПРОСРОЧЕНО EUR',   val:fmtEur(overdue), cls: overdue>0?'red':'' },
+    { label:'СЧЁТОВ ВСЕГО',     val:invoices.length, cls:'' },
+  ].map(k=>`<div class="kpi-card"><div class="kpi-label">${k.label}</div><div class="kpi-value ${k.cls}">${k.val}</div></div>`).join('');
+
+  // Tab counts
+  const counts = {all:0,ISSUED:0,WAITING:0,PAID:0,OVERDUE:0};
+  invoices.forEach(i=>{ counts.all++; counts[i.status]=(counts[i.status]||0)+1; });
+  Object.entries(counts).forEach(([k,v])=>{ const el=document.getElementById('btc-'+k.toLowerCase()); if(el)el.textContent=v; });
+
+  renderBillingTable();
+}
+
+function renderBillingTable() {
+  const filtered = STATE.billingFilter==='all' ? invoices : invoices.filter(i=>i.status===STATE.billingFilter);
+  document.querySelector('#t-billing tbody').innerHTML = filtered.map(i=>{
+    const amt = i.volume * i.tariff;
+    const cls = {PAID:'paid',ISSUED:'issued',WAITING:'waiting',OVERDUE:'overdue'}[i.status]||'';
+    let actions = '';
+    if (i.status==='WAITING') actions = `<button class="action-btn text-green" onclick="payInvoice('${i.id}')">✓ Оплачен</button>`;
+    if (i.status==='ISSUED')  actions = `<button class="action-btn" onclick="sendInvoice('${i.id}')">Отправить</button>`;
+    return `<tr><td class="mono text-accent">${i.id}</td><td>${shipperName(i.shipperId)}</td><td class="mono">${i.from} — ${i.to}</td><td class="mono">${fmt(i.volume)}</td><td class="mono">${i.tariff.toFixed(2)}</td><td class="mono fw7">${fmtEur(amt)}</td><td>${badge(i.status,cls)}</td><td>${actions}</td></tr>`;
+  }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">Нет записей</td></tr>';
+}
+
+// ── Fuel gas + official tariff state ─────────────────────────────────────────
+const FUEL_GAS = { ratePct: 0.50, priceEurMwh: 32.50, balRateEurMwh: 5.00, vtpPriceEurMwh: 31.80 };
+// Official AERS tariffs GY2025/2026 (EUR/(kWh/h)/year) — source: AERS 05-145, 17.07.2025
+const TARIFFS = {
+  entryGospodjinci:   4.19,   // firm annual, entry Gospođinci (Domestic Exit Zone)
+  exitHorgos:         6.85,   // firm annual, exit Horgoš (IP Kiskundorozsma)
+  bundledAnnual:      11.04,  // 4.19 + 6.85
+  commercialReverse:  3.25,   // annual, Horgoš→Gospođinci direction
+  dailyEntry:         0.0230, // daily firm, entry
+  dailyExitHorgos:    0.0375, // daily firm, exit Horgoš
+  dailyBundled:       0.0605, // 0.0230 + 0.0375
+};
+
+async function loadFuelGasParams() {
+  try {
+    if (STATE.backendMode && window.API) {
+      const p = await fetch(`${window.GTCP_API_URL || 'http://localhost:3000/api/v1'}/system-params`,
+        { headers: { Authorization: `Bearer ${sessionStorage.getItem('gtcp_access')}` } });
+      if (p.ok) {
+        const d = await p.json();
+        if (d.fuel_gas_rate_pct)         FUEL_GAS.ratePct          = d.fuel_gas_rate_pct.value;
+        if (d.fuel_gas_price_eur_mwh)    FUEL_GAS.priceEurMwh      = d.fuel_gas_price_eur_mwh.value;
+        if (d.balancing_gas_rate_eur_mwh) FUEL_GAS.balRateEurMwh   = d.balancing_gas_rate_eur_mwh.value;
+        if (d.vtp_serbia_price_eur_mwh)  FUEL_GAS.vtpPriceEurMwh   = d.vtp_serbia_price_eur_mwh.value;
+      }
+    }
+  } catch(e) { /* use defaults */ }
+  // Sync UI fields
+  const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+  set('fg-rate-pct', FUEL_GAS.ratePct);
+  set('fg-price-eur', FUEL_GAS.priceEurMwh);
+  set('fg-bal-rate', FUEL_GAS.balRateEurMwh);
+  set('fg-vtp-price', FUEL_GAS.vtpPriceEurMwh);
+  previewFuelCalc();
+}
+
+function previewFuelCalc() {
+  const rate  = parseFloat(document.getElementById('fg-rate-pct')?.value) || FUEL_GAS.ratePct;
+  const price = parseFloat(document.getElementById('fg-price-eur')?.value) || FUEL_GAS.priceEurMwh;
+  const sample = 100000;
+  const fgVol  = (sample * rate / 100).toFixed(1);
+  const fgCost = (fgVol * price).toFixed(0);
+  const pv = document.getElementById('fg-prev-vol');
+  const pc = document.getElementById('fg-prev-cost');
+  if (pv) pv.textContent = Number(fgVol).toLocaleString('ru') + ' МВт/ч';
+  if (pc) pc.textContent = Number(fgCost).toLocaleString('ru') + ' EUR';
+  // Also sync labels in invoice modal
+  const fpct = document.getElementById('inv-fg-pct');
+  const fpr  = document.getElementById('inv-fg-price');
+  const fbr  = document.getElementById('inv-bal-rate');
+  if (fpct) fpct.textContent = rate.toFixed(2);
+  if (fpr)  fpr.textContent  = price.toFixed(2);
+  if (fbr)  fbr.textContent  = (parseFloat(document.getElementById('fg-bal-rate')?.value)||FUEL_GAS.balRateEurMwh).toFixed(2);
+}
+
+async function saveFuelGasParams() {
+  FUEL_GAS.ratePct         = parseFloat(document.getElementById('fg-rate-pct').value)  || 0.50;
+  FUEL_GAS.priceEurMwh     = parseFloat(document.getElementById('fg-price-eur').value) || 32.50;
+  FUEL_GAS.balRateEurMwh   = parseFloat(document.getElementById('fg-bal-rate').value)  || 5.00;
+  FUEL_GAS.vtpPriceEurMwh  = parseFloat(document.getElementById('fg-vtp-price').value) || 31.80;
+
+  if (STATE.backendMode && window.API) {
+    const base = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+    const hdrs = { 'Content-Type':'application/json',
+                   Authorization: `Bearer ${sessionStorage.getItem('gtcp_access')}` };
+    const patch = async (key, value) =>
+      fetch(`${base}/system-params/${key}`, { method:'PATCH', headers:hdrs, body:JSON.stringify({value}) });
+    try {
+      await Promise.all([
+        patch('fuel_gas_rate_pct',          FUEL_GAS.ratePct),
+        patch('fuel_gas_price_eur_mwh',     FUEL_GAS.priceEurMwh),
+        patch('balancing_gas_rate_eur_mwh', FUEL_GAS.balRateEurMwh),
+        patch('vtp_serbia_price_eur_mwh',   FUEL_GAS.vtpPriceEurMwh),
+      ]);
+      toast('Параметры сохранены в базе данных','success');
+    } catch(e) {
+      toast('Сохранено локально (нет соединения с сервером)','info');
+    }
+  } else {
+    toast('Параметры сохранены локально','success');
+  }
+  addAudit('BILLING', `Параметры топливного газа обновлены: ${FUEL_GAS.ratePct}% · ${FUEL_GAS.priceEurMwh} EUR/МВт/ч`);
+  closeModal('modal-fuel-gas');
+  calcInvoice();
+}
+
+/** Switch billing model tabs in invoice modal */
+function onInvModelChange() {
+  const model = document.querySelector('input[name="inv-model"]:checked')?.value || 'CAPACITY';
+  document.getElementById('inv-capacity-fields').style.display = model === 'CAPACITY' ? '' : 'none';
+  document.getElementById('inv-volume-fields').style.display   = model === 'VOLUME'   ? '' : 'none';
+  const lbl = document.getElementById('inv-line1-label');
+  if (lbl) lbl.textContent = model === 'CAPACITY' ? '1. Плата за мощность (take-or-pay):' : '1. Транзитный тариф:';
+  calcInvoice();
+}
+
+/** Pre-fill capacity from shipper's active contract */
+function onInvShipperChange() {
+  const sid = document.getElementById('inv-shipper')?.value;
+  if (!sid) return;
+  const activeContracts = contracts.filter(c =>
+    (c.shipperId === sid || c.party === (shippers.find(s=>s.id===sid)||{}).name) &&
+    c.status === 'ACTIVE' && c.capacityKwhDay > 0
+  );
+  if (activeContracts.length > 0) {
+    const c = activeContracts[0];
+    const kwh_h = c.capacityKwhDay ? (c.capacityKwhDay / 24).toFixed(0) : '';
+    const capEl = document.getElementById('inv-cap-kwh-h');
+    if (capEl && !capEl.value && kwh_h) capEl.value = kwh_h;
+    // Set tariff based on contract type
+    const tarEl = document.getElementById('inv-tariff-kwh-h');
+    if (tarEl && !tarEl.value) {
+      const t = c.flowDir === 'HORGOS_GOSPODJINCI'
+        ? TARIFFS.commercialReverse : TARIFFS.bundledAnnual;
+      tarEl.value = t;
+    }
+    calcInvoice();
+  }
+}
+
+function calcInvoice() {
+  const model  = document.querySelector('input[name="inv-model"]:checked')?.value || 'CAPACITY';
+  const balGas = parseFloat(document.getElementById('inv-bal-gas')?.value) || 0;
+  const from   = document.getElementById('inv-from')?.value;
+  const to     = document.getElementById('inv-to')?.value;
+
+  let transit = 0, volForFuel = 0, detailText = '';
+
+  if (model === 'CAPACITY') {
+    const capKwhH  = parseFloat(document.getElementById('inv-cap-kwh-h')?.value) || 0;
+    const tarYr    = parseFloat(document.getElementById('inv-tariff-kwh-h')?.value) || TARIFFS.bundledAnnual;
+    let days = 30;
+    if (from && to) {
+      const d1 = new Date(from), d2 = new Date(to);
+      days = Math.max(1, Math.round((d2-d1)/86400000)+1);
+    }
+    const dailyRate = tarYr / 365;
+    transit = capKwhH * dailyRate * days;
+    volForFuel = capKwhH * 24 * days / 1000 * 0.85; // estimated MWh (85% utilization)
+    if (capKwhH > 0)
+      detailText = `${(capKwhH/1e6).toFixed(3)} ГВт·ч/ч × ${tarYr}/365 × ${days}д = ${fmtEur(transit)} EUR`;
+  } else {
+    const vol = parseFloat(document.getElementById('inv-vol')?.value) || 0;
+    const tar = parseFloat(document.getElementById('inv-tariff')?.value) || 0;
+    transit    = vol * tar;
+    volForFuel = vol;
+  }
+
+  const fgVol  = volForFuel * FUEL_GAS.ratePct / 100;
+  const fgAmt  = fgVol * FUEL_GAS.priceEurMwh;
+  const balAmt = balGas * FUEL_GAS.balRateEurMwh;
+  const total  = transit + fgAmt + balAmt;
+
+  const setText = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = fmtEur(v) + ' EUR'; };
+  setText('inv-line-transit', transit);
+  setText('inv-line-fuel', fgAmt);
+  setText('inv-line-bal', balAmt);
+  setText('inv-total', total);
+  const dl = document.getElementById('inv-line1-detail');
+  if (dl) dl.textContent = detailText;
+}
+
+function createInvoice() {  // FR-11
+  const sid    = document.getElementById('inv-shipper').value;
+  const from   = document.getElementById('inv-from').value;
+  const to     = document.getElementById('inv-to').value;
+  const model  = document.querySelector('input[name="inv-model"]:checked')?.value || 'CAPACITY';
+  const balGas = parseFloat(document.getElementById('inv-bal-gas')?.value) || 0;
+
+  if (!from || !to) { toast('Укажите период','error'); return; }
+
+  let vol = 0, tar = 2.85, transit = 0, capKwhH = 0;
+
+  if (model === 'CAPACITY') {
+    capKwhH = parseFloat(document.getElementById('inv-cap-kwh-h')?.value) || 0;
+    const tarYr = parseFloat(document.getElementById('inv-tariff-kwh-h')?.value) || TARIFFS.bundledAnnual;
+    const d1 = new Date(from), d2 = new Date(to);
+    const days = Math.max(1, Math.round((d2-d1)/86400000)+1);
+    if (!capKwhH) { toast('Укажите зарезервированную мощность (кВт·ч/ч)','error'); return; }
+    transit = parseFloat((capKwhH * (tarYr/365) * days).toFixed(2));
+    tar     = tarYr / 365;
+    vol     = parseFloat((capKwhH * 24 * days / 1000 * 0.85).toFixed(0));
+  } else {
+    vol  = parseFloat(document.getElementById('inv-vol')?.value) || 0;
+    tar  = parseFloat(document.getElementById('inv-tariff')?.value) || 2.85;
+    if (!vol || vol <= 0) { toast('Укажите объём транзита','error'); return; }
+    transit = parseFloat((vol * tar).toFixed(2));
+  }
+
+  const fgVol  = parseFloat(((model==='CAPACITY'?vol:vol) * FUEL_GAS.ratePct / 100).toFixed(3));
+  const fgAmt  = parseFloat((fgVol * FUEL_GAS.priceEurMwh).toFixed(2));
+  const balAmt = parseFloat((balGas * FUEL_GAS.balRateEurMwh).toFixed(2));
+  const total  = parseFloat((transit + fgAmt + balAmt).toFixed(2));
+
+  const inv = {
+    id: `INV-2026-${String(invCounter++).padStart(4,'0')}`,
+    shipperId: sid, from, to,
+    volume: vol, tariff: tar,
+    fuelGasVolume: fgVol, fuelGasRate: FUEL_GAS.ratePct, fuelGasPrice: FUEL_GAS.priceEurMwh, fuelGasAmount: fgAmt,
+    balancingGasVolume: balGas, balancingGasAmount: balAmt,
+    transitAmount: transit, totalAmount: total,
+    capacityKwhH: capKwhH || null, billingModel: model,
+    status: 'ISSUED', ts: today()
+  };
+  invoices.unshift(inv);
+  const label = model === 'CAPACITY'
+    ? `Мощность: ${capKwhH? (capKwhH/1e6).toFixed(3)+'ГВт/ч':''}`
+    : `Транзит: ${fmtEur(transit)} EUR`;
+  addAudit('BILLING',
+    `Создан счёт ${inv.id} [${model}] · ${shipperName(sid)} · ` +
+    `${label} + Топл.газ: ${fmtEur(fgAmt)} + Баланс: ${fmtEur(balAmt)} = ИТОГО: ${fmtEur(total)} EUR`);
+  closeModal('modal-inv'); renderBilling(); updateNavBadges();
+  toast(`Счёт ${inv.id} создан — ИТОГО ${fmtEur(total)} EUR`,'success');
+}
+
+function sendInvoice(id) {
+  const i = invoices.find(x=>x.id===id);
+  i.status='WAITING';
+  addAudit('BILLING', `Счёт ${id} отправлен контрагенту · статус → ОЖИДАЕТ ОПЛАТЫ`);
+  renderBilling(); toast(`${id} отправлен`,'info');
+}
+
+function payInvoice(id) {
+  if (!confirm(`Отметить ${id} как оплаченный?`)) return;
+  const i = invoices.find(x=>x.id===id);
+  i.status='PAID';
+  addAudit('BILLING', `Счёт ${id} оплачен`);
+  renderBilling(); updateNavBadges(); toast(`${id} оплачен`,'success');
+}
+
+function erpSync() {  // FR-12
+  const btn = document.querySelector('#page-billing .btn.success');
+  if (btn) { btn.textContent='⇄ Синхронизация...'; btn.disabled=true; }
+  addAudit('SYSTEM', 'Инициирована синхронизация с 1С ERP');
+  setTimeout(()=>{
+    if (btn) { btn.textContent='⇄ Синхр. с 1С ERP'; btn.disabled=false; }
+    addAudit('SYSTEM', `ERP синхронизация завершена · передано счётов: ${invoices.length}`);
+    toast(`Синхронизировано ${invoices.length} счётов с 1С ERP`,'success');
+  }, 2000);
+}
+
+// ═══════════════════════════════════════════════════════
+// CONTRACTS  FR-13  (CAM NC / Gastrans GTA)
+// ═══════════════════════════════════════════════════════
+function renderContracts() {
+  const filterType = (document.getElementById('ctr-filter-type')||{}).value || 'all';
+  const filterDir  = (document.getElementById('ctr-filter-dir')||{}).value  || 'all';
+  let data = contracts;
+  if (filterType !== 'all') data = data.filter(c => c.contractType === filterType);
+  if (filterDir  !== 'all') data = data.filter(c => c.flowDir === filterDir);
+
+  document.querySelector('#t-contracts tbody').innerHTML = data.map(c=>{
+    const d    = daysLeft(c.end);
+    const dCls = d<0?'text-red':d<30?'text-yellow':'';
+    const typeLabel = CONTRACT_TYPE_LABELS[c.contractType] || c.contractType || '—';
+    const dirLabel  = FLOW_DIR_LABELS[c.flowDir] || c.flowDir || '—';
+    const capFmt    = c.capacityKwhDay ? `${(c.capacityKwhDay/1000000).toFixed(1)} ТВт` : '—';
+    const tariffFmt = (c.tariffEntry||0) + (c.tariffExit||0) > 0
+      ? `${((c.tariffEntry||0)+(c.tariffExit||0)).toFixed(6)}`
+      : '—';
+    const dirBadge = c.flowDir==='HORGOS_GOSPODJINCI'
+      ? `<span style="color:var(--yellow);font-size:10px;">${dirLabel}</span>`
+      : `<span style="color:var(--accent);font-size:10px;">${dirLabel}</span>`;
+    return `<tr>
+      <td class="mono text-accent">${c.id}</td>
+      <td style="font-size:11px;">${typeLabel}</td>
+      <td class="fw7">${c.party}</td>
+      <td>${dirBadge}</td>
+      <td class="mono">${capFmt}</td>
+      <td class="mono">${tariffFmt}</td>
+      <td class="mono text-dim">${c.end}</td>
+      <td class="mono ${dCls}">${d<0?'ИСТЁК':d+'д'}</td>
+      <td>${contractStatus(c)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px;">Нет договоров</td></tr>';
+}
+
+// Populate shipper selector in contract modal
+function _populateCtrShipper() {
+  const sel = document.getElementById('ctr-shipper');
+  if (!sel) return;
+  sel.innerHTML = shippers.map(s=>`<option value="${s.id}">${s.name} (${s.id})</option>`).join('');
+}
+
+// Direction info banner
+function onCtrDirChange() {
+  const dir  = document.getElementById('ctr-dir').value;
+  const desc = document.getElementById('ctr-dir-desc');
+  if (desc) desc.textContent = FLOW_DIR_DESC[dir] || '';
+  // Auto-fill tariff hints for reverse flow
+  const entryEl = document.getElementById('ctr-tariff-entry');
+  const exitEl  = document.getElementById('ctr-tariff-exit');
+  if (dir === 'HORGOS_GOSPODJINCI') {
+    if (entryEl && !entryEl.value) entryEl.placeholder = '0.002500 (реверс)';
+    if (exitEl  && !exitEl.value)  exitEl.placeholder  = '0.000000';
+  } else {
+    if (entryEl && !entryEl.value) entryEl.placeholder = '0.004246';
+    if (exitEl  && !exitEl.value)  exitEl.placeholder  = '0.004246';
+  }
+  _updateCtrTariffTotal();
+}
+
+function onCtrTypeChange() {
+  const type = document.getElementById('ctr-type').value;
+  // Commercial Reverse → lock direction to HORGOS_GOSPODJINCI
+  if (type === 'TSA_COMMERCIAL_REVERSE') {
+    document.getElementById('ctr-dir').value = 'HORGOS_GOSPODJINCI';
+    onCtrDirChange();
+  }
+}
+
+function _updateCtrTariffTotal() {
+  const e = parseFloat(document.getElementById('ctr-tariff-entry').value)||0;
+  const x = parseFloat(document.getElementById('ctr-tariff-exit').value)||0;
+  const t = document.getElementById('ctr-tariff-total');
+  if (t) t.value = (e+x) > 0 ? `${(e+x).toFixed(6)} EUR/кВт/ч/д` : '';
+}
+
+async function addContract() {
+  const gtaNum       = document.getElementById('ctr-num').value.trim();
+  const shipperId    = document.getElementById('ctr-shipper').value;
+  const contractType = document.getElementById('ctr-type').value;
+  const flowDir      = document.getElementById('ctr-dir').value;
+  const startDate    = document.getElementById('ctr-start').value;
+  const endDate      = document.getElementById('ctr-end').value;
+  const capKwh       = parseFloat(document.getElementById('ctr-cap-kwh').value)||0;
+  const tariffEntry  = parseFloat(document.getElementById('ctr-tariff-entry').value)||0;
+  const tariffExit   = parseFloat(document.getElementById('ctr-tariff-exit').value)||0;
+  const auctionRef   = document.getElementById('ctr-auction').value.trim();
+  const signedDate   = document.getElementById('ctr-signed').value;
+  const notes        = document.getElementById('ctr-notes').value.trim();
+
+  if (!shipperId || !startDate || !endDate || !capKwh) {
+    toast('Заполните обязательные поля (грузоотправитель, даты, мощность)','error'); return;
+  }
+
+  const party = (shippers.find(s=>s.id===shipperId)||{}).name || shipperId;
+
+  // Auto-generate GTA number if blank
+  const year = new Date(startDate).getFullYear();
+  const autoNum = gtaNum || `GTA-${year}-${String(contracts.length+1).padStart(3,'0')}`;
+
+  if (STATE.backendMode && window.API) {
+    try {
+      const { data, error } = await API.contracts.create({
+        shipperId, contractType, flowDirection: flowDir,
+        startDate, endDate, capacityKwhDay: capKwh,
+        tariffEntryEurKwhDay: tariffEntry, tariffExitEurKwhDay: tariffExit,
+        auctionRef: auctionRef||undefined, signedDate: signedDate||undefined,
+        notes: notes||undefined, gtaNumber: gtaNum||undefined,
+      });
+      if (error) { toast(`Ошибка API: ${error}`,'error'); return; }
+      contracts.unshift({
+        id: data.contract_no, contractType: data.contract_type, flowDir: data.flow_direction,
+        party, start: data.start_date?.slice(0,10), end: data.end_date?.slice(0,10),
+        capacityKwhDay: parseFloat(data.capacity_kwh_day), tariffEntry: parseFloat(data.tariff_entry_eur_kwh_day),
+        tariffExit: parseFloat(data.tariff_exit_eur_kwh_day), status: data.status||'ACTIVE',
+      });
+      toast(`GTA ${data.contract_no} создан в базе`,'success');
+    } catch(e) {
+      toast(`Ошибка создания: ${e.message}`,'error'); return;
+    }
+  } else {
+    contracts.unshift({
+      id: autoNum, contractType, flowDir, party, start: startDate, end: endDate,
+      capacityKwhDay: capKwh, tariffEntry, tariffExit, status:'ACTIVE',
+    });
+    toast(`GTA ${autoNum} добавлен [DEMO]`,'success');
+  }
+
+  addAudit('CONTRACTS', `GTA ${autoNum} · ${CONTRACT_TYPE_LABELS[contractType]} · ${FLOW_DIR_LABELS[flowDir]} · ${party}`);
+  closeModal('modal-contract');
+  renderContracts();
+}
+
+// ═══════════════════════════════════════════════════════
+// CAPACITY  FR-14
+// ═══════════════════════════════════════════════════════
+function renderCapacity() {
+  const filter = document.getElementById('cap-filter-point').value;
+  const filtered = filter==='all' ? capacityBookings : capacityBookings.filter(b=>b.point===filter);
+  document.querySelector('#t-capacity tbody').innerHTML = filtered.map(b=>{
+    const d = daysLeft(b.to);
+    const dCls = d<0?'text-red':d<7?'text-yellow':'';
+    return `<tr><td class="mono text-accent">${b.id}</td><td>${b.party}</td><td class="mono">${b.point}</td><td>${badge(b.type,b.type.toLowerCase())}</td><td class="mono text-dim">${b.from} — ${b.to}</td><td class="mono">${fmt(b.volume)}</td><td class="mono ${dCls}">${d<0?'ИСТЁКЛО':d}</td><td>${capStatus(b)}</td></tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// AUDIT  FR-15
+// ═══════════════════════════════════════════════════════
+function renderAudit() {
+  const filter = document.getElementById('audit-filter').value;
+  const filtered = filter==='all' ? auditLog : auditLog.filter(a=>a.module===filter);
+  document.getElementById('audit-log').innerHTML = filtered.length ?
+    filtered.map(a=>`<div class="audit-row"><span class="audit-time">${a.ts}</span><span class="audit-user">${a.user}</span><span class="audit-action">${a.action}</span><span class="audit-module">${a.module}</span></div>`).join('')
+    : '<div style="text-align:center;padding:24px;color:var(--text3)">Нет записей</div>';
+}
+
+// ═══════════════════════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  if (id==='modal-mc') {
+    document.querySelectorAll('#mc-counterparty option').forEach(o=>{
+      const s=shippers.find(x=>x.id===o.value);
+      if(s){ const p=s.exposure/s.creditLimit; o.text=`${s.name}${p>1?' ⚠ ПРЕВЫШЕН':''}`; }
+    });
+    const mc = document.getElementById('mc-counterparty');
+    if (mc.value) openMcFor(mc.value);
+  }
+  if (id==='modal-contract') {
+    _populateCtrShipper();
+    // Set default dates
+    const today = new Date().toISOString().slice(0,10);
+    const nextY = new Date(); nextY.setFullYear(nextY.getFullYear()+1);
+    const startEl = document.getElementById('ctr-start');
+    const endEl   = document.getElementById('ctr-end');
+    if (startEl && !startEl.value) startEl.value = today;
+    if (endEl   && !endEl.value)   endEl.value   = nextY.toISOString().slice(0,10);
+    // Initialize direction banner
+    onCtrDirChange();
+    // Wire tariff total updater
+    ['ctr-tariff-entry','ctr-tariff-exit'].forEach(fid=>{
+      const el = document.getElementById(fid);
+      if (el) { el.oninput = _updateCtrTariffTotal; }
+    });
+  }
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.addEventListener('click', e=>{ if(e.target.classList.contains('overlay')) e.target.classList.remove('open'); });
+
+</script>
+</body>
+</html>
