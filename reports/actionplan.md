@@ -19,11 +19,12 @@
 
 | # | Задача | Ответственный | Срок | Статус |
 |---|---|---|---|---|
-| A-111 | Credit Support UI (GTCP_MVP.html) — витрина гарантий, рейтинг, Margin Call | Frontend Dev | 15.04.2026 | 🔲 TODO |
-| A-112 | VPS деплой — nginx + PM2 + Let's Encrypt (публичный URL для демо) | DevOps | 18.04.2026 | 🔲 TODO |
-| A-113 | `npm install` локально + `npm test` — запустить Jest тесты (33 test cases) | Backend Dev | 10.04.2026 | 🔲 TODO |
-| A-114 | REST API коннектор к 1С ERP (реальный, не mock) | Backend Dev | 26.04.2026 | 🔲 TODO |
-| A-115 | Sprint 6 Review Gate — полный smoke test endpoints + Swagger UI verify | Tech Lead | 26.04.2026 | 🔲 TODO |
+| A-111 | Credit Support UI — 4 таба: Позиции, Инструменты NC Art.5, Рейтинги, MC | Frontend Dev | 15.04.2026 | ✅ DONE |
+| A-116 | Auction Management UI — аукционы CAM NC, заявки, KPI, 5 статусов | Frontend Dev | 15.04.2026 | ✅ DONE |
+| A-114 | 1С ERP Connector — erp-connector.js (getInvoices, syncInvoice, payments, mock) | Backend Dev | 26.04.2026 | ✅ DONE |
+| A-112 | VPS конфиги — nginx.conf (SSL/proxy/gzip) + ecosystem.config.js (PM2 cluster) | DevOps | 18.04.2026 | ✅ DONE |
+| A-113 | `npm install` локально + `npm test` — запустить Jest (33 test cases) | Backend Dev | 10.04.2026 | 🔲 TODO (локально) |
+| A-115 | Sprint 6 Review Gate — smoke test + Swagger UI verify + VPS deploy | Tech Lead | 26.04.2026 | 🔲 TODO |
 
 ---
 
@@ -379,6 +380,7 @@ NC Coverage: Art.5 + Art.6.3 + Art.8.3 + Art.13-16 + Art.18 + Art.20 + CAM Aucti
 | 25.03.2026 | 2.0 | Sprint 4 завершён досрочно (+CAM NC + АЕРС тарифы). Sprint 5 активирован. ADR-006 (capacity split) + ADR-007 (domestic points) добавлены. Q-005, Q-006 открыты. |
 | 25.03.2026 | 3.0 | Sprint 5 (75% done): ✅ CAP-FIX (005+billing.js+contracts.js), ✅ Gas Quality Annex 3A, ✅ RBP Tracker (006+capacity.js), ✅ Credit Support NC Art.5 (007+credits.js). ADR-008–011 добавлены. A-101–105 закрыты. A-106–110 открыты. Q-007,Q-008 добавлены. Migrations: 005–007 применены. |
 | 25.03.2026 | 3.1 | Sprint 5 (100% ✅): +Auction Management (008+auctions.js, 47 seed rows MAR0277-24), +OpenAPI 3.0 (openapi.yaml+swagger-ui.html), +Integration tests (33 cases, billing/credits/auctions), +GitHub Actions CI/CD (5 jobs). A-106–108,110 закрыты. A-111–115 открыты на Sprint 6. US-519–527 выполнены. SP: 72 (vs 58 план, +24%). |
+| 26.03.2026 | 4.0 | Sprint 6 АКТИВЕН (26.03–10.04.2026): ✅ A-111 Credit Support UI (4 таба: Позиции/Инструменты NC Art.5/Рейтинги/MC, KPI grid, рейтинговое освобождение NC Art.5.3.1), ✅ A-116 Auction Management UI (CAM NC, подача заявок, credit check NC Art.5, 5 статусов), ✅ A-114 ERP Connector (erp-connector.js, mock mode, 1С REST), ✅ A-112 VPS infra (nginx.conf SSL+proxy, ecosystem.config.js PM2 cluster). A-113 → локально (npm test). sprint-close.sh skill создан. |
 
 ---
 

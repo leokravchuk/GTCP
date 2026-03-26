@@ -208,6 +208,30 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .audit-action{color:var(--text2);flex:1;}
 .audit-module{font-size:10px;padding:1px 6px;background:var(--bg3);color:var(--text3);flex-shrink:0;}
 
+/* CREDIT SUPPORT NC Art.5 */
+.cs-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.cs-kpi{background:var(--panel);border:1px solid var(--border);padding:16px;}
+.cs-kpi-label{font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:.5px;margin-bottom:6px;}
+.cs-kpi-val{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--text);}
+.cs-kpi-sub{font-size:10px;color:var(--text3);margin-top:3px;}
+.rating-badge{display:inline-block;padding:2px 8px;font-family:var(--mono);font-size:11px;border-radius:2px;}
+.rating-badge.inv-grade{background:rgba(0,229,160,.12);color:var(--green);border:1px solid var(--green2);}
+.rating-badge.sub-grade{background:rgba(255,77,109,.12);color:var(--red);border:1px solid var(--red2);}
+.rating-badge.exempt{background:rgba(0,200,255,.12);color:var(--accent);border:1px solid var(--accent2);}
+.rating-badge.not-exempt{background:rgba(255,209,102,.12);color:var(--yellow);border:1px solid var(--orange);}
+.instr-type{display:inline-block;padding:2px 8px;font-family:var(--mono);font-size:10px;border-radius:2px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);}
+
+/* AUCTIONS NC CAM */
+.auc-status{display:inline-block;padding:2px 9px;font-family:var(--mono);font-size:10px;border-radius:2px;}
+.auc-status.ANNOUNCED{background:rgba(0,200,255,.12);color:var(--accent);border:1px solid rgba(0,200,255,.3);}
+.auc-status.OPEN{background:rgba(0,229,160,.12);color:var(--green);border:1px solid var(--green2);}
+.auc-status.CLOSED{background:rgba(255,209,102,.12);color:var(--yellow);border:1px solid rgba(255,209,102,.3);}
+.auc-status.AWARDED{background:rgba(0,229,160,.2);color:var(--green);border:1px solid var(--green);}
+.auc-status.DRAFT{background:var(--bg3);color:var(--text3);border:1px solid var(--border2);}
+.auc-status.CONTRACTED{background:rgba(0,229,160,.08);color:var(--green2);border:1px solid var(--green2);}
+.auc-product{display:inline-block;padding:1px 7px;font-family:var(--mono);font-size:10px;background:rgba(0,136,187,.15);color:var(--accent);border:1px solid rgba(0,136,187,.3);}
+.bid-row-mine{background:rgba(0,200,255,.04);}
+
 </style>
 <!-- GTCP API Client — Sprint 4 backend integration -->
 <!-- Set GTCP_API_URL before loading api.js to point to your backend -->
@@ -299,6 +323,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
           Мощности
         </div>
+        <div class="nav-item" onclick="nav('auctions')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M9 9h6v6H9z"/><path d="M9 3v6M15 3v6M9 15v6M15 15v6M3 9h6M15 9h6M3 15h6M15 15h6"/></svg>
+          Аукционы <span class="nav-badge yellow" id="nb-auctions">0</span>
+        </div>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">СИСТЕМА</div>
@@ -365,26 +393,97 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <!-- CREDIT -->
       <div class="page" id="page-credit">
         <div class="page-header">
-          <div><div class="page-title">КРЕДИТНЫЙ МОНИТОР</div><div class="page-sub">FR-08 · FR-09 · Мониторинг в реальном времени</div></div>
+          <div><div class="page-title">КРЕДИТНЫЙ МОНИТОР</div><div class="page-sub">FR-08 · FR-09 · NC Art.5 · Гарантии · Рейтинги · Margin Call</div></div>
           <div class="actions">
+            <button class="btn" onclick="openModal('modal-credit-instr')">+ Инструмент</button>
             <button class="btn danger" onclick="openModal('modal-mc')">⚡ Margin Call</button>
           </div>
         </div>
+        <!-- KPI row -->
+        <div class="cs-kpi-grid" id="cs-kpi-grid"></div>
         <div id="credit-alerts"></div>
+        <!-- TABS -->
         <div class="section-wrap">
-          <div class="section-head"><span class="section-title">КРЕДИТНЫЕ ПОЗИЦИИ · REAL-TIME</span><span style="font-family:var(--mono);font-size:10px;color:var(--text3)" id="credit-ts"></span></div>
+          <div class="tabs">
+            <div class="tab active" onclick="creditTab(this,'positions')" id="ctab-positions">Позиции</div>
+            <div class="tab" onclick="creditTab(this,'instruments')" id="ctab-instruments">Инструменты NC Art.5 <span class="tab-count" id="ctc-instr">0</span></div>
+            <div class="tab" onclick="creditTab(this,'ratings')" id="ctab-ratings">Рейтинги &amp; Освобождения</div>
+            <div class="tab" onclick="creditTab(this,'mc')" id="ctab-mc">Margin Call <span class="tab-count" id="ctc-mc">0</span></div>
+          </div>
+          <!-- TAB: Positions -->
+          <div id="ctab-content-positions">
+            <div style="padding:10px 16px 0;display:flex;align-items:center;justify-content:space-between;"><span style="font-family:var(--mono);font-size:10px;color:var(--text3)" id="credit-ts">Обновлено: —</span></div>
+            <div class="table-wrap">
+              <table id="t-credit">
+                <thead><tr><th>КОНТРАГЕНТ</th><th>ЛИМИТ EUR</th><th>ЭКСПОЗИЦИЯ EUR</th><th>ОСТАТОК EUR</th><th>ИСПОЛЬЗОВАНО %</th><th>ИНСТРУМЕНТ</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- TAB: Instruments NC Art.5 -->
+          <div id="ctab-content-instruments" style="display:none">
+            <div style="padding:10px 16px;font-size:11px;color:var(--text3);">NC Art.5.3 — допустимые инструменты кредитного обеспечения: банковская гарантия (URDG 758), аккредитив, денежный депозит, поручительство.</div>
+            <div class="table-wrap">
+              <table id="t-cs-instr">
+                <thead><tr><th>КОНТРАГЕНТ</th><th>ТИП ИНСТРУМЕНТА</th><th>БАНК-ГАРАНТ</th><th>СУММА EUR</th><th>ДЕЙСТВУЕТ ДО</th><th>ПРОДУКТ</th><th>МИНИМУМ NC Art.5</th><th>СТАТУС</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- TAB: Ratings -->
+          <div id="ctab-content-ratings" style="display:none">
+            <div style="padding:10px 16px;font-size:11px;color:var(--text3);">NC Art.5.3.1 — освобождение от гарантии: рейтинг ≥ BBB- (S&amp;P/Fitch) или ≥ Baa3 (Moody's) или Creditreform ≤ 235.</div>
+            <div class="table-wrap">
+              <table id="t-cs-ratings">
+                <thead><tr><th>КОНТРАГЕНТ</th><th>S&amp;P / FITCH</th><th>MOODY'S</th><th>CREDITREFORM</th><th>ОСВОБОЖДЕНИЕ NC Art.5</th><th>МИНИМАЛЬНЫЙ КРЕДИТ EUR</th><th>ОБНОВЛЕНО</th><th>ДЕЙСТВИЯ</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <!-- TAB: Margin Call history -->
+          <div id="ctab-content-mc" style="display:none">
+            <div class="table-wrap">
+              <table id="t-mc-history">
+                <thead><tr><th>ДАТА</th><th>КОНТРАГЕНТ</th><th>СУММА EUR</th><th>СРОК</th><th>ОСНОВАНИЕ</th><th>СТАТУС</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUCTIONS -->
+      <div class="page" id="page-auctions">
+        <div class="page-header">
+          <div><div class="page-title">АУКЦИОНЫ CAM NC</div><div class="page-sub">CAM NC EU 2017/459 · MAR0277-24 · ENTSOG · Мощность 2025/2026</div></div>
+          <div class="actions">
+            <button class="btn" onclick="openModal('modal-bid')">+ Подать заявку</button>
+            <button class="btn success" onclick="renderAuctions()">↻ Обновить</button>
+          </div>
+        </div>
+        <!-- KPI row -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;" id="auc-kpi-grid"></div>
+        <div class="section-wrap">
+          <div class="tabs">
+            <div class="tab active" onclick="aucTab(this,'all')">Все <span class="tab-count" id="atc-all">0</span></div>
+            <div class="tab" onclick="aucTab(this,'OPEN')">Открыты <span class="tab-count" id="atc-open">0</span></div>
+            <div class="tab" onclick="aucTab(this,'ANNOUNCED')">Объявлены <span class="tab-count" id="atc-ann">0</span></div>
+            <div class="tab" onclick="aucTab(this,'AWARDED')">Присуждены <span class="tab-count" id="atc-awd">0</span></div>
+            <div class="tab" onclick="aucTab(this,'CLOSED')">Закрыты <span class="tab-count" id="atc-cls">0</span></div>
+          </div>
           <div class="table-wrap">
-            <table id="t-credit">
-              <thead><tr><th>КОНТРАГЕНТ</th><th>ЛИМИТ EUR</th><th>ЭКСПОЗИЦИЯ EUR</th><th>ОСТАТОК EUR</th><th>ИСПОЛЬЗОВАНО %</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
+            <table id="t-auctions">
+              <thead><tr><th>ID АУКЦИОНА</th><th>ПРОДУКТ</th><th>ТОЧКА IP</th><th>ПЕРИОД</th><th>МАХ МОЩНОСТЬ кВт/ч/ч</th><th>РЕЗЕРВНАЯ ЦЕНА EUR</th><th>ПРЁМ ЗАЯВОК ДО</th><th>ПОБЕДИТЕЛЬ</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
         </div>
+        <!-- My bids section -->
         <div class="section-wrap">
-          <div class="section-head"><span class="section-title">ИСТОРИЯ MARGIN CALL</span></div>
+          <div class="section-head"><span class="section-title">МОИ ЗАЯВКИ</span></div>
           <div class="table-wrap">
-            <table id="t-mc-history">
-              <thead><tr><th>ДАТА</th><th>КОНТРАГЕНТ</th><th>СУММА EUR</th><th>СРОК</th><th>ОСНОВАНИЕ</th><th>СТАТУС</th></tr></thead>
+            <table id="t-my-bids">
+              <thead><tr><th>АУКЦИОН</th><th>КОНТРАГЕНТ</th><th>ОБЪЁМ кВт/ч/ч</th><th>ЦЕНА EUR/(кВт/ч/ч)/год</th><th>СУММА EUR/год</th><th>СТАТУС ЗАЯВКИ</th><th>ПОДАНА</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -575,6 +674,82 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <div class="form-row"><label>ПОЛУЧАТЕЛЬ УВЕДОМЛЕНИЯ</label><input type="text" id="mc-recipient" placeholder="email@counterparty.com"></div>
     </div>
     <div class="modal-foot"><button class="btn" onclick="closeModal('modal-mc')">Отмена</button><button class="btn danger" onclick="sendMarginCall()">Отправить Margin Call</button></div>
+  </div>
+</div>
+
+<!-- Credit Instrument (NC Art.5) -->
+<div class="overlay" id="modal-credit-instr">
+  <div class="modal" style="width:580px;max-width:98vw;">
+    <div class="modal-head"><span class="modal-title">КРЕДИТНЫЙ ИНСТРУМЕНТ · NC Art.5</span><button class="modal-close" onclick="closeModal('modal-credit-instr')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:12px;">NC Art.5.3 — допустимые формы обеспечения: банковская гарантия (URDG 758), аккредитив (UCP 600), депозит, поручительство.</div>
+      <div class="form-row"><label>КОНТРАГЕНТ *</label><select id="ci-shipper"></select></div>
+      <div class="form-grid">
+        <div class="form-row">
+          <label>ТИП ИНСТРУМЕНТА *</label>
+          <select id="ci-type">
+            <option value="BANK_GUARANTEE">Банковская гарантия (URDG 758)</option>
+            <option value="LETTER_OF_CREDIT">Аккредитив (UCP 600)</option>
+            <option value="CASH_DEPOSIT">Денежный депозит</option>
+            <option value="SURETY_BOND">Поручительство</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>ТИП ПРОДУКТА (NC Art.5.3.1)</label>
+          <select id="ci-product">
+            <option value="ANNUAL">Annual (×2/12 = 16.67%)</option>
+            <option value="QUARTERLY">Quarterly (×2/3 квартала = 22.22%)</option>
+            <option value="MONTHLY">Monthly (×1 мес. = 8.33%)</option>
+            <option value="DAILY">Daily (×1 д. = 0.27%)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row"><label>БАНК-ГАРАНТ / ЭМИТЕНТ</label><input type="text" id="ci-bank" placeholder="Raiffeisen Bank, UniCredit..."></div>
+        <div class="form-row"><label>СУММА (EUR) *</label><input type="number" id="ci-amount" placeholder="0" oninput="calcMinCredit()"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row"><label>ДАТА ВЫДАЧИ</label><input type="date" id="ci-issued"></div>
+        <div class="form-row"><label>ДЕЙСТВУЕТ ДО *</label><input type="date" id="ci-expires"></div>
+      </div>
+      <div id="ci-min-credit" class="info-box" style="font-size:11px;display:none;">
+        <div class="ib-row"><span class="ib-label">Минимальный размер NC Art.5.3.1:</span><span class="ib-val" id="ci-min-val">—</span></div>
+        <div class="ib-row"><span class="ib-label">Покрытие:</span><span class="ib-val" id="ci-coverage">—</span></div>
+      </div>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-credit-instr')">Отмена</button><button class="btn primary" onclick="addCreditInstrument()">Добавить инструмент</button></div>
+  </div>
+</div>
+
+<!-- Auction Bid -->
+<div class="overlay" id="modal-bid">
+  <div class="modal" style="width:580px;max-width:98vw;">
+    <div class="modal-head"><span class="modal-title">ПОДАТЬ ЗАЯВКУ НА АУКЦИОН</span><button class="modal-close" onclick="closeModal('modal-bid')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-row"><label>АУКЦИОН *</label>
+        <select id="bid-auction" onchange="onBidAucChange()">
+          <option value="">Выберите аукцион...</option>
+        </select>
+      </div>
+      <div id="bid-auc-info" class="info-box" style="display:none;font-size:11px;">
+        <div class="ib-row"><span class="ib-label">Продукт:</span><span class="ib-val" id="bid-info-product">—</span></div>
+        <div class="ib-row"><span class="ib-label">Точка IP:</span><span class="ib-val" id="bid-info-point">—</span></div>
+        <div class="ib-row"><span class="ib-label">Период:</span><span class="ib-val" id="bid-info-period">—</span></div>
+        <div class="ib-row"><span class="ib-label">Макс. мощность:</span><span class="ib-val" id="bid-info-cap">—</span></div>
+        <div class="ib-row"><span class="ib-label">Резервная цена:</span><span class="ib-val" id="bid-info-reserve">—</span></div>
+      </div>
+      <div class="form-row"><label>КОНТРАГЕНТ (ГРУЗООТПРАВИТЕЛЬ) *</label><select id="bid-shipper"></select></div>
+      <div class="form-grid">
+        <div class="form-row"><label>ЗАПРАШИВАЕМАЯ МОЩНОСТЬ (кВт/ч/ч) *</label><input type="number" id="bid-cap" placeholder="0" oninput="calcBid()"></div>
+        <div class="form-row"><label>ПРЕДЛАГАЕМАЯ ЦЕНА EUR/(кВт/ч/ч)/год *</label><input type="number" id="bid-price" step="0.001" placeholder="0.000" oninput="calcBid()"></div>
+      </div>
+      <div id="bid-calc" class="info-box" style="font-size:11px;">
+        <div class="ib-row"><span class="ib-label">Годовая стоимость:</span><span class="ib-val" id="bid-annual">0.00 EUR</span></div>
+        <div class="ib-row"><span class="ib-label">Проверка кредита (NC Art.5):</span><span class="ib-val" id="bid-credit-check">—</span></div>
+      </div>
+      <div class="form-row"><label>КОММЕНТАРИЙ</label><textarea id="bid-comment" placeholder="Необязательно..."></textarea></div>
+    </div>
+    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-bid')">Отмена</button><button class="btn primary" onclick="submitBid()">Подать заявку</button></div>
   </div>
 </div>
 
@@ -915,6 +1090,42 @@ let auditLog = [];
 let nomCounter = 9;
 let invCounter = 7;
 
+// ── SPRINT 6: Credit Support NC Art.5 seed data ──────────────────────────────
+let creditInstruments = [
+  { id:'CI-001', shipperId:'SHP-001', type:'BANK_GUARANTEE',   bank:'Raiffeisen Bank Srbija', amount:8000000, issued:'2025-10-01', expires:'2026-10-01', product:'ANNUAL',    status:'ACTIVE' },
+  { id:'CI-002', shipperId:'SHP-002', type:'LETTER_OF_CREDIT', bank:'UniCredit Srbija',       amount:5000000, issued:'2025-07-01', expires:'2026-07-01', product:'ANNUAL',    status:'ACTIVE' },
+  { id:'CI-003', shipperId:'SHP-003', type:'CASH_DEPOSIT',     bank:'Banca Intesa',           amount:3500000, issued:'2026-01-01', expires:'2026-12-31', product:'QUARTERLY', status:'ACTIVE' },
+  { id:'CI-004', shipperId:'SHP-004', type:'BANK_GUARANTEE',   bank:'OTP Banka',              amount:2000000, issued:'2025-11-01', expires:'2026-05-01', product:'MONTHLY',   status:'EXPIRING' },
+  { id:'CI-005', shipperId:'SHP-005', type:'SURETY_BOND',      bank:'Erste Bank',             amount:1500000, issued:'2026-02-01', expires:'2026-08-01', product:'MONTHLY',   status:'ACTIVE' },
+];
+let creditRatings = [
+  { shipperId:'SHP-001', name:'Gazprom Export',    sp:'BBB',  moodys:'Baa2', creditreform:215, updatedAt:'2026-01-15' },
+  { shipperId:'SHP-002', name:'Repower Gas',       sp:'BBB+', moodys:'Baa1', creditreform:200, updatedAt:'2026-02-10' },
+  { shipperId:'SHP-003', name:'MET International', sp:'BB+',  moodys:'Ba1',  creditreform:260, updatedAt:'2026-01-20' },
+  { shipperId:'SHP-004', name:'Axpo Solutions',    sp:'A-',   moodys:'A3',   creditreform:180, updatedAt:'2026-03-01' },
+  { shipperId:'SHP-005', name:'Energo-Pro',        sp:'BB',   moodys:'Ba2',  creditreform:280, updatedAt:'2026-02-28' },
+];
+let instrCounter = 6;
+
+// ── SPRINT 6: Auctions CAM NC / MAR0277-24 seed data ─────────────────────────
+let auctionsData = [
+  { id:'AUC-2026-001', product:'ANNUAL',    point:'HORGOS_IP',      period:'2026-10-01/2027-09-30', maxCap:500000,  reservePrice:6.85,  bidsDeadline:'2026-04-15', winner:null,         status:'ANNOUNCED' },
+  { id:'AUC-2026-002', product:'QUARTERLY', point:'HORGOS_IP',      period:'2026-07-01/2026-09-30', maxCap:200000,  reservePrice:6.95,  bidsDeadline:'2026-04-10', winner:null,         status:'OPEN'      },
+  { id:'AUC-2026-003', product:'MONTHLY',   point:'GOSPODJINCI_IP', period:'2026-05-01/2026-05-31', maxCap:150000,  reservePrice:4.19,  bidsDeadline:'2026-03-28', winner:'Repower Gas', status:'AWARDED'   },
+  { id:'AUC-2026-004', product:'ANNUAL',    point:'GOSPODJINCI_IP', period:'2026-10-01/2027-09-30', maxCap:400000,  reservePrice:4.19,  bidsDeadline:'2026-04-20', winner:null,         status:'ANNOUNCED' },
+  { id:'AUC-2026-005', product:'QUARTERLY', point:'HORGOS_IP',      period:'2026-10-01/2026-12-31', maxCap:180000,  reservePrice:6.95,  bidsDeadline:'2026-04-05', winner:null,         status:'OPEN'      },
+  { id:'AUC-2026-006', product:'MONTHLY',   point:'HORGOS_IP',      period:'2026-04-01/2026-04-30', maxCap:100000,  reservePrice:6.85,  bidsDeadline:'2026-03-25', winner:'Axpo Solutions', status:'CONTRACTED' },
+];
+let auctionBids = [
+  { id:'BID-001', aucId:'AUC-2026-003', shipperId:'SHP-002', shipperName:'Repower Gas',   cap:150000, price:7.10, annualVal:150000*7.10, status:'WON',    ts:'2026-03-20' },
+  { id:'BID-002', aucId:'AUC-2026-003', shipperId:'SHP-001', shipperName:'Gazprom Export',cap:120000, price:6.90, annualVal:120000*6.90, status:'LOST',   ts:'2026-03-21' },
+  { id:'BID-003', aucId:'AUC-2026-006', shipperId:'SHP-004', shipperName:'Axpo Solutions',cap:100000, price:7.20, annualVal:100000*7.20, status:'WON',    ts:'2026-03-22' },
+  { id:'BID-004', aucId:'AUC-2026-002', shipperId:'SHP-002', shipperName:'Repower Gas',   cap:180000, price:7.00, annualVal:180000*7.00, status:'PENDING',ts:'2026-03-25' },
+  { id:'BID-005', aucId:'AUC-2026-005', shipperId:'SHP-004', shipperName:'Axpo Solutions',cap:100000, price:7.15, annualVal:100000*7.15, status:'PENDING',ts:'2026-03-25' },
+];
+let bidCounter = 6;
+let aucTabFilter = 'all';
+
 const PHYS_CAP = { HORGOS: 12000, GOSPODJINCI: 12000 };
 
 // ═══════════════════════════════════════════════════════
@@ -1150,7 +1361,8 @@ function nav(page) {
     if ((n.getAttribute('onclick')||'').includes(`'${page}'`)) n.classList.add('active');
   });
   const renders = {dashboard:renderDashboard, nominations:renderNominations, credit:renderCredit,
-    balance:renderBalance, billing:renderBilling, contracts:renderContracts, capacity:renderCapacity, audit:renderAudit};
+    balance:renderBalance, billing:renderBilling, contracts:renderContracts, capacity:renderCapacity,
+    auctions:renderAuctions, audit:renderAudit};
   if (renders[page]) renders[page]();
 }
 
@@ -1186,6 +1398,10 @@ function updateNavBadges() {
   const nbc = document.getElementById('nb-contracts');
   nbc.style.display = expiring > 0 ? 'inline' : 'none';
   nbc.textContent = expiring;
+  // auctions badge
+  const openAuc = auctionsData.filter(a=>a.status==='OPEN').length;
+  const nba = document.getElementById('nb-auctions');
+  if (nba) { nba.style.display = openAuc > 0 ? 'inline':'none'; nba.textContent = openAuc; }
   const alertCount = creditViol + overdue;
   const pill = document.getElementById('alert-pill');
   pill.style.display = alertCount > 0 ? 'block' : 'none';
@@ -1424,16 +1640,20 @@ function approveRenom(id) {
 // ═══════════════════════════════════════════════════════
 function renderCredit() {
   document.getElementById('credit-ts').textContent = 'Обновлено: ' + nowStr();
+  renderCreditKPI();
   const violations = shippers.filter(s=>s.exposure>s.creditLimit);
   document.getElementById('credit-alerts').innerHTML = violations.map(s=>
     `<div class="alert-banner"><span class="ab-icon">⚠</span><span class="ab-text"><strong>${s.name}</strong>: лимит ${fmtEur(s.creditLimit)} EUR превышен на ${fmtEur(s.exposure-s.creditLimit)} EUR</span><span class="ab-action" onclick="openMcFor('${s.id}')">→ Margin Call</span></div>`
   ).join('');
 
+  const typeLabels = {BANK_GUARANTEE:'БГ',LETTER_OF_CREDIT:'LC',CASH_DEPOSIT:'Депозит',SURETY_BOND:'Поруч.'};
   document.querySelector('#t-credit tbody').innerHTML = shippers.map(s=>{
     const pct = Math.min(s.exposure/s.creditLimit, 1);
     const pctVal = (s.exposure/s.creditLimit*100).toFixed(1);
     const barCls = s.exposure>s.creditLimit?'red':s.exposure/s.creditLimit>0.8?'yellow':'green';
     const sts = s.exposure>s.creditLimit ? badge('ПРЕВЫШЕН','crit') : s.exposure/s.creditLimit>0.8 ? badge('ВНИМАНИЕ','warn') : badge('НОРМА','ok');
+    const instr = creditInstruments.filter(i=>i.shipperId===s.id&&i.status==='ACTIVE');
+    const instrLabel = instr.length ? instr.map(i=>`<span class="instr-type" style="font-size:9px">${typeLabels[i.type]||i.type}</span>`).join(' ') : '<span style="color:var(--text3);font-size:10px">—</span>';
     return `<tr>
       <td class="fw7">${s.name}</td>
       <td class="mono">${fmtEur(s.creditLimit)}</td>
@@ -1443,14 +1663,13 @@ function renderCredit() {
         <div class="cbar" style="width:100px"><div class="cbar-fill" style="width:${Math.min(100,pct*100)}%;background:var(--${barCls})"></div></div>
         <span class="mono" style="font-size:11px">${pctVal}%</span>
       </div></td>
+      <td>${instrLabel}</td>
       <td>${sts}</td>
-      <td><button class="action-btn" onclick="openMcFor('${s.id}')">Margin Call</button></td>
+      <td><button class="action-btn" onclick="openMcFor('${s.id}')">MC</button></td>
     </tr>`;
   }).join('');
 
-  document.querySelector('#t-mc-history tbody').innerHTML = mcHistory.length ?
-    mcHistory.map(m=>`<tr><td class="mono text-dim">${m.ts}</td><td>${m.party}</td><td class="mono text-yellow">${fmtEur(m.amount)}</td><td class="mono">${m.deadline}</td><td class="text-dim">${m.basis}</td><td>${badge('ОТПРАВЛЕН','matching')}</td></tr>`).join('')
-    : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px">Нет истории</td></tr>';
+  document.getElementById('ctc-mc').textContent = mcHistory.length;
 }
 
 function openMcFor(shipperId) {
@@ -1949,6 +2168,339 @@ function renderCapacity() {
 }
 
 // ═══════════════════════════════════════════════════════
+// SPRINT 6 — CREDIT SUPPORT  NC Art.5
+// ═══════════════════════════════════════════════════════
+
+// NC Art.5.3.1 — рейтинговое освобождение
+function isRatingExempt(r) {
+  const spOk = ['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-'].includes((r.sp||'').toUpperCase());
+  const moOk = ['Aaa','Aa1','Aa2','Aa3','A1','A2','A3','Baa1','Baa2','Baa3'].includes(r.moodys||'');
+  const crOk = r.creditreform != null && r.creditreform <= 235;
+  return spOk || moOk || crOk;
+}
+
+// NC Art.5.3.1 — минимальный размер обеспечения (мультипликаторы по продукту)
+const MIN_CREDIT_MULT = { ANNUAL:2/12, QUARTERLY:2/3, MONTHLY:1, DAILY:1/30 };
+function calcMinCreditSize(annualFee, product) {
+  return annualFee * (MIN_CREDIT_MULT[product] || 2/12);
+}
+
+// Credit tab switch
+function creditTab(el, tab) {
+  document.querySelectorAll('#page-credit .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['positions','instruments','ratings','mc'].forEach(t=>{
+    const c = document.getElementById('ctab-content-'+t);
+    if (c) c.style.display = t===tab?'':'none';
+  });
+  if (tab==='instruments') renderCreditInstruments();
+  if (tab==='ratings')     renderCreditRatings();
+  if (tab==='mc')          renderMcHistory();
+}
+
+// KPI summary row
+function renderCreditKPI() {
+  const totalLimit    = shippers.reduce((s,x)=>s+x.creditLimit,0);
+  const totalExposure = shippers.reduce((s,x)=>s+x.exposure,0);
+  const overLimit     = shippers.filter(s=>s.exposure>s.creditLimit).length;
+  const expiring      = creditInstruments.filter(i=>i.status==='EXPIRING').length;
+  const grid = document.getElementById('cs-kpi-grid');
+  if (!grid) return;
+  const kpis = [
+    { label:'ОБЩИЙ КРЕДИТНЫЙ ЛИМИТ', val:'€ '+fmtEur(totalLimit), sub:'по всем шипперам' },
+    { label:'ТЕКУЩАЯ ЭКСПОЗИЦИЯ',     val:'€ '+fmtEur(totalExposure), sub:`${((totalExposure/totalLimit)*100).toFixed(1)}% от лимита` },
+    { label:'ПРЕВЫШЕНИЙ ЛИМИТА',      val:overLimit,  sub:'требуют Margin Call', color:overLimit>0?'var(--red)':'' },
+    { label:'ИСТЕКАЮТ (30д)',          val:expiring,   sub:'инструментов NC Art.5', color:expiring>0?'var(--yellow)':'' },
+  ];
+  grid.innerHTML = kpis.map(k=>`
+    <div class="cs-kpi">
+      <div class="cs-kpi-label">${k.label}</div>
+      <div class="cs-kpi-val" style="${k.color?'color:'+k.color:''}">${k.val}</div>
+      <div class="cs-kpi-sub">${k.sub}</div>
+    </div>`).join('');
+}
+
+// Instruments table
+function renderCreditInstruments() {
+  const typeLabels = {
+    BANK_GUARANTEE:'Банк. гарантия (URDG 758)',
+    LETTER_OF_CREDIT:'Аккредитив (UCP 600)',
+    CASH_DEPOSIT:'Денежный депозит',
+    SURETY_BOND:'Поручительство',
+  };
+  const tbody = document.querySelector('#t-cs-instr tbody');
+  if (!tbody) return;
+  tbody.innerHTML = creditInstruments.map(i=>{
+    const s = shippers.find(x=>x.id===i.shipperId)||{name:i.shipperId};
+    const d = daysLeft(i.expires);
+    const dCls = d<0?'text-red':d<30?'text-yellow':'';
+    // estimate annual fee for min credit calc
+    const annualFee = (s.creditLimit||0);
+    const minCredit = calcMinCreditSize(annualFee, i.product);
+    const cover = minCredit>0 ? ((i.amount/minCredit)*100).toFixed(0)+'%' : '—';
+    const coverOk = i.amount >= minCredit;
+    const statusCls = i.status==='ACTIVE'?'green':i.status==='EXPIRING'?'yellow':'red';
+    return `<tr>
+      <td class="fw7">${s.name}</td>
+      <td><span class="instr-type">${typeLabels[i.type]||i.type}</span></td>
+      <td class="text-dim">${i.bank||'—'}</td>
+      <td class="mono">€ ${fmtEur(i.amount)}</td>
+      <td class="mono ${dCls}">${i.expires} <span style="font-size:10px">(${d<0?'ИСТЁК':d+'д'})</span></td>
+      <td><span class="auc-product">${i.product}</span></td>
+      <td class="mono ${coverOk?'text-green':'text-red'}">€ ${fmtEur(minCredit)} <span style="font-size:10px">(${cover})</span></td>
+      <td>${badge(i.status, statusCls)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px;">Нет инструментов</td></tr>';
+  document.getElementById('ctc-instr').textContent = creditInstruments.length;
+}
+
+// Ratings table
+function renderCreditRatings() {
+  const tbody = document.querySelector('#t-cs-ratings tbody');
+  if (!tbody) return;
+  tbody.innerHTML = creditRatings.map(r=>{
+    const exempt = isRatingExempt(r);
+    const s = shippers.find(x=>x.id===r.shipperId)||{creditLimit:0};
+    const minCr = exempt ? 0 : calcMinCreditSize(s.creditLimit||0, 'ANNUAL');
+    const spCls  = ['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-'].includes((r.sp||'').toUpperCase()) ? 'inv-grade':'sub-grade';
+    const moCls  = ['Aaa','Aa1','Aa2','Aa3','A1','A2','A3','Baa1','Baa2','Baa3'].includes(r.moodys||'') ? 'inv-grade':'sub-grade';
+    const crCls  = (r.creditreform||999) <= 235 ? 'inv-grade':'sub-grade';
+    return `<tr>
+      <td class="fw7">${r.name}</td>
+      <td><span class="rating-badge ${spCls}">${r.sp||'—'}</span></td>
+      <td><span class="rating-badge ${moCls}">${r.moodys||'—'}</span></td>
+      <td><span class="rating-badge ${crCls}">${r.creditreform||'—'}</span></td>
+      <td><span class="rating-badge ${exempt?'exempt':'not-exempt'}">${exempt?'✓ ОСВОБОЖДЁН':'✗ ТРЕБУЕТ ОБЕСПЕЧЕНИЕ'}</span></td>
+      <td class="mono">${exempt ? '—' : '€ '+fmtEur(minCr)}</td>
+      <td class="mono text-dim">${r.updatedAt}</td>
+      <td><button class="action-btn" onclick="updateRating('${r.shipperId}')">Обновить</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function updateRating(sid) {
+  toast(`Рейтинговое обновление для ${sid} запрошено`, 'info');
+  addAudit(`Запрос обновления рейтинга: ${sid}`, 'CREDIT');
+}
+
+// Add credit instrument
+function calcMinCredit() {
+  const amount  = parseFloat(document.getElementById('ci-amount').value)||0;
+  const product = document.getElementById('ci-product').value;
+  const sid     = document.getElementById('ci-shipper').value;
+  const s       = shippers.find(x=>x.id===sid)||{creditLimit:0};
+  const minCr   = calcMinCreditSize(s.creditLimit||0, product);
+  const box     = document.getElementById('ci-min-credit');
+  if (!box) return;
+  box.style.display = 'block';
+  document.getElementById('ci-min-val').textContent = '€ ' + fmtEur(minCr);
+  const ok = amount >= minCr;
+  const cvg = minCr > 0 ? ((amount/minCr)*100).toFixed(1)+'%' : '—';
+  document.getElementById('ci-coverage').innerHTML = `<span style="color:${ok?'var(--green)':'var(--red)'}">${cvg} ${ok?'✓ Достаточно':'✗ Недостаточно'}</span>`;
+}
+
+function addCreditInstrument() {
+  const sid     = document.getElementById('ci-shipper').value;
+  const type    = document.getElementById('ci-type').value;
+  const product = document.getElementById('ci-product').value;
+  const bank    = document.getElementById('ci-bank').value.trim();
+  const amount  = parseFloat(document.getElementById('ci-amount').value)||0;
+  const issued  = document.getElementById('ci-issued').value;
+  const expires = document.getElementById('ci-expires').value;
+  if (!sid || !amount || !expires) { toast('Заполните обязательные поля', 'error'); return; }
+  const s = shippers.find(x=>x.id===sid);
+  const minCr = calcMinCreditSize(s?s.creditLimit:0, product);
+  if (amount < minCr) {
+    toast(`Сумма € ${fmtEur(amount)} < минимум NC Art.5 € ${fmtEur(minCr)}`, 'warning');
+  }
+  creditInstruments.push({ id:`CI-00${instrCounter++}`, shipperId:sid, type, bank, amount, issued:issued||today(), expires, product, status:'ACTIVE' });
+  renderCreditKPI();
+  renderCreditInstruments();
+  closeModal('modal-credit-instr');
+  toast(`Инструмент добавлен — NC Art.5 (${type})`, 'success');
+  addAudit(`Добавлен кредитный инструмент: ${type} для ${s?s.name:sid}`, 'CREDIT');
+}
+
+// Margin Call history
+function renderMcHistory() {
+  const tbody = document.querySelector('#t-mc-history tbody');
+  if (!tbody) return;
+  tbody.innerHTML = mcHistory.length
+    ? mcHistory.map(m=>`<tr><td class="mono text-dim">${m.ts}</td><td class="fw7">${m.party}</td><td class="mono text-red">€ ${fmtEur(m.amount)}</td><td class="mono">${m.deadline}</td><td class="text-dim">${m.basis}</td><td>${badge('ОТПРАВЛЕН','red')}</td></tr>`).join('')
+    : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:20px;">Нет Margin Call</td></tr>';
+  document.getElementById('ctc-mc').textContent = mcHistory.length;
+}
+
+// Populate credit instrument modal shipper
+function _populateCiShipper() {
+  const sel = document.getElementById('ci-shipper');
+  if (!sel) return;
+  sel.innerHTML = shippers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+// SPRINT 6 — AUCTION MANAGEMENT  CAM NC
+// ═══════════════════════════════════════════════════════
+
+const PRODUCT_LABELS = { ANNUAL:'Firm Annual', QUARTERLY:'Firm Quarterly', MONTHLY:'Firm Monthly', DAILY:'Firm Daily' };
+
+function renderAuctionKPI() {
+  const grid = document.getElementById('auc-kpi-grid');
+  if (!grid) return;
+  const open     = auctionsData.filter(a=>a.status==='OPEN').length;
+  const ann      = auctionsData.filter(a=>a.status==='ANNOUNCED').length;
+  const awarded  = auctionsData.filter(a=>a.status==='AWARDED'||a.status==='CONTRACTED').length;
+  const myBids   = auctionBids.length;
+  const kpis = [
+    { label:'ОТКРЫТЫЕ АУКЦИОНЫ', val:open, sub:'принимают заявки', color:open>0?'var(--green)':'' },
+    { label:'ОБЪЯВЛЕННЫЕ',       val:ann,  sub:'скоро открытие', color:ann>0?'var(--accent)':'' },
+    { label:'ПРИСУЖДЕНО',        val:awarded, sub:'контрактов' },
+    { label:'МОИ ЗАЯВКИ',        val:myBids,  sub:'всего подано' },
+  ];
+  grid.innerHTML = kpis.map(k=>`
+    <div class="cs-kpi">
+      <div class="cs-kpi-label">${k.label}</div>
+      <div class="cs-kpi-val" style="${k.color?'color:'+k.color:''}">${k.val}</div>
+      <div class="cs-kpi-sub">${k.sub}</div>
+    </div>`).join('');
+}
+
+function aucTab(el, filter) {
+  document.querySelectorAll('#page-auctions .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  aucTabFilter = filter;
+  renderAuctions();
+}
+
+function renderAuctions() {
+  renderAuctionKPI();
+  const list = aucTabFilter==='all' ? auctionsData : auctionsData.filter(a=>a.status===aucTabFilter);
+  // update counts
+  ['all','OPEN','ANNOUNCED','AWARDED','CLOSED'].forEach(f=>{
+    const id = {all:'atc-all',OPEN:'atc-open',ANNOUNCED:'atc-ann',AWARDED:'atc-awd',CLOSED:'atc-cls'}[f];
+    const el = document.getElementById(id);
+    if (el) el.textContent = f==='all' ? auctionsData.length : auctionsData.filter(a=>a.status===f).length;
+  });
+  // nav badge
+  const nb = document.getElementById('nb-auctions');
+  if (nb) nb.textContent = auctionsData.filter(a=>a.status==='OPEN').length;
+
+  const tbody = document.querySelector('#t-auctions tbody');
+  if (!tbody) return;
+  tbody.innerHTML = list.map(a=>{
+    const isOpen = a.status==='OPEN';
+    const myBidCount = auctionBids.filter(b=>b.aucId===a.id).length;
+    return `<tr>
+      <td class="mono text-accent">${a.id}</td>
+      <td><span class="auc-product">${PRODUCT_LABELS[a.product]||a.product}</span></td>
+      <td class="mono">${a.point.replace('_IP','')}</td>
+      <td class="text-dim" style="font-size:11px">${a.period}</td>
+      <td class="mono">${fmt(a.maxCap)}</td>
+      <td class="mono">€ ${fmtEur(a.reservePrice)}</td>
+      <td class="mono ${isOpen?'text-yellow':''}">${a.bidsDeadline}</td>
+      <td class="fw7">${a.winner||'—'}</td>
+      <td><span class="auc-status ${a.status}">${a.status}</span></td>
+      <td>
+        ${isOpen ? `<button class="action-btn" onclick="openBidFor('${a.id}')">Подать заявку</button>` : ''}
+        ${myBidCount>0 ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">${myBidCount} заявок</span>` : ''}
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">Нет аукционов</td></tr>';
+
+  // My bids
+  const bTbody = document.querySelector('#t-my-bids tbody');
+  if (!bTbody) return;
+  bTbody.innerHTML = auctionBids.map(b=>{
+    const a = auctionsData.find(x=>x.id===b.aucId)||{id:b.aucId};
+    const bCls = b.status==='WON'?'text-green':b.status==='LOST'?'text-red':b.status==='PENDING'?'text-yellow':'';
+    return `<tr class="${b.status==='WON'||b.status==='PENDING'?'bid-row-mine':''}">
+      <td class="mono text-accent">${b.aucId}</td>
+      <td class="fw7">${b.shipperName}</td>
+      <td class="mono">${fmt(b.cap)}</td>
+      <td class="mono">€ ${fmtEur(b.price)}</td>
+      <td class="mono">€ ${fmtEur(b.annualVal)}</td>
+      <td class="mono ${bCls}">${b.status}</td>
+      <td class="mono text-dim">${b.ts}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px;">Нет заявок</td></tr>';
+}
+
+function openBidFor(aucId) {
+  openModal('modal-bid');
+  const sel = document.getElementById('bid-auction');
+  if (sel) sel.value = aucId;
+  onBidAucChange();
+}
+
+function onBidAucChange() {
+  const aucId = document.getElementById('bid-auction').value;
+  const a = auctionsData.find(x=>x.id===aucId);
+  const info = document.getElementById('bid-auc-info');
+  if (!a || !info) return;
+  info.style.display = '';
+  document.getElementById('bid-info-product').textContent = PRODUCT_LABELS[a.product]||a.product;
+  document.getElementById('bid-info-point').textContent   = a.point;
+  document.getElementById('bid-info-period').textContent  = a.period;
+  document.getElementById('bid-info-cap').textContent     = fmt(a.maxCap) + ' кВт/ч/ч';
+  document.getElementById('bid-info-reserve').textContent = '€ ' + fmtEur(a.reservePrice) + ' / (кВт/ч/ч)/год';
+  // prefill reserve price
+  const priceEl = document.getElementById('bid-price');
+  if (priceEl && !priceEl.value) priceEl.value = a.reservePrice;
+  calcBid();
+}
+
+function calcBid() {
+  const cap   = parseFloat(document.getElementById('bid-cap').value)||0;
+  const price = parseFloat(document.getElementById('bid-price').value)||0;
+  const annual = cap * price;
+  document.getElementById('bid-annual').textContent = '€ ' + fmtEur(annual);
+  // credit check NC Art.5 — annual × 2/12
+  const minCr = annual * (2/12);
+  const aucId = document.getElementById('bid-auction').value;
+  const sid   = document.getElementById('bid-shipper').value;
+  const instr = creditInstruments.filter(i=>i.shipperId===sid&&i.status==='ACTIVE').reduce((s,i)=>s+i.amount,0);
+  const ccEl  = document.getElementById('bid-credit-check');
+  if (ccEl && aucId) {
+    const ok = instr >= minCr;
+    ccEl.innerHTML = `Мин. гарантия NC Art.5: <span style="color:var(--accent)">€ ${fmtEur(minCr)}</span> | Есть: <span style="color:${ok?'var(--green)':'var(--red)'}">€ ${fmtEur(instr)}</span> <span style="color:${ok?'var(--green)':'var(--red)'}">${ok?'✓':'✗'}</span>`;
+  }
+}
+
+function submitBid() {
+  const aucId  = document.getElementById('bid-auction').value;
+  const sid    = document.getElementById('bid-shipper').value;
+  const cap    = parseFloat(document.getElementById('bid-cap').value)||0;
+  const price  = parseFloat(document.getElementById('bid-price').value)||0;
+  if (!aucId || !sid || !cap || !price) { toast('Заполните все обязательные поля', 'error'); return; }
+  const a = auctionsData.find(x=>x.id===aucId);
+  if (!a || a.status!=='OPEN') { toast('Аукцион не открыт для приёма заявок', 'error'); return; }
+  if (cap > a.maxCap) { toast(`Запрашиваемая мощность превышает максимум ${fmt(a.maxCap)} кВт/ч/ч`, 'warning'); return; }
+  const s = shippers.find(x=>x.id===sid)||{name:sid};
+  auctionBids.push({
+    id:`BID-00${bidCounter++}`, aucId, shipperId:sid, shipperName:s.name,
+    cap, price, annualVal:cap*price, status:'PENDING', ts:today(),
+  });
+  renderAuctions();
+  closeModal('modal-bid');
+  toast(`Заявка BID-00${bidCounter-1} подана на ${aucId}`, 'success');
+  addAudit(`Заявка на аукцион ${aucId}: ${fmt(cap)} кВт/ч/ч × €${price} (${s.name})`, 'AUCTIONS');
+  // reset
+  ['bid-cap','bid-price','bid-comment'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('bid-auction').value='';
+  const info=document.getElementById('bid-auc-info');if(info)info.style.display='none';
+}
+
+function _populateBidSelects() {
+  const aucSel = document.getElementById('bid-auction');
+  if (aucSel) {
+    aucSel.innerHTML = '<option value="">Выберите аукцион...</option>' +
+      auctionsData.filter(a=>a.status==='OPEN').map(a=>`<option value="${a.id}">${a.id} — ${PRODUCT_LABELS[a.product]} ${a.point} ${a.period}</option>`).join('');
+  }
+  const bidShip = document.getElementById('bid-shipper');
+  if (bidShip) bidShip.innerHTML = shippers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════
 // AUDIT  FR-15
 // ═══════════════════════════════════════════════════════
 function renderAudit() {
@@ -1964,6 +2516,17 @@ function renderAudit() {
 // ═══════════════════════════════════════════════════════
 function openModal(id) {
   document.getElementById(id).classList.add('open');
+  if (id==='modal-credit-instr') {
+    _populateCiShipper();
+    document.getElementById('ci-issued').value = today();
+    const exp = new Date(); exp.setFullYear(exp.getFullYear()+1);
+    document.getElementById('ci-expires').value = exp.toISOString().slice(0,10);
+    document.getElementById('ci-min-credit').style.display = 'none';
+  }
+  if (id==='modal-bid') {
+    _populateBidSelects();
+    document.getElementById('bid-auc-info').style.display = 'none';
+  }
   if (id==='modal-mc') {
     document.querySelectorAll('#mc-counterparty option').forEach(o=>{
       const s=shippers.find(x=>x.id===o.value);
