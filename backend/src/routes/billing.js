@@ -261,7 +261,12 @@ router.get('/', authorize('billing:read'), async (req, res, next) => {
        LIMIT $${i++} OFFSET $${i++}`,
       [...params, limit, offset]
     );
-    res.json(rows);
+    const { rows: cRows } = await db.query(
+      `SELECT COUNT(*) AS count FROM invoices i ${where}`,
+      params
+    );
+    const total = parseInt((cRows[0] || {}).count || '0', 10);
+    res.json({ data: rows, total, limit: Number(limit), offset: Number(offset) });
   } catch (err) { next(err); }
 });
 
@@ -290,7 +295,11 @@ router.get('/:id', authorize('billing:read'), async (req, res, next) => {
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Invoice not found' });
-    res.json(rows[0]);
+    const { rows: items } = await db.query(
+      `SELECT * FROM invoice_line_items WHERE invoice_id = $1 ORDER BY id`,
+      [req.params.id]
+    );
+    res.json({ ...rows[0], items });
   } catch (err) { next(err); }
 });
 
@@ -592,6 +601,15 @@ router.post(
 );
 
 // PATCH /billing/:id/status
+// Valid transitions per NC business rules
+const ALLOWED_TRANSITIONS = {
+  DRAFT:     ['ISSUED', 'CANCELLED'],
+  ISSUED:    ['PAID', 'OVERDUE', 'CANCELLED'],
+  OVERDUE:   ['PAID', 'CANCELLED'],
+  PAID:      [],           // terminal
+  CANCELLED: [],           // terminal
+};
+
 router.patch('/:id/status', authorize('billing:update'), async (req, res, next) => {
   const { status } = req.body;
   const valid = ['DRAFT', 'ISSUED', 'PAID', 'OVERDUE', 'CANCELLED'];
@@ -600,26 +618,38 @@ router.patch('/:id/status', authorize('billing:update'), async (req, res, next) 
   }
 
   try {
-    const sp = await getSystemParams();
+    // Fetch invoice first — determines current status for transition check
+    const { rows: inv } = await db.query(
+      `SELECT id, status, total_amount_eur, due_date FROM invoices WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!inv.length) return res.status(404).json({ error: 'Invoice not found' });
+
+    const current = inv[0].status;
+    const allowed = ALLOWED_TRANSITIONS[current] || [];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status transition: ${current} → ${status}`,
+      });
+    }
+
     let lateInterest = 0;
     let daysOverdue  = 0;
 
     // On OVERDUE: calculate interest (NC Art. 20.4.2)
     if (status === 'OVERDUE') {
-      const { rows: inv } = await db.query(
-        `SELECT total_amount_eur, due_date FROM invoices WHERE id = $1`, [req.params.id]
-      );
-      if (inv.length && inv[0].due_date) {
+      const sp = await getSystemParams();
+      if (inv[0].due_date) {
         daysOverdue = Math.max(
           0,
           Math.floor((Date.now() - new Date(inv[0].due_date)) / 86400000)
         );
         lateInterest = calcLatePaymentInterest({
-          overdueEur:         parseFloat(inv[0].total_amount_eur),
+          overdueEur:   parseFloat(inv[0].total_amount_eur),
           daysOverdue,
-          euribor6mPct:       sp.euribor6mPct,
-          spreadPct:          sp.latePaymentSpreadPct,
-          dayBasis:           sp.latePaymentDayBasis,
+          euribor6mPct: sp.euribor6mPct,
+          spreadPct:    sp.latePaymentSpreadPct,
+          dayBasis:     sp.latePaymentDayBasis,
         });
       }
     }

@@ -78,7 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_auction_calendar_delivery ON auction_calendar(del
 CREATE TABLE IF NOT EXISTS auction_bids (
   id                      SERIAL PRIMARY KEY,
   auction_id              INTEGER NOT NULL REFERENCES auction_calendar(id) ON DELETE RESTRICT,
-  shipper_id              INTEGER NOT NULL REFERENCES shippers(id),
+  shipper_id              UUID    NOT NULL REFERENCES shippers(id),
 
   -- Параметры заявки
   point_code              VARCHAR(50) NOT NULL REFERENCES interconnection_points(code),
@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS auction_bids (
   result_notes            TEXT,
 
   -- Связь с контрактом (заполняется при создании контракта)
-  contract_id             INTEGER REFERENCES contracts(id),
+  contract_id             UUID REFERENCES contracts(id),
   contract_created_at     TIMESTAMPTZ,
 
   -- Кредитная блокировка (NC Art. 5)
@@ -122,8 +122,8 @@ CREATE TABLE IF NOT EXISTS auction_bids (
   credit_blocked_eur      NUMERIC(18,2),   -- заблокировано на счёте кредитной поддержки
 
   notes                   TEXT,
-  created_by              INTEGER REFERENCES users(id),
-  updated_by              INTEGER REFERENCES users(id),
+  created_by              UUID REFERENCES users(id),
+  updated_by              UUID REFERENCES users(id),
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -157,14 +157,14 @@ CREATE TRIGGER trg_auction_bids_upd
 -- ============================================================
 CREATE OR REPLACE FUNCTION fn_create_contract_from_bid(
   p_bid_id     INTEGER,
-  p_created_by INTEGER DEFAULT NULL
-) RETURNS INTEGER AS $$
+  p_created_by UUID DEFAULT NULL
+) RETURNS UUID AS $$
 DECLARE
   v_bid         RECORD;
   v_auction     RECORD;
   v_shipper     RECORD;
   v_ip          RECORD;
-  v_contract_id INTEGER;
+  v_contract_id UUID;
   v_tariff_entry NUMERIC(12,6) := 6.00;
   v_tariff_exit  NUMERIC(12,6) := 6.85;
   v_cap_entry    NUMERIC(18,2);
@@ -673,22 +673,22 @@ WHERE product_type IN ('ANNUAL','QUARTERLY','MONTHLY')
 -- ============================================================
 -- 10. Параметры аукционного модуля в system_params
 -- ============================================================
-INSERT INTO system_params (param_key, param_value, description, updated_at)
+INSERT INTO system_params (key, value, description, updated_at)
 VALUES
-  ('auction.rbp_platform_url',     'https://rbp.eu',               'URL платформы RBP.EU', NOW()),
-  ('auction.daily_firm_open_utc',  '15:30',                        'Открытие Daily Firm аукциона (UTC зима)', NOW()),
-  ('auction.daily_firm_open_utc_summer', '14:30',                  'Открытие Daily Firm аукциона (UTC лето)', NOW()),
-  ('auction.daily_run_utc',        '05:00',                        'Начало суток поставки (UTC зима)', NOW()),
-  ('auction.daily_run_utc_summer', '04:00',                        'Начало суток поставки (UTC лето)', NOW()),
-  ('auction.within_day_round_min', '30',                           'Длительность раунда Within-Day (минут)', NOW()),
-  ('auction.within_day_h_plus',    '4',                            'Поставка Within-Day capacity: H+4', NOW()),
-  ('auction.cam_nc_version',       'CAM NC EU 2017/459',           'Применимый регламент CAM NC', NOW()),
-  ('auction.calendar_source',      'MAR0277-24',                   'Источник расписания аукционов', NOW()),
-  ('auction.calendar_valid_from',  '2025-03-01',                   'Расписание действует с', NOW()),
-  ('auction.calendar_valid_to',    '2026-10-01',                   'Расписание действует до', NOW())
-ON CONFLICT (param_key) DO UPDATE
-  SET param_value = EXCLUDED.param_value,
-      updated_at  = NOW();
+  ('auction.rbp_platform_url',          '"https://rbp.eu"',         'URL платформы RBP.EU', NOW()),
+  ('auction.daily_firm_open_utc',       '"15:30"',                  'Открытие Daily Firm аукциона (UTC зима)', NOW()),
+  ('auction.daily_firm_open_utc_summer','"14:30"',                  'Открытие Daily Firm аукциона (UTC лето)', NOW()),
+  ('auction.daily_run_utc',             '"05:00"',                  'Начало суток поставки (UTC зима)', NOW()),
+  ('auction.daily_run_utc_summer',      '"04:00"',                  'Начало суток поставки (UTC лето)', NOW()),
+  ('auction.within_day_round_min',      '30',                       'Длительность раунда Within-Day (минут)', NOW()),
+  ('auction.within_day_h_plus',         '4',                        'Поставка Within-Day capacity: H+4', NOW()),
+  ('auction.cam_nc_version',            '"CAM NC EU 2017/459"',     'Применимый регламент CAM NC', NOW()),
+  ('auction.calendar_source',           '"MAR0277-24"',             'Источник расписания аукционов', NOW()),
+  ('auction.calendar_valid_from',       '"2025-03-01"',             'Расписание действует с', NOW()),
+  ('auction.calendar_valid_to',         '"2026-10-01"',             'Расписание действует до', NOW())
+ON CONFLICT (key) DO UPDATE
+  SET value      = EXCLUDED.value,
+      updated_at = NOW();
 
 COMMIT;
 

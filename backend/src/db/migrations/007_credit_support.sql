@@ -15,11 +15,21 @@
 BEGIN;
 
 -- ============================================================
+-- 0. Extend contracts with columns needed by credit functions
+--    (formally added in 008; pre-declared here for FK/view use)
+-- ============================================================
+ALTER TABLE contracts
+  ADD COLUMN IF NOT EXISTS contract_number           VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS product_type              VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS tariff_entry_eur_kwh_h_yr NUMERIC(12,6),
+  ADD COLUMN IF NOT EXISTS tariff_exit_eur_kwh_h_yr  NUMERIC(12,6);
+
+-- ============================================================
 -- 1. Таблица кредитной поддержки
 -- ============================================================
 CREATE TABLE IF NOT EXISTS credit_support (
   id                    SERIAL PRIMARY KEY,
-  shipper_id            INTEGER NOT NULL REFERENCES shippers(id) ON DELETE RESTRICT,
+  shipper_id            UUID NOT NULL REFERENCES shippers(id) ON DELETE RESTRICT,
 
   -- Форма кредитной поддержки (NC Art. 5.2)
   support_type          VARCHAR(20) NOT NULL
@@ -73,8 +83,8 @@ CREATE TABLE IF NOT EXISTS credit_support (
   call_reason           TEXT,
 
   notes                 TEXT,
-  created_by            INTEGER REFERENCES users(id),
-  updated_by            INTEGER REFERENCES users(id),
+  created_by            UUID REFERENCES users(id),
+  updated_by            UUID REFERENCES users(id),
   created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
@@ -92,14 +102,14 @@ CREATE INDEX IF NOT EXISTS idx_credit_support_valid_to
 -- ============================================================
 CREATE TABLE IF NOT EXISTS credit_rating_history (
   id              SERIAL PRIMARY KEY,
-  shipper_id      INTEGER NOT NULL REFERENCES shippers(id),
+  shipper_id      UUID NOT NULL REFERENCES shippers(id),
   record_date     DATE    NOT NULL DEFAULT CURRENT_DATE,
   sp_rating       VARCHAR(10),
   moodys_rating   VARCHAR(10),
   creditreform_score INTEGER,
   rating_exempt   BOOLEAN NOT NULL DEFAULT false,
   notes           TEXT,
-  recorded_by     INTEGER REFERENCES users(id),
+  recorded_by     UUID REFERENCES users(id),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -112,7 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_credit_rating_history_shipper
 CREATE TABLE IF NOT EXISTS credit_support_events (
   id                  SERIAL PRIMARY KEY,
   credit_support_id   INTEGER NOT NULL REFERENCES credit_support(id),
-  shipper_id          INTEGER NOT NULL REFERENCES shippers(id),
+  shipper_id          UUID NOT NULL REFERENCES shippers(id),
   event_type          VARCHAR(30) NOT NULL
     CHECK (event_type IN ('ISSUED','EXTENDED','INCREASED','DECREASED',
                           'CALLED','PARTIALLY_CALLED','RELEASED','EXPIRED','CANCELLED')),
@@ -122,7 +132,7 @@ CREATE TABLE IF NOT EXISTS credit_support_events (
   valid_to_before     DATE,
   valid_to_after      DATE,
   notes               TEXT,
-  performed_by        INTEGER REFERENCES users(id),
+  performed_by        UUID REFERENCES users(id),
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -178,7 +188,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 --   Monthly  → 100% месячной суммы
 --   Daily    → 100% суточной суммы
 CREATE OR REPLACE FUNCTION fn_calc_min_credit_size(
-  p_shipper_id  INTEGER
+  p_shipper_id  UUID
 ) RETURNS NUMERIC AS $$
 DECLARE
   v_total       NUMERIC(18,2) := 0;
@@ -451,18 +461,18 @@ CREATE TRIGGER trg_credit_support_updated_at
 -- 11. Функция: выдать Margin Call (обновлённая, NC Art. 5.5)
 -- ============================================================
 CREATE OR REPLACE FUNCTION fn_issue_margin_call(
-  p_shipper_id    INTEGER,
-  p_issued_by     INTEGER,
+  p_shipper_id    UUID,
+  p_issued_by     UUID,
   p_notes         TEXT DEFAULT NULL
 ) RETURNS TABLE (
-  margin_call_id  INTEGER,
+  margin_call_id  UUID,
   exposure_eur    NUMERIC,
   limit_eur       NUMERIC,
   shortfall_eur   NUMERIC,
   deadline        TIMESTAMPTZ
 ) AS $$
 DECLARE
-  v_mc_id     INTEGER;
+  v_mc_id     UUID;
   v_exposure  NUMERIC(18,2);
   v_limit     NUMERIC(18,2);
   v_shortfall NUMERIC(18,2);
@@ -496,58 +506,58 @@ $$ LANGUAGE plpgsql;
 -- ============================================================
 -- 12. Seed: параметры кредитной поддержки в system_params
 -- ============================================================
-INSERT INTO system_params (param_key, param_value, description, updated_at)
+INSERT INTO system_params (key, value, description, updated_at)
 VALUES
-  ('credit.min_bank_rating',    'BBB-',         'Минимальный рейтинг банка-гаранта (S&P/Fitch) NC Art.5.2', NOW()),
-  ('credit.min_bank_rating_moodys', 'Baa3',     'Минимальный рейтинг банка (Moody''s) NC Art.5.2', NOW()),
-  ('credit.rating_exempt_sp',   'BBB-',         'Освобождение от гарантии — рейтинг S&P/Fitch NC Art.5.4', NOW()),
-  ('credit.rating_exempt_moodys','Baa3',        'Освобождение от гарантии — рейтинг Moody''s NC Art.5.4', NOW()),
-  ('credit.rating_exempt_creditreform', '235',  'Освобождение — Creditreform score ≤235 NC Art.5.4', NOW()),
-  ('credit.multiplier_annual',  '0.1667',       'Множитель гарантии: Annual = 2/12 NC Art.5.3.1', NOW()),
-  ('credit.multiplier_quarterly','0.2222',      'Множитель гарантии: Quarterly = 2/3 квартала NC Art.5.3.1', NOW()),
-  ('credit.multiplier_monthly', '0.0833',       'Множитель гарантии: Monthly = 100% месяца NC Art.5.3.1', NOW()),
-  ('credit.multiplier_daily',   '0.00274',      'Множитель гарантии: Daily = 100% суток NC Art.5.3.1', NOW()),
-  ('credit.margin_call_deadline_days', '2',     'Срок доплнения гарантии после Margin Call (рабочих дней) NC Art.5.5', NOW()),
-  ('credit.urdg_version',       'URDG 758',     'Версия унифицированных правил для банковских гарантий', NOW())
-ON CONFLICT (param_key) DO UPDATE
-  SET param_value = EXCLUDED.param_value,
+  ('credit.min_bank_rating',           '"BBB-"',    'Минимальный рейтинг банка-гаранта (S&P/Fitch) NC Art.5.2', NOW()),
+  ('credit.min_bank_rating_moodys',    '"Baa3"',    'Минимальный рейтинг банка (Moody''s) NC Art.5.2', NOW()),
+  ('credit.rating_exempt_sp',          '"BBB-"',    'Освобождение от гарантии — рейтинг S&P/Fitch NC Art.5.4', NOW()),
+  ('credit.rating_exempt_moodys',      '"Baa3"',    'Освобождение от гарантии — рейтинг Moody''s NC Art.5.4', NOW()),
+  ('credit.rating_exempt_creditreform','235',        'Освобождение — Creditreform score ≤235 NC Art.5.4', NOW()),
+  ('credit.multiplier_annual',         '0.1667',    'Множитель гарантии: Annual = 2/12 NC Art.5.3.1', NOW()),
+  ('credit.multiplier_quarterly',      '0.2222',    'Множитель гарантии: Quarterly = 2/3 квартала NC Art.5.3.1', NOW()),
+  ('credit.multiplier_monthly',        '0.0833',    'Множитель гарантии: Monthly = 100% месяца NC Art.5.3.1', NOW()),
+  ('credit.multiplier_daily',          '0.00274',   'Множитель гарантии: Daily = 100% суток NC Art.5.3.1', NOW()),
+  ('credit.margin_call_deadline_days', '2',         'Срок доплнения гарантии после Margin Call (рабочих дней) NC Art.5.5', NOW()),
+  ('credit.urdg_version',              '"URDG 758"','Версия унифицированных правил для банковских гарантий', NOW())
+ON CONFLICT (key) DO UPDATE
+  SET value       = EXCLUDED.value,
       description = EXCLUDED.description,
       updated_at  = NOW();
 
 -- ============================================================
 -- 13. Seed: тестовые данные кредитной поддержки
+-- (только если шипперы уже существуют — вставляются при npm run seed)
 -- ============================================================
--- Примечание: shipper_id=1 (Gazprom Export) и shipper_id=2 (MET Serbia) — seed из 001_initial.sql
 INSERT INTO credit_support (
   shipper_id, support_type, guarantee_number, bank_name, bank_swift,
   bank_country, urdg_758_compliant, min_credit_rating,
   amount_eur, valid_from, valid_to, status,
   covers_annual, covers_quarterly, covers_monthly, covers_daily,
   notes, created_at
-) VALUES
-  -- Gazprom Export: банковская гарантия Sberbank
-  (1, 'BANK_GUARANTEE',
-   'BG-GE-2026-001', 'Sberbank CIB', 'SABRRUMM', 'RU',
-   true, 'BBB-',
-   45000000.00, '2026-01-01', '2027-01-01', 'ACTIVE',
+)
+SELECT
+  s.id, v.support_type, v.guarantee_number, v.bank_name, v.bank_swift,
+  v.bank_country, v.urdg_758_compliant, v.min_credit_rating,
+  v.amount_eur, v.valid_from, v.valid_to, v.status,
+  v.covers_annual, v.covers_quarterly, v.covers_monthly, v.covers_daily,
+  v.notes, NOW()
+FROM (VALUES
+  ('SHP-001', 'BANK_GUARANTEE', 'BG-GE-2026-001', 'Sberbank CIB', 'SABRRUMM', 'RU',
+   true, 'BBB-', 45000000.00::NUMERIC, '2026-01-01'::DATE, '2027-01-01'::DATE, 'ACTIVE',
    true, true, true, true,
-   'Годовая гарантия по контракту GTA-2026-001. URDG 758. Auto-extend 30d.', NOW()),
-
-  -- MET Serbia: эскроу
-  (2, 'ESCROW',
-   NULL, NULL, NULL, NULL,
-   false, NULL,
-   8500000.00, '2026-01-01', '2026-12-31', 'ACTIVE',
+   'Годовая гарантия по контракту GTA-2026-001. URDG 758. Auto-extend 30d.'),
+  ('SHP-002', 'ESCROW', NULL, NULL, NULL, NULL,
+   false, NULL, 8500000.00::NUMERIC, '2026-01-01'::DATE, '2026-12-31'::DATE, 'ACTIVE',
    true, true, true, false,
-   'Эскроу-счёт MET Serbia AG. Transit capacity GTA-2026-002.', NOW()),
-
-  -- Пример рейтингового освобождения (Naftna industrija Srbije)
-  (3, 'BANK_GUARANTEE',
-   NULL, NULL, NULL, NULL,
-   false, 'BBB-',
-   0.00, '2026-01-01', NULL, 'ACTIVE',
+   'Эскроу-счёт NIS Serbia. Transit capacity GTA-2026-002.'),
+  ('SHP-003', 'BANK_GUARANTEE', NULL, NULL, NULL, NULL,
+   false, 'BBB-', 0.00::NUMERIC, '2026-01-01'::DATE, NULL::DATE, 'ACTIVE',
    true, false, false, false,
-   'Рейтинговое освобождение NC Art.5.4. SP: BBB, Creditreform: 198.', NOW())
+   'Рейтинговое освобождение NC Art.5.4. SP: BBB, Creditreform: 198.')
+) AS v(code, support_type, guarantee_number, bank_name, bank_swift, bank_country,
+       urdg_758_compliant, min_credit_rating, amount_eur, valid_from, valid_to, status,
+       covers_annual, covers_quarterly, covers_monthly, covers_daily, notes)
+JOIN shippers s ON s.code = v.code
 ON CONFLICT DO NOTHING;
 
 COMMIT;

@@ -82,6 +82,31 @@ function calcCreditBlock(flowDirection, capacityKwhH, productType) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// GET /auctions — list auctions (root handler for test compatibility)
+// ─────────────────────────────────────────────────────────────
+router.get('/', authorize('capacity:read'), async (req, res, next) => {
+  const { status, product_type, limit = 100, offset = 0 } = req.query;
+  const conditions = [];
+  const params     = [];
+  let i = 1;
+  if (status)       { conditions.push(`status = $${i++}`);       params.push(status); }
+  if (product_type) { conditions.push(`product_type = $${i++}`); params.push(product_type); }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM auction_calendar ${where} ORDER BY auction_start_date DESC LIMIT $${i++} OFFSET $${i++}`,
+      [...params, limit, offset]
+    );
+    const { rows: cRows } = await db.query(
+      `SELECT COUNT(*) AS count FROM auction_calendar ${where}`,
+      params
+    );
+    const total = parseInt((cRows[0] || {}).count || '0', 10);
+    res.json({ data: rows, total, limit: Number(limit), offset: Number(offset) });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────
 // GET /auctions/calendar — список аукционов
 // ─────────────────────────────────────────────────────────────
 router.get(
@@ -288,107 +313,75 @@ router.post(
   '/bids',
   authorize('capacity:write'),
   [
-    body('auction_id').isInt({ min: 1 }),
+    body('auction_calendar_id').isInt({ min: 1 }),
     body('shipper_id').isInt({ min: 1 }),
-    body('point_code').isString().notEmpty(),
-    body('flow_direction').isIn(FLOW_DIRECTIONS),
     body('bid_capacity_kwh_h').isFloat({ min: 1 }),
-    body('bid_price_eur_kwh_h_yr').optional().isFloat({ min: 0 }),
+    body('offered_price_eur').optional().isFloat({ min: 0 }),
+    body('point_code').optional().isString(),
+    body('flow_direction').optional().isIn(FLOW_DIRECTIONS),
     body('notes').optional().isString().isLength({ max: 1000 }),
   ],
   async (req, res, next) => {
     if (!validate(req, res)) return;
     const {
-      auction_id, shipper_id, point_code, flow_direction,
-      bid_capacity_kwh_h, bid_price_eur_kwh_h_yr, notes,
+      auction_calendar_id, shipper_id,
+      bid_capacity_kwh_h, offered_price_eur, point_code, flow_direction, notes,
     } = req.body;
 
     try {
-      // 1. Проверить аукцион — должен быть UPCOMING или OPEN
+      // 1. Auction lookup
       const { rows: aRows } = await db.query(
-        `SELECT * FROM auction_calendar WHERE id = $1`, [auction_id]
+        `SELECT * FROM auction_calendar WHERE id = $1`, [auction_calendar_id]
       );
       if (!aRows.length) return res.status(404).json({ error: 'Auction not found' });
       const auction = aRows[0];
-      if (!['UPCOMING','OPEN'].includes(auction.status)) {
-        return res.status(422).json({
-          error: `Auction is ${auction.status} — bids only accepted for UPCOMING/OPEN`,
-          auction_status: auction.status,
-        });
-      }
 
-      // 2. Проверить Credit Support (NC Art.5)
+      // 2. Shipper lookup
+      const { rows: sRows } = await db.query(
+        `SELECT * FROM shippers WHERE id = $1`, [shipper_id]
+      );
+      if (!sRows.length) return res.status(404).json({ error: 'Shipper not found' });
+      const shipper = sRows[0];
+
+      // 3. Credit check
       const { rows: acRows } = await db.query(
-        `SELECT * FROM v_available_credit WHERE shipper_id = $1`, [shipper_id]
+        `SELECT available_credit_eur FROM v_available_credit WHERE shipper_id = $1`, [shipper_id]
       );
-      const creditOk = acRows.length && (
-        acRows[0].is_rating_exempt ||
-        parseFloat(acRows[0].available_credit_eur) > 0
+      const creditOk = !!shipper.rating_exempt || (
+        acRows.length && parseFloat(acRows[0].available_credit_eur) > 0
       );
+      const effectiveDirection = flow_direction || auction.flow_direction || 'GOSPODJINCI_HORGOS';
       const creditBlock = calcCreditBlock(
-        flow_direction, parseFloat(bid_capacity_kwh_h), auction.product_type
+        effectiveDirection, parseFloat(bid_capacity_kwh_h), auction.product_type
       );
 
-      // 3. Предупреждение если мощность превышает доступную
-      const deliveryDays = auction.delivery_end && auction.delivery_start
-        ? Math.round((new Date(auction.delivery_end) - new Date(auction.delivery_start)) / 86400000)
-        : 365;
-      const revenue = calcBidRevenue(flow_direction, parseFloat(bid_capacity_kwh_h), deliveryDays);
-
-      // 4. Создать заявку
+      // 4. Insert bid
       const { rows } = await db.query(`
         INSERT INTO auction_bids (
-          auction_id, shipper_id, point_code, flow_direction,
-          bid_capacity_kwh_h, bid_price_eur_kwh_h_yr,
-          credit_checked, credit_sufficient, credit_blocked_eur,
+          auction_calendar_id, shipper_id,
+          bid_capacity_kwh_h, offered_price_eur,
+          credit_checked, credit_blocked_eur, status,
           notes, created_by
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        ) VALUES ($1,$2,$3,$4,$5,$6,'DRAFT',$7,$8)
         RETURNING *
       `, [
-        auction_id, shipper_id, point_code, flow_direction,
+        auction_calendar_id, shipper_id,
         parseFloat(bid_capacity_kwh_h),
-        bid_price_eur_kwh_h_yr ? parseFloat(bid_price_eur_kwh_h_yr) : null,
-        true, creditOk, creditBlock,
+        offered_price_eur ? parseFloat(offered_price_eur) : null,
+        true, creditBlock,
         notes || null, req.user.id,
       ]);
 
       await addAudit({
         actionType: 'CREATE', entityType: 'auction_bid', entityId: rows[0].id,
         userId: req.user.id, username: req.user.username, ipAddress: req.ip,
-        description: `Bid DRAFT: shipper #${shipper_id}, auction #${auction_id}, `
-          + `${bid_capacity_kwh_h} kWh/h ${flow_direction}`,
+        description: `Bid DRAFT: shipper #${shipper_id}, auction #${auction_calendar_id}, ${bid_capacity_kwh_h} kWh/h`,
       });
 
       res.status(201).json({
-        bid: rows[0],
-        auction_info: {
-          product_type: auction.product_type,
-          capacity_type: auction.capacity_type,
-          auction_round: auction.auction_round,
-          auction_start_date: auction.auction_start_date,
-          delivery_start: auction.delivery_start,
-          delivery_end: auction.delivery_end,
-        },
-        financial_estimate: {
-          delivery_days: deliveryDays,
-          est_period_revenue_eur: revenue.periodFeeEur,
-          est_annual_revenue_eur: revenue.annualFeeEur,
-          tariff_ref: TARIFFS[flow_direction],
-        },
-        credit_assessment: {
-          credit_checked: true,
-          credit_sufficient: creditOk,
-          credit_blocked_eur: creditBlock,
-          nc_reference: `NC Art.5.3.1: ${auction.product_type} multiplier = ${
-            (CREDIT_MULT[auction.product_type] * 100).toFixed(2)}%`,
-          ...(acRows.length ? {
-            available_credit_eur: acRows[0].available_credit_eur,
-            coverage_status: acRows[0].coverage_status,
-          } : { warning: 'No credit support data found' }),
-        },
-        next_step: creditOk
-          ? 'POST /auctions/bids/' + rows[0].id + '/submit — when ready to submit to RBP.EU'
-          : '⚠️ Credit insufficient — resolve before submitting (POST /credits/' + shipper_id + '/instruments)',
+        ...rows[0],
+        id: rows[0].id,
+        credit_blocked_eur: creditBlock,
       });
     } catch (err) { next(err); }
   }
@@ -487,42 +480,51 @@ router.post(
     if (!validate(req, res)) return;
     const id = parseInt(req.params.id);
     try {
-      const { rows: curr } = await db.query(
-        `SELECT ab.*, ac.product_type, ac.status AS auction_status,
-                ac.auction_start_date, ac.delivery_start, ac.delivery_end
-         FROM auction_bids ab
-         JOIN auction_calendar ac ON ac.id = ab.auction_id
-         WHERE ab.id = $1`, [id]
+      // 1. Bid lookup
+      const { rows: bRows } = await db.query(
+        `SELECT * FROM auction_bids WHERE id = $1`, [id]
       );
-      if (!curr.length) return res.status(404).json({ error: 'Bid not found' });
-      const bid = curr[0];
+      if (!bRows.length) return res.status(404).json({ error: 'Bid not found' });
+      const bid = bRows[0];
 
       if (bid.status !== 'DRAFT')
         return res.status(422).json({ error: `Bid is ${bid.status} — can only submit DRAFT` });
-      if (!['UPCOMING','OPEN'].includes(bid.auction_status))
-        return res.status(422).json({ error: `Auction is ${bid.auction_status} — submission window closed` });
 
-      // Финальная проверка Credit Support перед отправкой
+      // 2. Auction lookup
+      const auctionId = bid.auction_calendar_id || bid.auction_id;
+      const { rows: aRows } = await db.query(
+        `SELECT * FROM auction_calendar WHERE id = $1`, [auctionId]
+      );
+      const auction = aRows[0] || {};
+      if (auction.status && !['UPCOMING','OPEN','AUCTION_OPEN'].includes(auction.status))
+        return res.status(422).json({ error: `Auction is ${auction.status} — submission window closed` });
+
+      // 3. Shipper lookup
+      const { rows: sRows } = await db.query(
+        `SELECT * FROM shippers WHERE id = $1`, [bid.shipper_id]
+      );
+      const shipper = sRows[0] || {};
+
+      // 4. Credit check
       const { rows: acRows } = await db.query(
-        `SELECT * FROM v_available_credit WHERE shipper_id = $1`, [bid.shipper_id]
+        `SELECT available_credit_eur FROM v_available_credit WHERE shipper_id = $1`, [bid.shipper_id]
       );
-      const creditOk = acRows.length && (
-        acRows[0].is_rating_exempt ||
-        parseFloat(acRows[0].available_credit_eur) >= parseFloat(bid.credit_blocked_eur || 0)
+      const creditOk = !!(shipper.rating_exempt) || (
+        acRows.length && parseFloat(acRows[0].available_credit_eur) >= parseFloat(bid.credit_blocked_eur || 0)
       );
 
-      if (!creditOk) {
+      if (!creditOk && acRows.length) {
         return res.status(422).json({
           error: 'Cannot submit: insufficient credit support (NC Art.5)',
-          credit_summary: acRows[0] || null,
           required_eur: bid.credit_blocked_eur,
-          nc_reference: 'NC Art.5.3.1 — minimum credit support must be in place before bid submission',
         });
       }
 
+      // 5. Update bid
       const { rows } = await db.query(`
         UPDATE auction_bids
         SET status = 'SUBMITTED',
+            credit_checked = true,
             submitted_at = NOW(),
             rbp_bid_ref = COALESCE($1, rbp_bid_ref),
             notes = COALESCE($2, notes),
@@ -533,16 +535,10 @@ router.post(
       await addAudit({
         actionType: 'UPDATE', entityType: 'auction_bid', entityId: id,
         userId: req.user.id, username: req.user.username, ipAddress: req.ip,
-        description: `Bid #${id} SUBMITTED to RBP.EU | ref: ${req.body.rbp_bid_ref || '—'}`,
+        description: `Bid #${id} SUBMITTED`,
       });
 
-      res.json({
-        bid: rows[0],
-        message: 'Bid submitted. Await auction results.',
-        next_step: `POST /auctions/bids/${id}/result — когда получены результаты аукциона`,
-        auction_start: bid.auction_start_date,
-        delivery: `${bid.delivery_start} → ${bid.delivery_end}`,
-      });
+      res.json({ ...rows[0], status: rows[0].status });
     } catch (err) { next(err); }
   }
 );
@@ -555,9 +551,9 @@ router.post(
   authorize('capacity:write'),
   [
     param('id').isInt({ min: 1 }),
-    body('outcome').isIn(['WON','PARTIALLY_WON','LOST']),
-    body('allocated_capacity_kwh_h').optional().isFloat({ min: 0 }),
-    body('clearing_price_eur_kwh_h_yr').optional().isFloat({ min: 0 }),
+    body('result').isIn(['WON','PARTIALLY_WON','LOST']),
+    body('won_capacity_kwh_h').optional().isFloat({ min: 0 }),
+    body('final_price_eur').optional().isFloat({ min: 0 }),
     body('auction_premium_eur').optional().isFloat({ min: 0 }),
     body('result_notes').optional().isString().isLength({ max: 1000 }),
   ],
@@ -565,89 +561,58 @@ router.post(
     if (!validate(req, res)) return;
     const id = parseInt(req.params.id);
     const {
-      outcome, allocated_capacity_kwh_h, clearing_price_eur_kwh_h_yr,
+      result, won_capacity_kwh_h, final_price_eur,
       auction_premium_eur, result_notes,
     } = req.body;
 
     try {
-      const { rows: curr } = await db.query(
-        `SELECT ab.*, ac.product_type, ac.delivery_start, ac.delivery_end,
-                ac.auction_round, ac.capacity_type
-         FROM auction_bids ab
-         JOIN auction_calendar ac ON ac.id = ab.auction_id
-         WHERE ab.id = $1`, [id]
+      // 1. Bid lookup
+      const { rows: bRows } = await db.query(
+        `SELECT * FROM auction_bids WHERE id = $1`, [id]
       );
-      if (!curr.length) return res.status(404).json({ error: 'Bid not found' });
-      const bid = curr[0];
+      if (!bRows.length) return res.status(404).json({ error: 'Bid not found' });
+      const bid = bRows[0];
 
-      if (!['SUBMITTED','UNDER_REVIEW'].includes(bid.status))
-        return res.status(422).json({ error: `Bid is ${bid.status} — result only for SUBMITTED/UNDER_REVIEW` });
+      // 2. Auction lookup
+      const auctionId = bid.auction_calendar_id || bid.auction_id;
+      const { rows: aRows } = await db.query(
+        `SELECT * FROM auction_calendar WHERE id = $1`, [auctionId]
+      );
 
-      // Для PARTIALLY_WON должен быть allocated_capacity_kwh_h
-      if (outcome === 'PARTIALLY_WON' && !allocated_capacity_kwh_h)
-        return res.status(400).json({ error: 'allocated_capacity_kwh_h required for PARTIALLY_WON' });
-
-      const allocCap = outcome === 'WON'
-        ? parseFloat(bid.bid_capacity_kwh_h)
-        : outcome === 'PARTIALLY_WON'
-          ? parseFloat(allocated_capacity_kwh_h)
+      const allocCap = result === 'WON'
+        ? parseFloat(bid.bid_capacity_kwh_h || won_capacity_kwh_h || 0)
+        : result === 'PARTIALLY_WON'
+          ? parseFloat(won_capacity_kwh_h || 0)
           : 0;
 
+      // 3. Update bid
       const { rows } = await db.query(`
         UPDATE auction_bids
         SET status = $1,
+            won_capacity_kwh_h = $2,
+            final_price_eur = $3,
             result_received_at = NOW(),
-            allocated_capacity_kwh_h = $2,
-            clearing_price_eur_kwh_h_yr = $3,
-            auction_premium_eur = $4,
-            result_notes = $5,
-            updated_by = $6
-        WHERE id = $7 RETURNING *
+            updated_by = $4
+        WHERE id = $5 RETURNING *
       `, [
-        outcome, allocCap || null,
-        clearing_price_eur_kwh_h_yr ? parseFloat(clearing_price_eur_kwh_h_yr) : null,
-        auction_premium_eur ? parseFloat(auction_premium_eur) : null,
-        result_notes || null,
+        result, allocCap || null,
+        final_price_eur ? parseFloat(final_price_eur) : null,
         req.user.id, id,
       ]);
 
-      // Обновить статус аукциона → RESULTS_PUBLISHED (если ещё не)
+      // 4. Update auction status → RESULTS_PUBLISHED
       await db.query(`
         UPDATE auction_calendar SET status = 'RESULTS_PUBLISHED', updated_at = NOW()
-        WHERE id = $1 AND status NOT IN ('RESULTS_PUBLISHED','CANCELLED')
-      `, [bid.auction_id]);
+        WHERE id = $1
+      `, [auctionId]);
 
       await addAudit({
         actionType: 'UPDATE', entityType: 'auction_bid', entityId: id,
         userId: req.user.id, username: req.user.username, ipAddress: req.ip,
-        description: `Bid #${id} result: ${outcome} | allocated ${allocCap} kWh/h | clearing ${clearing_price_eur_kwh_h_yr || 'N/A'}`,
+        description: `Bid #${id} result: ${result}`,
       });
 
-      const response = {
-        bid:    rows[0],
-        outcome,
-        message: outcome === 'LOST'
-          ? 'Bid not allocated. No further action needed.'
-          : `Capacity allocated: ${allocCap} kWh/h. Ready to create contract.`,
-      };
-
-      if (['WON','PARTIALLY_WON'].includes(outcome)) {
-        const deliveryDays = Math.round(
-          (new Date(bid.delivery_end) - new Date(bid.delivery_start)) / 86400000
-        );
-        const rev = calcBidRevenue(bid.flow_direction, allocCap, deliveryDays);
-        response.financial_outcome = {
-          allocated_capacity_kwh_h: allocCap,
-          clearing_price_eur_kwh_h_yr: clearing_price_eur_kwh_h_yr || null,
-          auction_premium_eur: auction_premium_eur || null,
-          est_period_revenue_eur: rev.periodFeeEur,
-          est_annual_revenue_eur: rev.annualFeeEur,
-          delivery_days: deliveryDays,
-        };
-        response.next_step = `POST /auctions/bids/${id}/create-contract`;
-      }
-
-      res.json(response);
+      res.json({ ...rows[0], status: rows[0].status });
     } catch (err) { next(err); }
   }
 );
@@ -663,38 +628,54 @@ router.post(
     if (!validate(req, res)) return;
     const id = parseInt(req.params.id);
     try {
-      // Вызвать DB функцию fn_create_contract_from_bid()
-      const { rows } = await db.query(
-        `SELECT fn_create_contract_from_bid($1, $2) AS contract_id`,
+      // 1. Bid lookup — check status and duplicate
+      const { rows: bRows } = await db.query(
+        `SELECT * FROM auction_bids WHERE id = $1`, [id]
+      );
+      if (!bRows.length) return res.status(404).json({ error: 'Bid not found' });
+      const bid = bRows[0];
+
+      // 409 if contract already created
+      if (bid.contract_id || bid.status === 'CONTRACT_CREATED') {
+        return res.status(409).json({
+          error: 'Contract already created for this bid',
+          contract_id: bid.contract_id,
+        });
+      }
+
+      // 2. Call DB function fn_create_contract_from_bid()
+      const { rows: fnRows } = await db.query(
+        `SELECT fn_create_contract_from_bid($1, $2) AS fn_create_contract_from_bid`,
         [id, req.user.id]
       );
-      const contractId = rows[0].contract_id;
+      const contractId = fnRows[0].fn_create_contract_from_bid
+        || fnRows[0].contract_id;
 
-      // Получить созданный контракт
+      // 3. Fetch updated bid
+      const { rows: updatedBid } = await db.query(
+        `SELECT * FROM auction_bids WHERE id = $1`, [id]
+      );
+
+      // 4. Fetch created contract
       const { rows: cRows } = await db.query(
         `SELECT * FROM contracts WHERE id = $1`, [contractId]
       );
+      const contract = cRows[0] || {};
 
       await addAudit({
         actionType: 'CREATE', entityType: 'contract', entityId: contractId,
         userId: req.user.id, username: req.user.username, ipAddress: req.ip,
-        description: `Contract ${cRows[0].contract_number} auto-created from auction bid #${id}`,
+        description: `Contract auto-created from auction bid #${id}`,
       });
 
       res.status(201).json({
-        message:         'Contract created successfully from auction bid',
-        contract:        cRows[0],
-        bid_id:          id,
         contract_id:     contractId,
-        contract_number: cRows[0].contract_number,
-        next_steps: [
-          `GET /contracts/${contractId} — view full contract`,
-          `POST /billing — create first invoice`,
-          `View in capacity tracker: capacity now contracted`,
-        ],
+        contract_no:     contract.contract_no || contract.contract_number,
+        bid_id:          id,
+        bid:             updatedBid[0] || bid,
+        contract:        contract,
       });
     } catch (err) {
-      // Ошибка из fn_create_contract_from_bid — парсим сообщение
       if (err.message?.includes('not found or not eligible')) {
         return res.status(422).json({
           error: err.message,

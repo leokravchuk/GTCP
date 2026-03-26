@@ -111,24 +111,29 @@ function validate(req, res) {
 // GET /credits — dashboard всех шипперов
 // ─────────────────────────────────────────────────────────────
 router.get('/', authorize('credits:read'), async (req, res, next) => {
+  const { shipper_id, status, limit = 100, offset = 0 } = req.query;
+  const conditions = [];
+  const params     = [];
+  let i = 1;
+  if (shipper_id) { conditions.push(`cs.shipper_id = $${i++}`); params.push(shipper_id); }
+  if (status)     { conditions.push(`cs.status = $${i++}`);     params.push(status); }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   try {
-    const { rows } = await db.query(`
-      SELECT
-        ac.*,
-        COUNT(mc.id) FILTER (WHERE mc.status = 'OPEN') AS open_margin_calls_count
-      FROM v_available_credit ac
-      LEFT JOIN margin_calls mc ON mc.shipper_id = ac.shipper_id
-      GROUP BY
-        ac.shipper_id, ac.shipper_code, ac.shipper_name,
-        ac.rating_exempt, ac.sp_rating, ac.moodys_rating, ac.creditreform_score,
-        ac.is_rating_exempt, ac.total_credit_eur, ac.active_instruments,
-        ac.expiring_soon_count, ac.nearest_expiry, ac.open_invoices_eur,
-        ac.overdue_eur, ac.min_required_eur, ac.available_credit_eur,
-        ac.utilization_pct, ac.coverage_status, ac.shortfall_eur,
-        ac.has_overdue, ac.has_expiring_soon, ac.risk_level
-      ORDER BY ac.risk_level DESC, ac.utilization_pct DESC NULLS LAST
-    `);
-    res.json(rows);
+    const { rows } = await db.query(
+      `SELECT cs.*, s.name AS company_name, s.code AS shipper_code
+       FROM credit_support cs
+       JOIN shippers s ON s.id = cs.shipper_id
+       ${where}
+       ORDER BY cs.created_at DESC
+       LIMIT $${i++} OFFSET $${i++}`,
+      [...params, limit, offset]
+    );
+    const { rows: cRows } = await db.query(
+      `SELECT COUNT(*) AS count FROM credit_support cs ${where}`,
+      params
+    );
+    const total = parseInt((cRows[0] || {}).count || '0', 10);
+    res.json({ data: rows, total, limit: Number(limit), offset: Number(offset) });
   } catch (err) { next(err); }
 });
 
@@ -432,6 +437,7 @@ router.get('/:shipperId/eligibility', authorize('credits:read'), async (req, res
       shipper_id:             id,
       shipper_code:           ac.shipper_code,
       shipper_name:           ac.shipper_name,
+      eligible:               eligible,
       eligible_for_auction:   eligible,
       blocking_reasons:       [
         !isExempt && !hasSufficient ? 'Insufficient credit support' : null,
@@ -767,6 +773,8 @@ router.post(
   authorize('credits:margin_call'),
   [
     param('shipperId').isInt({ min: 1 }),
+    body('shortfall_eur').isFloat({ min: 0 }).withMessage('shortfall_eur is required'),
+    body('reason').optional().isString().isLength({ max: 1000 }),
     body('notes').optional().isString().isLength({ max: 1000 }),
   ],
   async (req, res, next) => {
@@ -825,6 +833,7 @@ router.post(
         total_credit_eur:  ac.total_credit_eur,
         shortfall_eur:     ac.shortfall_eur,
         coverage_status:   ac.coverage_status,
+        deadline_date:     deadline.toISOString().slice(0, 10),
         deadline_iso:      deadline.toISOString(),
         nc_reference:      'NC Art. 5.5 — 2 рабочих дня на доплнение кредитного обеспечения',
       });

@@ -104,7 +104,7 @@ WHERE flow_direction = 'HORGOS_GOSPODJINCI'
 -- 3. Add MDAP (Delivery-Acceptance Protocol) table for actual flows
 CREATE TABLE IF NOT EXISTS mdap_daily (
   id              SERIAL PRIMARY KEY,
-  contract_id     INTEGER REFERENCES contracts(id),
+  contract_id     UUID REFERENCES contracts(id),
   gas_day         DATE NOT NULL,
   point_code      VARCHAR(30) NOT NULL,    -- GOSPODJINCI, HORGOS, KIREVO, etc.
   direction       VARCHAR(5)  NOT NULL,    -- ENTRY / EXIT
@@ -127,19 +127,18 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS billing_days      INTEGER;        
 -- 5. Update system_params: replace wrong tariff values with official AERS values
 -- Official units: EUR/(kWh/h)/year for annual firm
 INSERT INTO system_params (key, value, description, updated_by) VALUES
-  ('tariff_entry_gospodjinci_eur_kwh_h_yr', '4.19',    'Official AERS tariff GY2025/26: Entry Gospođinci (Domestic Exit Zone) firm annual EUR/(kWh/h)/year', 'migration_004'),
-  ('tariff_exit_horgos_eur_kwh_h_yr',       '6.85',    'Official AERS tariff GY2025/26: Exit Horgoš (IP Kiskundorozsma) firm annual EUR/(kWh/h)/year', 'migration_004'),
-  ('tariff_commercial_reverse_eur_kwh_h_yr','3.25',    'Official AERS tariff GY2025/26: Commercial Reverse annual EUR/(kWh/h)/year', 'migration_004'),
-  ('tariff_daily_entry_eur_kwh_h',          '0.0230',  'Official AERS: Daily firm entry Gospođinci EUR/(kWh/h)/day', 'migration_004'),
-  ('tariff_daily_exit_horgos_eur_kwh_h',    '0.0375',  'Official AERS: Daily firm exit Horgoš EUR/(kWh/h)/day', 'migration_004'),
-  ('tariff_bundled_annual_eur_kwh_h_yr',    '11.04',   'Bundled entry+exit annual firm (4.19+6.85) EUR/(kWh/h)/year', 'migration_004'),
-  ('gas_year_current',                       '2025/2026','Current gas year (Oct 2025 – Sep 2026)', 'migration_004'),
-  ('gcv_reference_kwh_nm3',                  '11.524',  'Reference GCV kWh/Nm3 at 0°C (GMS-4 Gospođinci April 2025 actual)', 'migration_004'),
-  ('density_reference_kg_nm3',               '0.7661',  'Reference density kg/Nm3 at 0°C (GMS-4 April 2025 actual)', 'migration_004'),
-  ('nbs_rate_usd_rsd',                       '104.39',  'NBS exchange rate USD/RSD (reference April 2025)', 'migration_004'),
-  ('nbs_rate_eur_rsd',                       '117.22',  'NBS exchange rate EUR/RSD (reference April 2025)', 'migration_004')
+  ('tariff_entry_gospodjinci_eur_kwh_h_yr', '4.19',    'Official AERS tariff GY2025/26: Entry Gospođinci (Domestic Exit Zone) firm annual EUR/(kWh/h)/year', NULL),
+  ('tariff_exit_horgos_eur_kwh_h_yr',       '6.85',    'Official AERS tariff GY2025/26: Exit Horgoš (IP Kiskundorozsma) firm annual EUR/(kWh/h)/year', NULL),
+  ('tariff_commercial_reverse_eur_kwh_h_yr','3.25',    'Official AERS tariff GY2025/26: Commercial Reverse annual EUR/(kWh/h)/year', NULL),
+  ('tariff_daily_entry_eur_kwh_h',          '0.0230',  'Official AERS: Daily firm entry Gospođinci EUR/(kWh/h)/day', NULL),
+  ('tariff_daily_exit_horgos_eur_kwh_h',    '0.0375',  'Official AERS: Daily firm exit Horgoš EUR/(kWh/h)/day', NULL),
+  ('tariff_bundled_annual_eur_kwh_h_yr',    '11.04',   'Bundled entry+exit annual firm (4.19+6.85) EUR/(kWh/h)/year', NULL),
+  ('gas_year_current',                       '"2025/2026"','Current gas year (Oct 2025 – Sep 2026)', NULL),
+  ('gcv_reference_kwh_nm3',                  '11.524',  'Reference GCV kWh/Nm3 at 0°C (GMS-4 Gospođinci April 2025 actual)', NULL),
+  ('density_reference_kg_nm3',               '0.7661',  'Reference density kg/Nm3 at 0°C (GMS-4 April 2025 actual)', NULL),
+  ('nbs_rate_usd_rsd',                       '104.39',  'NBS exchange rate USD/RSD (reference April 2025)', NULL),
+  ('nbs_rate_eur_rsd',                       '117.22',  'NBS exchange rate EUR/RSD (reference April 2025)', NULL)
 ON CONFLICT (key) DO UPDATE
   SET value       = EXCLUDED.value,
       description = EXCLUDED.description,
-      updated_by  = EXCLUDED.updated_by,
       updated_at  = NOW();

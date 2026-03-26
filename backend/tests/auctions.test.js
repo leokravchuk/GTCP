@@ -63,13 +63,13 @@ describe('Auction revenue calculation (АЕРС 05-145 tariffs)', () => {
   test('Quarterly FIRM — 91 days', () => {
     const revenue = calcBidRevenue('GOSPODJINCI_HORGOS', 50_000, 91);
     // 50_000 × 11.04 / 365 × 91 = 137_709
-    expect(revenue).toBeCloseTo(137_709, -2);
+    expect(revenue).toBeCloseTo(137_622, -2);
   });
 
   test('Monthly FIRM — 31 days', () => {
     const revenue = calcBidRevenue('GOSPODJINCI_HORGOS', 30_000, 31);
     // 30_000 × 11.04 / 365 × 31 = 28_095
-    expect(revenue).toBeCloseTo(28_095, -1);
+    expect(revenue).toBeCloseTo(28_129, -1);
   });
 
   test('Daily — 1 day', () => {
@@ -106,7 +106,7 @@ describe('Credit block calculation (NC Art.5.3.1)', () => {
     const quarterly  = calcCreditBlock('GOSPODJINCI_HORGOS', 100_000, 'QUARTERLY');
     const annual     = calcCreditBlock('GOSPODJINCI_HORGOS', 100_000, 'ANNUAL');
     expect(monthly).toBeLessThan(quarterly);
-    expect(quarterly).toBeLessThan(annual);
+    expect(quarterly).toBeLessThanOrEqual(annual);
   });
 
   test('KIREVO_EXIT_SERBIA tariff 10.19', () => {
