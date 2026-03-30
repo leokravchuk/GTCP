@@ -366,9 +366,278 @@ Tests:       342 passed, 342 total ✅
 
 ---
 
+## DB-specific тесты — push coverage к 95%+
+
+### Новые тест-файлы
+
+✅ Записано: `ETRM/backend/tests/billing.dbspec.test.js` — `calcCapacityFee` все 3 ветки (WITHIN_DAY, COMMERCIAL_REVERSE, LEGACY_BUNDLED), `POST /billing/generate` fallback to capacity_bookings (contract без capacity), auto-lookup tariff from reserve_prices, `POST /billing/with-lines` fallback product type + INTERRUPTIBLE daily mode, errorHandler (404 + 500)
+
+✅ Записано: `ETRM/backend/tests/auctions.dbspec.test.js` — `PATCH /bids/:id` (edit DRAFT, reject non-DRAFT, empty update, recalc credit block), `POST /bids/:id/submit` full chain, `POST /bids/:id/result` (WON/PARTIALLY_WON/LOST + auction lookup), `POST /bids/:id/create-contract` (409 duplicate, fn_create_contract, 422 "not eligible" catch), `DELETE /bids/:id` (cancel SUBMITTED, reject WON), `GET /summary`, `GET /timeline`
+
+✅ Записано: `ETRM/backend/tests/nominations.dbspec.test.js` — capacity check from bookings + contracts fallback, over-nomination allowed (NC Art.12.8) + rejected (no spare capacity), `POST /over-nominate` inner logic, `POST /:id/edigas-submit` renomination XML path, `GET /:id/edigas-nomint` renomination XML
+
+✅ Записано: `ETRM/backend/tests/rbp.dbspec.test.js` — все 11 catch-блоков (502 responses): sync-capacity, sync-credit, auctions, trades, credit/:id, sync-log (DB error → []), surrender/approve, bilateral, bilateral/approve, network-users, remit
+
+### Баг найден и исправлен
+
+✅ Исправлено: `ETRM/backend/src/routes/billing.js` — **ReferenceError в POST /billing/generate**
+
+**Проблема:** переменная `pts` (FLOW_POINTS lookup) использовалась на строке 1042 для auto-lookup tariff, но объявлялась `const pts = ...` только на строке 1077. В JavaScript `const` в одном scope → `ReferenceError: Cannot access 'pts' before initialization`.
+
+**Следствие:** `POST /billing/generate` с контрактом без тарифов (`tariff_entry_eur_kwh_h = null`) падал с 500.
+
+**Исправление:** `FLOW_POINTS` map + `const pts = ...` перенесены перед tariff auto-lookup. Дублирующий блок удалён.
+
+### Coverage — финальный результат
+
+```
+Test Suites: 22 passed, 22 total
+Tests:       389 passed, 389 total
+```
+
+| Модуль | Сессия начало | После Level 1 | После coverage push | После DB-specific | Итого |
+|--------|-------------|---------------|--------------------|--------------------|-------|
+| **billing.js** | **17%** | 41% | 91% | **95%** | **+78%** |
+| **rbp.js** | **38%** | 85% | 85% | **100%** | **+62%** |
+| **errorHandler.js** | 50% | 50% | 50% | **100%** | **+50%** |
+| **auctions.js** | **35%** | 63% | 82% | **87%** | **+52%** |
+| **shippers.js** | 50% | 92% | 92% | 92% | **+42%** |
+| **nominations.js** | **48%** | 65% | 83% | **84%** | **+36%** |
+| **auth.js** | 94% | 95% | 95% | 95% | +1% |
+| **contracts.js** | 85% | 93% | 93% | 93% | +8% |
+| audit.js | 31% | 95% | 95% | 95% | +64% |
+| balance.js | 35% | 95% | 95% | 95% | +60% |
+| capacity.js | 29% | 94% | 94% | 94% | +65% |
+| credits.js | 36% | 90% | 90% | 90% | +54% |
+| systemParams.js | 43% | 90% | 90% | 90% | +47% |
+| authenticate.js | — | 100% | 100% | 100% | new |
+| ncRoutes.js | 100% | 100% | 100% | 100% | — |
+| logger.js | 100% | 100% | 100% | 100% | — |
+
+### Непокрываемые ветки (объяснение)
+
+| Модуль | Lines | Причина | Можно ли покрыть |
+|--------|-------|---------|------------------|
+| billing.js 95% | 182-188 | `calcCapacityFee` WITHIN_DAY — вызывается внутри `POST /billing` но validator не принимает `productType` | Нет — нужен отдельный экспорт функции |
+| auctions.js 87% | 363-385 | capacity check guard `NODE_ENV !== 'test'` | Нет — **намеренно** пропускается в тестах |
+| nominations.js 84% | 438-514 | `POST /over-nominate` inner — 5+ DB queries, сложная цепочка | Частично — нужна реальная БД с populated data |
+
+---
+
+## Итоги сессии 30.03.2026
+
+### Созданные файлы (всего 52)
+
+**Backend инфраструктура (17 файлов):**
+- package.json, .env.test, docker-compose.test.yml
+- middleware: authenticate.js, authorize.js, errorHandler.js
+- db: index.js, migrate.js, seed-runner.js, 000_init.sql
+- utils: logger.js
+- services: auditService.js, edigasService.js
+- routes: auth.js, credits.js, capacity.js, balance.js, audit.js, systemParams.js
+
+**Тесты (22 файла):**
+- setup.js, helpers.js
+- 3 existing (nc-routes, tariffs, rbp-mock)
+- nc-compliance.test.js (79 NC regression tests)
+- 6 integration (auth, billing, contracts, nominations, auctions, shippers)
+- 8 coverage push (billing×2, auctions, nominations×2, shippers, stubs, rbp)
+- 4 dbspec (billing, auctions, nominations, rbp)
+- billing.unit.test.js (unit tests for exported internal functions)
+- edge-cases.test.js (authorize/authenticate/edigas/auditService edge branches)
+
+**CI/CD (1 файл):**
+- .github/workflows/test.yml (2 jobs: mock + PostgreSQL)
+
+**Миграции (1 файл):**
+- 015_views.sql (5 SQL views: v_capacity_available, v_available_credit, v_bid_lifecycle, v_upcoming_auctions, v_auction_overview)
+
+**Отчёт (1 файл):**
+- reports/session-testing-infrastructure-2026-03-30.md
+
+---
+
+## Финальный push — экспорт функций + unit тесты + edge cases
+
+### Экспорт internal functions
+
+✅ Изменено: `ETRM/backend/src/routes/billing.js` — добавлен `module.exports._test` с 5 функциями: `calcCapacityFee`, `calcFuelGas`, `calcLatePaymentInterest`, `calcInterruptionPenalty`, `getSystemParams`, `REVERSE_ROUTES`
+
+### Новые тест-файлы
+
+✅ Записано: `ETRM/backend/tests/billing.unit.test.js` — **прямые unit тесты** для всех 4 billing-функций:
+- `calcCapacityFee`: все 4 mode (WITHIN_DAY, COMMERCIAL_REVERSE, LEGACY_BUNDLED, SEPARATE_ENTRY_EXIT), fallback к capacityKwhH, defaults
+- `calcFuelGas`: NC Art.18 формула, negative protection, zero flow, gcv=0
+- `calcLatePaymentInterest`: NC Art.20.4.2, zero/negative overdue, zero days, defaults
+- `calcInterruptionPenalty`: все 4 interruptible types (×3), все 3 non-interruptible types (→0), unknown type
+
+✅ Записано: `ETRM/backend/tests/edge-cases.test.js` — defensive branches:
+- `authorize.js`: role without permission → 403 with `required` field
+- `edigasService.js`: все 5 функций (generateNominationXml, generateConfirmationXml, buildNomint, buildRenomint, submitToTso)
+- `auctions.js validate()`: non-integer IDs, invalid enums → 400 на 7 endpoints
+- `authenticate.js`: malformed header, empty header, wrong secret
+- `auditService.js`: DB error → swallowed (не throws)
+
+✅ Записано: `ETRM/backend/src/db/migrations/015_views.sql` — 5 SQL views для auction validation и reporting
+
+### Ключевые метрики
+
+| Метрика | Начало сессии | Конец сессии |
+|---------|--------------|-------------|
+| Test suites | 3 | **24** |
+| Tests | 61 | **436** |
+| billing.js coverage | 17% | **97%** |
+| Модули на 100% | 2 | **8** (rbp, errorHandler, auditService, authenticate, ncRoutes, logger, capacityUpload, audit) |
+| Модули ≥ 90% | 2 | **18 из 21** |
+| Средний coverage (lines) | ~40% | **~95%** |
+| Баги найдены | 0 | **2** (rounding ±€0.01 + ReferenceError pts before init) |
+| CI/CD | нет | **GitHub Actions + PostgreSQL** |
+
+### Финальная coverage таблица
+
+| Модуль | Начало | Конец | Lines |
+|--------|--------|-------|-------|
+| billing.js | 17% | 94% | **97%** |
+| rbp.js | 38% | 100% | **100%** |
+| errorHandler.js | 50% | 100% | **100%** |
+| auditService.js | 67% | 100% | **100%** |
+| authenticate.js | — | 100% | **100%** |
+| ncRoutes.js | 100% | 100% | **100%** |
+| logger.js | 100% | 100% | **100%** |
+| capacityUpload.js | 100% | 100% | **100%** |
+| audit.js | 31% | 92% | **100%** |
+| auth.js | 94% | 94% | **95%** |
+| reservePrices.js | 25% | 66% | **95%** |
+| balance.js | 35% | 96% | **95%** |
+| capacity.js | 29% | 82% | **94%** |
+| contracts.js | 85% | 85% | **93%** |
+| shippers.js | 50% | 92% | **92%** |
+| systemParams.js | 43% | 87% | **90%** |
+| credits.js | 36% | 85% | **90%** |
+| edigasService.js | 33% | 90% | **90%** |
+| authorize.js | — | 89% | **88%** |
+| auctions.js | 35% | 81% | **87%** |
+| nominations.js | 48% | 82% | **84%** |
+
+### Непокрываемые строки (~30 из ~3500)
+
+| Категория | Строк | Пример | Причина |
+|-----------|-------|--------|---------|
+| NODE_ENV guards | ~12 | auctions.js 362-385, nominations.js 107-115, 196-197 | `!== 'test'` / `=== 'production'` — намеренно |
+| Defensive dead code | ~5 | authorize.js line 13 (`!req.user`) | authenticate всегда ставит req.user до authorize |
+| DB chain complexity | ~13 | nominations.js 438-514 (over-nominate) | 5+ sequential queries, mock не эмулирует цепочку |
+
+---
+
+## Real-DB тесты — nominations over-nominate (NC Art.12.8)
+
+### Проблема
+
+Строки 438-514 в `nominations.js` (`POST /over-nominate`) содержат 5 последовательных DB-запросов. Mock не может их покрыть — оба Query 1 и Query 2 содержат `capacity_bookings`, mock не различает их по `sql.includes()`.
+
+### Решение
+
+✅ Записано: `ETRM/backend/tests/nominations.realdb.test.js` — **6 тестов на реальной PostgreSQL** (без jest.mock):
+
+| Тест | Что проверяет | NC Reference |
+|------|--------------|-------------|
+| creates within contracted | Обычная номинация, 5 реальных SQL | NC Art.12.6 |
+| over-nomination allowed | nom > contracted, spare exists → ALLOWED | **NC Art.12.8** |
+| over-nomination rejected | nom > contracted, no spare → 422 | NC Art.13.2.1 |
+| contracts fallback | bookings = 0 → fallback к `contracts.cap_entry_kwh_h` | NC Art.13.2.1 |
+| over-nominate endpoint | `POST /over-nominate` → within-day interruptible | NC Art.12.8 |
+| matching real SQL | `POST /match` → PENDING pairs matched via transaction | NC Art.13 |
+
+### Тестовые данные (gtcp_test)
+
+```
+capacity_bookings (KIREVO-ENTRY, ENTRY):
+  SHP-001: 450,000 MWh/d = 18,750,000 kWh/h
+  SHP-002: 280,000 MWh/d = 11,666,667 kWh/h
+  SHP-003: 150,000 MWh/d =  6,250,000 kWh/h
+  SHP-004: 380,000 MWh/d = 15,833,333 kWh/h
+  Total:                  = 52,500,000 kWh/h
+
+nominations (2026-04-15, KIREVO-ENTRY):
+  NOM-TEST-001: SHP-001, 15,000,000 kWh/h, SUBMITTED
+  NOM-TEST-002: SHP-002,  8,000,000 kWh/h, SUBMITTED
+  Total nominated:        23,000,000 kWh/h
+  Spare capacity:         29,500,000 kWh/h → over-nomination allowed
+```
+
+### Schema fix
+
+✅ Изменено: `ETRM/backend/src/db/migrations/000_init.sql` — добавлены колонки `is_over_nomination`, `over_nom_interruptible_kwh_h`, `created_by` в таблицу `nominations`
+
+### Coverage note
+
+Jest coverage не может объединить mock-based и real-DB тесты в один отчёт (ограничение инструмента — `jest.mock` подменяет module registry). Real-DB тест в одиночку покрывает 45% nominations (строки 100-200, over-nominate path), mock-тесты покрывают 84% (остальные endpoints). Объединённое реальное покрытие: **~93%**.
+
+### Прогон
+
+```
+# Real-DB only
+DB_HOST=localhost DB_PORT=8887 DB_NAME=gtcp_test DB_USER=gtcp_user \
+  npx jest tests/nominations.realdb.test.js --verbose --forceExit
+
+Test Suites: 1 passed, 1 total
+Tests:       6 passed, 6 total ✅
+
+# All tests (mock + real-DB)
+Test Suites: 25 passed, 25 total
+Tests:       442 passed, 442 total ✅
+```
+
+---
+
+## Итоги сессии 30.03.2026 (финальные)
+
+### Все созданные файлы (55)
+
+**Backend инфраструктура (18 файлов):**
+- `package.json`, `.env.test`, `docker-compose.test.yml`
+- middleware: `authenticate.js`, `authorize.js`, `errorHandler.js`
+- db: `index.js`, `migrate.js`, `seed-runner.js`, `000_init.sql`, `015_views.sql`
+- utils: `logger.js`
+- services: `auditService.js`, `edigasService.js`
+- routes: `auth.js`, `credits.js`, `capacity.js`, `balance.js`, `audit.js`, `systemParams.js`
+
+**Тесты (25 файлов):**
+- `setup.js`, `helpers.js`
+- 3 existing: `nc-routes.test.js`, `tariffs.test.js`, `rbp-mock.test.js`
+- 1 NC compliance: `nc-compliance.test.js` (79 tests)
+- 6 integration: `auth`, `billing`, `contracts`, `nominations`, `auctions`, `shippers`
+- 8 coverage push: `billing.coverage`, `billing.deep`, `auctions.coverage`, `nominations.coverage`, `nominations.deep`, `shippers.coverage`, `stubs.coverage`, `rbp.coverage`
+- 4 dbspec: `billing.dbspec`, `auctions.dbspec`, `nominations.dbspec`, `rbp.dbspec`
+- 1 unit: `billing.unit` (exported internal functions)
+- 1 edge: `edge-cases` (authorize/authenticate/edigas/audit)
+- 1 real-DB: `nominations.realdb` (PostgreSQL, no mock)
+
+**CI/CD (1 файл):**
+- `.github/workflows/test.yml` (2 jobs: mock + PostgreSQL)
+
+**Отчёт (1 файл):**
+- `reports/session-testing-infrastructure-2026-03-30.md`
+
+### Ключевые метрики
+
+| Метрика | Начало сессии | Конец сессии |
+|---------|--------------|-------------|
+| Test suites | 3 | **25** |
+| Tests | 61 | **442** |
+| billing.js coverage (lines) | 17% | **97%** |
+| Модули на 100% | 2 | **8** |
+| Модули ≥ 90% | 2 | **18 из 21** |
+| Средний coverage (lines) | ~40% | **~95%** |
+| Баги найдены и исправлены | 0 | **3** (rounding ±€0.01, ReferenceError pts, missing column) |
+| CI/CD | нет | **GitHub Actions + PostgreSQL** |
+| Real-DB тесты | 0 | **6** |
+
+---
+
 ## Следующие шаги
 
-1. **Push на GitHub** — коммит всех тестовых файлов + CI workflow + миграции
-2. **Обновить GTCP_Artifacts.md** — добавить testing section, 342 tests, 18 suites, 2 modes
-3. **Обновить GTCP_UserGuide v3.2** — раздел «Тестирование» (mock/DB/CI команды)
-4. **DB-specific тесты** — написать тесты которые проверяют SQL напрямую (без mock), покрыть оставшиеся ветки billing/auctions/nominations до 95%+
+1. ~~Push на GitHub~~ ✅ Коммит `33ccf6e` запушен
+2. **Push все финальные тесты** — коммит: unit tests, edge cases, dbspec, realdb, views, bugfixes
+3. **Обновить GTCP_Artifacts.md** — testing section, 442 tests, 25 suites
+4. **Обновить GTCP_UserGuide v3.2** — раздел «Тестирование» (mock/DB/CI/real-DB команды)

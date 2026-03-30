@@ -158,6 +158,8 @@ CREATE TABLE IF NOT EXISTS nominations (
   volume_kwh_h     NUMERIC(18,2),
   contracted_kwh_h NUMERIC(18,2),
   matched_kwh_h    NUMERIC(18,2),
+  is_over_nomination BOOLEAN DEFAULT false,
+  over_nom_interruptible_kwh_h NUMERIC(18,2),
   status           VARCHAR(32)  DEFAULT 'PENDING',
   parent_id        UUID,
   gas_day_cycle    INTEGER      DEFAULT 0,
@@ -165,6 +167,7 @@ CREATE TABLE IF NOT EXISTS nominations (
   tso_response     JSONB,
   notes            TEXT,
   submitted_by     UUID,
+  created_by       UUID,
   submitted_at     TIMESTAMPTZ  DEFAULT NOW()
 );
 

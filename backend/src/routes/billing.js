@@ -1032,6 +1032,22 @@ router.post(
             else capExit = Math.max(capExit, kwhH);
           }
         }
+        const flowDir = c.flow_direction || 'KIREVO_HORGOS';
+
+        // Determine entry/exit points from flow direction (needed for tariff lookup)
+        const FLOW_POINTS = {
+          KIREVO_HORGOS:            { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' },
+          KIREVO_EXIT_SERBIA:       { entry: 'KIREVO-ENTRY', exit: 'EXIT-SERBIA' },
+          KIREVO_HORGOS_AND_SERBIA: { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' },
+          HORGOS_KIREVO:            { entry: 'HORGOS-ENTRY', exit: 'KIREVO-EXIT' },
+          EXIT_SERBIA_KIREVO:       { entry: 'EXIT-SERBIA-ENTRY', exit: 'KIREVO-EXIT' },
+          HORGOS_EXIT_SERBIA:       { entry: 'HORGOS-ENTRY', exit: 'EXIT-SERBIA' },
+          EXIT_SERBIA_HORGOS:       { entry: 'EXIT-SERBIA-ENTRY', exit: 'HORGOS-EXIT' },
+          GOSPODJINCI_HORGOS:       { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' },
+          HORGOS_GOSPODJINCI:       { entry: 'HORGOS-ENTRY', exit: 'EXIT-SERBIA' },
+        };
+        const pts = FLOW_POINTS[flowDir] || { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' };
+
         let tariffEntry = parseFloat(c.tariff_entry_eur_kwh_h || 0);
         let tariffExit  = parseFloat(c.tariff_exit_eur_kwh_h  || 0);
         let tariffSourceEntry = 'CONTRACT';
@@ -1060,21 +1076,6 @@ router.post(
         // Final fallback to system params
         if (tariffEntry === 0) { tariffEntry = sp.tariffEntryEurKwhHYr; tariffSourceEntry = 'SYSTEM_PARAMS'; }
         if (tariffExit === 0)  { tariffExit = sp.tariffExitHorgosEurKwhHYr; tariffSourceExit = 'SYSTEM_PARAMS'; }
-        const flowDir = c.flow_direction || 'KIREVO_HORGOS';
-
-        // Determine entry/exit points from flow direction
-        const FLOW_POINTS = {
-          KIREVO_HORGOS:            { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' },
-          KIREVO_EXIT_SERBIA:       { entry: 'KIREVO-ENTRY', exit: 'EXIT-SERBIA' },
-          KIREVO_HORGOS_AND_SERBIA: { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' },
-          HORGOS_KIREVO:            { entry: 'HORGOS-ENTRY', exit: 'KIREVO-EXIT' },
-          EXIT_SERBIA_KIREVO:       { entry: 'EXIT-SERBIA-ENTRY', exit: 'KIREVO-EXIT' },
-          HORGOS_EXIT_SERBIA:       { entry: 'HORGOS-ENTRY', exit: 'EXIT-SERBIA' },
-          EXIT_SERBIA_HORGOS:       { entry: 'EXIT-SERBIA-ENTRY', exit: 'HORGOS-EXIT' },
-          GOSPODJINCI_HORGOS:       { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' },
-          HORGOS_GOSPODJINCI:       { entry: 'HORGOS-ENTRY', exit: 'EXIT-SERBIA' },
-        };
-        const pts = FLOW_POINTS[flowDir] || { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' };
 
         // Entry line
         if (capEntry > 0) {
@@ -1237,3 +1238,13 @@ router.post('/:id/erp-sync', authorize('billing:erp_sync'), async (req, res, nex
 });
 
 module.exports = router;
+
+// Export internal functions for unit testing
+module.exports._test = {
+  calcCapacityFee,
+  calcFuelGas,
+  calcLatePaymentInterest,
+  calcInterruptionPenalty,
+  getSystemParams,
+  REVERSE_ROUTES,
+};
