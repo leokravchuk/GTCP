@@ -1,0 +1,27 @@
+version: '3.8'
+
+# GTCP Test Environment — local PostgreSQL for integration testing
+# Usage: docker compose -f docker-compose.test.yml up -d db
+#        npm run test:db
+#        docker compose -f docker-compose.test.yml down
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: gtcp-test-db
+    environment:
+      POSTGRES_DB: gtcp_test
+      POSTGRES_USER: gtcp_user
+      POSTGRES_PASSWORD: gtcp_test_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - gtcp_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gtcp_user -d gtcp_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  gtcp_test_data:

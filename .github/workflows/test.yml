@@ -1,0 +1,97 @@
+name: GTCP Tests
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**']
+  pull_request:
+    branches: [main]
+    paths: ['backend/**']
+
+jobs:
+  test-mock:
+    name: Unit & Integration (mock DB)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx jest tests/ --verbose --forceExit --coverage
+        env:
+          NODE_ENV: test
+          JWT_ACCESS_SECRET: test-secret-for-jwt-signing
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-mock
+          path: backend/coverage/
+
+  test-db:
+    name: Integration (real PostgreSQL)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: gtcp_test
+          POSTGRES_USER: gtcp_user
+          POSTGRES_PASSWORD: gtcp_test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gtcp_user -d gtcp_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Run migrations
+        run: node src/db/migrate.js
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: gtcp_test
+          DB_USER: gtcp_user
+          DB_PASSWORD: gtcp_test_pass
+      - name: Seed test data
+        run: node src/db/seed-runner.js
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: gtcp_test
+          DB_USER: gtcp_user
+          DB_PASSWORD: gtcp_test_pass
+      - name: Run tests
+        run: npx jest tests/ --verbose --forceExit --coverage
+        env:
+          NODE_ENV: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: gtcp_test
+          DB_USER: gtcp_user
+          DB_PASSWORD: gtcp_test_pass
+          JWT_ACCESS_SECRET: test-secret-for-jwt-signing
+          RBP_MODE: mock
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-db
+          path: backend/coverage/
