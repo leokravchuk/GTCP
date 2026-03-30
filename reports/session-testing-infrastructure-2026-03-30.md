@@ -635,9 +635,50 @@ Tests:       442 passed, 442 total ✅
 
 ---
 
+## GitHub Push
+
+1. ✅ Коммит `33ccf6e` — 43 файла, +7233 строк (Level 1-3 тесты, CI workflow, инфраструктура, NC compliance, billing rounding fix)
+2. ✅ Коммит `c38c400` — 11 файлов, +1869 строк (unit tests, dbspec, real-DB, edge cases, views, billing bugfix)
+
+---
+
+## Связь с предыдущей сессией (29.03.2026)
+
+Предыдущая сессия (`session-uat-fixes-2026-03-29.md`) выявила:
+
+| Задача из UAT сессии | Статус после тестирования |
+|---------------------|--------------------------|
+| Dashboard topbar fix (ХОРГОШ→ГОСПОДЖИНЦЫ) | ✅ Исправлен 29.03 |
+| Nomination deadline 14:00 CET (Art.12.6.1.1) | ✅ **Подтверждено тестами**: `nc-compliance.test.js` проверяет `14:00 CET` и `14, 0, 0` в коде nominations.js |
+| UAT-опросник (11 разделов) | ✅ **Покрыто автоматически**: 442 теста проверяют все 12 API-разделов (auth, contracts, capacity, nominations, billing, credits, auctions, shippers, RBP, tariffs, system-params, balance) |
+| Sprint 8–12 файлы на GitHub | ✅ **Запушены**: коммиты `33ccf6e` + `c38c400` содержат routes, middleware, migrations, tests |
+| GTCP_Artifacts.md = read-only | Не изменялся в этой сессии |
+
+### UAT покрытие через автотесты
+
+Из 12 разделов UAT-опросника (29.03) — **все 12 теперь покрыты**:
+
+| UAT раздел | Тесты | Coverage (lines) |
+|-----------|-------|-----------------|
+| Auth/Login | 14 | 95% |
+| Contracts | 12 | 93% |
+| Capacity | 4+ | 94% |
+| Nominations | 13 + 6 realdb | 84% (+93% с real-DB) |
+| Billing | 14 + 20 + 30 + 8 unit | **97%** |
+| Credits | 5 | 90% |
+| Auctions | 10 + 15 + 20 | 87% |
+| Shippers | 12 + 12 | 92% |
+| RBP Bridge | 14 + 12 | **100%** |
+| Tariffs/Reserve Prices | 3 + 79 NC | **100%** (ncRoutes) |
+| System Params | 3 | 90% |
+| Balance | 2 | 95% |
+
+---
+
 ## Следующие шаги
 
-1. ~~Push на GitHub~~ ✅ Коммит `33ccf6e` запушен
-2. **Push все финальные тесты** — коммит: unit tests, edge cases, dbspec, realdb, views, bugfixes
+1. ~~Push на GitHub~~ ✅ `33ccf6e` + `c38c400`
+2. ~~Push финальные тесты~~ ✅ `c38c400`
 3. **Обновить GTCP_Artifacts.md** — testing section, 442 tests, 25 suites
 4. **Обновить GTCP_UserGuide v3.2** — раздел «Тестирование» (mock/DB/CI/real-DB команды)
+5. **Завершить UAT-опросник вручную** — автотесты покрывают API, но UI (Soft/GTCP_MVP.html) нужно проверять глазами

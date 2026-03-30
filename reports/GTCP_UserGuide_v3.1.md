@@ -1,6 +1,6 @@
 # GTCP — User Guide / Руководство пользователя
 
-**Gas Trading & Commercial Platform · v3.1 · Sprint 12**
+**Gas Trading & Commercial Platform · v3.2 · Sprint 13**
 Обновлено: 30.03.2026 · Gastrans d.o.o. Novi Sad, Serbia
 Дипломный проект · Факультет технических наук · krav4ukleo@gmail.com
 
@@ -1375,6 +1375,96 @@ Gastrans обязан передавать сделки в ACER (EU Regulation 1
 
 ---
 
+## 18. Тестирование (Sprint 13)
+
+### 18.1 Запуск тестов
+
+```bash
+cd ETRM/backend
+
+# Mock-режим (без БД) — 442 теста, ~6 сек
+npm test
+
+# С отчётом покрытия
+npm run test:coverage
+
+# На реальной PostgreSQL (порт 8887)
+npm run test:db
+
+# С покрытием на реальной БД
+npm run test:db:coverage
+```
+
+### 18.2 Тестовая база данных
+
+```bash
+# Создание тестовой БД (от суперпользователя)
+psql -h localhost -p 8887 -U postgres -c "CREATE DATABASE gtcp_test OWNER gtcp_user;"
+
+# Миграции (19 таблиц + 5 views)
+npm run db:migrate
+
+# Seed-данные (5 users, 5 shippers, 5 contracts, 57 tariffs)
+npm run db:seed
+
+# Полный сброс (migrate + seed)
+npm run db:reset
+```
+
+Конфигурация: `.env.test` (DB_HOST=localhost, DB_PORT=8887, DB_NAME=gtcp_test)
+
+### 18.3 Docker (альтернатива)
+
+```bash
+# Поднять PostgreSQL 15 на порту 5433
+npm run docker:test:up
+
+# Тесты
+npm run test:db
+
+# Убить контейнер
+npm run docker:test:down
+```
+
+### 18.4 CI/CD (GitHub Actions)
+
+Файл: `.github/workflows/test.yml`
+
+| Job | Что делает |
+|---|---|
+| `test-mock` | Mock DB, `npm test --coverage`, upload artifact |
+| `test-db` | PostgreSQL 15 service → migrate → seed → `npm test --coverage` |
+
+Триггер: push/PR в `main`, только `backend/**`.
+
+### 18.5 Структура тестов (25 файлов, 442 теста)
+
+| Уровень | Suites | Tests | Описание |
+|---|---|---|---|
+| NC Compliance | 1 | 79 | Регрессия: §2.1 IPs, 7 routes, Art.6 products, AERS tariffs, Art.18 FG, Art.20 interest |
+| Integration (supertest) | 6 | 75 | HTTP → auth, billing, contracts, nominations, auctions, shippers |
+| Coverage push | 8 | 127 | Глубокое покрытие: billing formulas, bid lifecycle, NC Art.3 lifecycle |
+| DB-specific | 4 | 47 | Все ветки: CR/WD/legacy modes, error branches, renom Art.12.7.5 |
+| Unit (exported) | 1 | 30 | calcCapacityFee (4 modes), calcFuelGas, calcInterest, calcPenalty |
+| Edge cases | 1 | 18 | authorize, authenticate, edigas, auditService |
+| Real-DB | 1 | 6 | PostgreSQL без mock: over-nominate Art.12.8, matching |
+| Existing | 3 | 60 | nc-routes, tariffs, rbp-mock |
+
+### 18.6 Покрытие (Coverage)
+
+| Модуль | Lines | NC Reference |
+|---|---|---|
+| billing.js | **97%** | Art.18, 20, AERS 05-145 |
+| rbp.js | **100%** | Art.7.4, 5, 8, 10, 24 |
+| auth.js | **95%** | — |
+| shippers.js | **92%** | Art.3 lifecycle |
+| auctions.js | **87%** | Art.7, CAM NC |
+| nominations.js | **84%** | Art.12, 13 |
+
+Непокрываемые строки (~30 из ~3500): NODE_ENV guards, defensive dead code, complex DB chains.
+
+---
+
 # ЧАСТЬ II — ENGLISH
 
 ---
@@ -2484,7 +2574,9 @@ Full specification: Swagger UI at `http://localhost:3000/docs`
 | **11** | **27.03.2026** | **39** | **✅** | **Nominations 100% (NC Art.12-13), Over-Nomination logic, Balance panel, Renomination 4-rule, migration 013 (nominations_kwh_h); RBP Core: Mock SOAP Server, rbpClient.js, capacityUpload, creditSync, auctionSync, bundledAuction, migration 014 (rbp_tables)** |
 | **12** | **28.03.2026** | **19** | **✅** | **RBP Secondary Market: surrenderApproval, bilateralManager, remitReporter, networkUserSync; RBP Bridge UI (4 tabs), rbp-mock.test.js (16 tests), 117/117 tests** |
 
-**Cumulative 28.03.2026: ~456 SP · 117/117 tests · NC 79% (55/70) · 93 endpoints · Migrations 001–014**
+| **13** | **30.03.2026** | **45** | **✅** | **Testing Infrastructure: 442 tests (25 suites), CI/CD GitHub Actions + PostgreSQL, coverage ~95%, billing 97%, 3 bugs found+fixed, migrations 000+015** |
+
+**Cumulative 30.03.2026: ~501 SP · 442/442 tests · NC 79% (55/70) · 93 endpoints · Migrations 000–015**
 
 ### 17.2 RBP Integration — ✅ Complete (Sprint 11–12)
 
@@ -2581,6 +2673,67 @@ Gastrans is required to report trades to ACER (EU Regulation 1227/2011) via RBP 
 | Art.14 | Restrictions (congestion management) | P3 |
 | Art.24 | Transparency portal (ENTSO-G) | P3 |
 | AS4 | ENTSOG message exchange standard | P3 |
+
+---
+
+## 18. Testing (Sprint 13)
+
+### 18.1 Running Tests
+
+```bash
+cd ETRM/backend
+
+# Mock mode (no DB required) — 442 tests, ~6 sec
+npm test
+
+# With coverage report
+npm run test:coverage
+
+# Against real PostgreSQL (port 8887)
+npm run test:db
+```
+
+### 18.2 Test Database Setup
+
+```bash
+# Create test DB
+psql -h localhost -p 8887 -U postgres -c "CREATE DATABASE gtcp_test OWNER gtcp_user;"
+
+# Run migrations (19 tables + 5 views)
+npm run db:migrate
+
+# Seed data (5 users, 5 shippers, 5 contracts, 57 AERS tariffs)
+npm run db:seed
+```
+
+### 18.3 CI/CD
+
+GitHub Actions (`.github/workflows/test.yml`) runs on every push/PR to `main`:
+- **Job 1:** Mock DB — `npm test --coverage`
+- **Job 2:** Real PostgreSQL 15 — migrate → seed → `npm test --coverage`
+
+### 18.4 Test Suite Summary
+
+| Level | Suites | Tests | Description |
+|---|---|---|---|
+| NC Compliance | 1 | 79 | Regression: §2.1, Art.5, 6, 12, 18, 20, AERS 05-145 |
+| Integration | 6 | 75 | HTTP via supertest: auth, billing, contracts, nominations, auctions, shippers |
+| Coverage | 8 | 127 | Deep: billing formulas, bid lifecycle, NC Art.3 |
+| DB-specific | 4 | 47 | All branches: CR/WD/legacy, error paths, Art.12.7.5 |
+| Unit | 1 | 30 | Exported functions: calcCapacityFee, calcFuelGas, calcInterest |
+| Edge cases | 1 | 18 | Defensive: auth, authorize, edigas, audit |
+| Real-DB | 1 | 6 | PostgreSQL: over-nominate Art.12.8, matching |
+
+**Total: 442 tests · 25 suites · Coverage ~95%**
+
+### 18.5 Key Coverage
+
+| Module | Lines | NC |
+|---|---|---|
+| billing.js | **97%** | Art.18, 20, AERS |
+| rbp.js | **100%** | Art.7, 8, 10, 24 |
+| auth.js | **95%** | — |
+| shippers.js | **92%** | Art.3 |
 
 ---
 
