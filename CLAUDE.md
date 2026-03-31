@@ -93,6 +93,30 @@ Before writing or changing any code in the following areas, verify against the N
 | **Daily** Interruptible | D-1 at 16:30 / 15:30 UTC | 1 hour after Firm |
 | **Within-Day** | Continuous, every hour | For remaining hours of current Gas Day |
 
+## Available Capacity Formulas (NC Art.7.1.1 + Art.7.3)
+
+**Binding rule — always calculate from DB, never hardcode.**
+
+```
+Firm ST Available (Art.7.1.1):
+  = Technical[IP] - SUM(active bookings at IP) + SUM(surrendered at IP)
+  Daily/WD: += non-nominated capacity (Art.12.7.5)
+
+CR Available (Art.7.3.2-7.3.5):
+  = SUM(contracted in physical direction at IP) - SUM(CR already contracted at IP)
+
+Yearly Firm Available (Art.7.1.2):
+  = SUM(surrendered LT at IP)  (0 if no surrender)
+
+Available Credit (Art.5.3.4):
+  Updated every hour on Capacity Booking Platform
+```
+
+API: `GET /capacity/available` — real-time SQL, always fresh.
+Implementation: Option A (real-time SQL on every request).
+
+---
+
 **Key rules:**
 - **Yearly Firm auction = ONLY surrendered LT capacity** (NC Art. 7.1.2). If no LT released → no yearly auction. ST 10% is NOT sold at yearly auction.
 - **ST 10% capacity is sold via Quarterly/Monthly/Daily/Within-Day auctions** (NC Art. 7.1.1).

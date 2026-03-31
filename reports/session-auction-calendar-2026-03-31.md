@@ -173,6 +173,27 @@ Shipper (NC Art.3)
 - 30 Quarterly Firm (4 rounds × 3 IP × varying quarters) + 20 CR Quarterly
 - 36 Monthly Firm (12 months × 3 IP) + 24 CR Monthly
 
+### Available Capacity Engine (Option A: Real-time SQL)
+
+✅ Записано: `backend/src/routes/capacity.js` — GET /capacity/available endpoint:
+- Real-time SQL on every request (~10ms)
+- Physical: Tech - Contracted + Surrendered + Non-nominated (NC Art.7.1.1)
+- CR: Total Contracted Physical - CR Already Contracted (NC Art.7.3)
+- Breakdown: tech, contracted, LT, ST, surrendered, non-nominated, available per IP
+
+✅ Изменено: `backend/src/routes/auctions.js` — /calendar/days uses dynamic available from DB instead of hardcoded ST_FREE
+
+✅ Изменено: `backend/src/routes/shippers.js` — GET / returns status, gta_type, ratings
+
+### Auction table improvements
+
+✅ Изменено: `Soft/GTCP_MVP.html`:
+- Two capacity columns: TECH (grey) + AVAILABLE (accent, bold)
+- capacity_type badge: Firm (blue) / CR (purple) / Int (orange)
+- Nomination KPI = Entry only (not Entry+Exit)
+- activeShippers filter uses status from backend
+- Dashboard labels: "ЗАБРОНИРОВАНО (ВСЕГО)" / "СВОБОДНО ДЛЯ АУКЦИОНОВ"
+
 ### CR capacity fix
 
 ✅ Изменено: `Soft/GTCP_MVP.html` — ST_FREE map расширен CR IPs:

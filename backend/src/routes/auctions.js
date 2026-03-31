@@ -212,15 +212,30 @@ router.get('/calendar/days', authorize('capacity:read'), async (req, res, next) 
       ORDER BY auction_start_date, product_type, point_code
     `, [startDate, endDate]);
 
-    // ST free capacity per IP (AERS 90/10)
-    const ST_FREE = {
-      'KIREVO-ENTRY': 1528049,
-      'HORGOS-EXIT': 1024023,
-      'EXIT-SERBIA': 504026,
-      'HORGOS-ENTRY': 9216210,
-      'EXIT-SERBIA-ENTRY': 4536230,
-      'KIREVO-EXIT': 0,
-    };
+    // Dynamic available capacity (real-time from DB)
+    const ST_FREE = {};
+    try {
+      const TECH = { 'KIREVO-ENTRY': 15280488, 'HORGOS-EXIT': 10240233, 'EXIT-SERBIA': 5040256 };
+      const { rows: bk } = await db.query(`
+        SELECT point, ROUND(SUM(capacity_mwh_d * 1000.0 / 24.0))::bigint AS contracted
+        FROM capacity_bookings WHERE status = 'ACTIVE'
+          AND period_from <= CURRENT_DATE AND period_to >= CURRENT_DATE
+        GROUP BY point
+      `);
+      // Physical: Available = Tech - Contracted
+      Object.entries(TECH).forEach(([ip, tech]) => {
+        const contracted = parseInt((bk.find(b => b.point === ip) || {}).contracted) || 0;
+        ST_FREE[ip] = Math.max(0, tech - contracted);
+      });
+      // CR: Available = Total Contracted Physical
+      ST_FREE['HORGOS-ENTRY'] = parseInt((bk.find(b => b.point === 'HORGOS-EXIT') || {}).contracted) || 0;
+      ST_FREE['EXIT-SERBIA-ENTRY'] = parseInt((bk.find(b => b.point === 'EXIT-SERBIA') || {}).contracted) || 0;
+      ST_FREE['KIREVO-EXIT'] = parseInt((bk.find(b => b.point === 'KIREVO-ENTRY') || {}).contracted) || 0;
+    } catch {
+      // Fallback to static if DB query fails
+      Object.assign(ST_FREE, { 'KIREVO-ENTRY': 1528049, 'HORGOS-EXIT': 1024023, 'EXIT-SERBIA': 504026,
+        'HORGOS-ENTRY': 9216210, 'EXIT-SERBIA-ENTRY': 4536230, 'KIREVO-EXIT': 0 });
+    }
 
     // Daily/WD reserve prices (AERS 05-145)
     const DAILY_PRICES = { 'KIREVO-ENTRY': 0.0329, 'HORGOS-EXIT': 0.0375, 'EXIT-SERBIA': 0.0230 };

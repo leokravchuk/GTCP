@@ -119,6 +119,7 @@ Jan–Feb 2026  Mar 2026              Mar 2026                   Mar 2026       
 | Data Integrity | 8 | Contract→Booking→Nomination chain, 90/10 AERS split, capacity balanced per NC Art.12.3 |
 | Dashboard P0 | 5 | Shipper code+name, active filter, GTA type, capacity KPI blocks (booked/free per IP) |
 | NC Compliance Fix | 2 | Yearly Firm = only surrendered LT (Art.7.1.2), publication timing from MAR0277-24 |
+| Available Capacity Engine | 5 | GET /capacity/available (real-time SQL, Option A), dynamic available in auctions, NC Art.7.1.1+7.3 formulas |
 
 **Коммит:** `feat(sprint-14)` — backend routes, frontend, seeds, docs
 **Отчёты:** `session-uat-frontend-2026-03-30.md`, `session-uat-dashboard-2026-03-31.md`, `session-auction-calendar-2026-03-31.md`

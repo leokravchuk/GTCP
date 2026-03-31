@@ -356,11 +356,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div class="kpi-grid" id="kpi-grid"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
           <div class="section-wrap" style="margin:0">
-            <div class="section-head"><span class="section-title">ЗАБРОНИРОВАНО (LT 90%)</span></div>
+            <div class="section-head"><span class="section-title">ЗАБРОНИРОВАНО (ВСЕГО)</span></div>
             <div class="table-wrap"><table id="t-dash-booked"><thead><tr><th>IP</th><th>НАПР.</th><th>ЗАБРОНИРОВАНО кВт·ч/ч</th><th>ТЕХ. ЛИМИТ</th><th>UTIL%</th></tr></thead><tbody></tbody></table></div>
           </div>
           <div class="section-wrap" style="margin:0">
-            <div class="section-head"><span class="section-title">СВОБОДНО ДЛЯ АУКЦИОНОВ (ST 10%)</span></div>
+            <div class="section-head"><span class="section-title">СВОБОДНО ДЛЯ АУКЦИОНОВ</span></div>
             <div class="table-wrap"><table id="t-dash-free"><thead><tr><th>IP</th><th>НАПР.</th><th>СВОБОДНО кВт·ч/ч</th><th>ТЕХ. ЛИМИТ</th><th>AVAIL%</th></tr></thead><tbody></tbody></table></div>
           </div>
         </div>
@@ -512,7 +512,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
           </div>
           <div class="table-wrap">
             <table id="t-auctions">
-              <thead><tr><th>ID АУКЦИОНА</th><th>ПРОДУКТ</th><th>ТОЧКА IP</th><th>ПЕРИОД</th><th>МАХ МОЩНОСТЬ кВт/ч/ч</th><th>РЕЗЕРВНАЯ ЦЕНА EUR</th><th>ПРЁМ ЗАЯВОК ДО</th><th>ПОБЕДИТЕЛЬ</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
+              <thead><tr><th>ID</th><th>ПРОДУКТ</th><th>ТОЧКА IP</th><th>ПЕРИОД</th><th>TECH кВт·ч/ч</th><th>AVAILABLE кВт·ч/ч</th><th>РЕЗ. ЦЕНА EUR</th><th>ПРИЁМ ДО</th><th>ПОБЕДИТЕЛЬ</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -649,11 +649,13 @@ tr:hover td{background:rgba(255,255,255,.02);}
         </div>
         <!-- Bookings tab -->
         <div id="cap-tab-bookings">
+          <!-- Summary per IP -->
+          <div id="cap-ip-summary" style="display:grid;grid-template-columns:1fr;gap:4px;margin-bottom:16px"></div>
           <div class="section-wrap">
             <div class="section-head"><span class="section-title">ЖУРНАЛ БРОНИРОВАНИЙ</span></div>
             <div class="table-wrap">
               <table id="t-capacity">
-                <thead><tr><th>ID</th><th>КОНТРАГЕНТ</th><th>ТОЧКА</th><th>ТИП</th><th>ПЕРИОД</th><th>ОБЪЁМ кВт·ч/ч</th><th>ОСТАЛОСЬ ДНЕЙ</th><th>СТАТУС</th></tr></thead>
+                <thead><tr><th>REF</th><th>КОНТРАГЕНТ</th><th>ТОЧКА</th><th>НАПР.</th><th>LT/ST</th><th>ТИП</th><th>ПЕРИОД</th><th>ОБЪЁМ кВт·ч/ч</th><th>ОСТАЛОСЬ</th><th>СТАТУС</th></tr></thead>
                 <tbody></tbody>
               </table>
             </div>
@@ -1638,6 +1640,7 @@ async function _refreshFromBackend() {
       };
       auctionsData = aucData.map(a => ({
         id: a.id || a.auction_id, product: a.product_type || a.product || '',
+        capacityType: a.capacity_type || '',
         point: a.point_code || a.point || '',
         period: `${(a.delivery_start || a.period_from || '').slice(0,10)}/${(a.delivery_end || a.period_to || '').slice(0,10)}`,
         maxCap: ST_FREE[a.point_code] || parseFloat(a.max_capacity_kwh_h || a.maxCap) || 0,
@@ -1662,13 +1665,16 @@ async function _refreshFromBackend() {
     const { data: capData } = await API.capacity.list();
     if (capData) {
       capacityBookings = capData.map(cb => ({
-        id: cb.id || cb.booking_id, party: cb.shipper_name || cb.shipper_code || cb.party || '',
-        point: cb.point || cb.point_code || '', direction: cb.direction || '',
+        id: cb.booking_ref || cb.id || cb.booking_id,
+        shipperId: cb.shipper_code || cb.shipper_id || '',
+        party: cb.shipper_name ? `${cb.shipper_code} ${cb.shipper_name}` : (cb.shipper_code || cb.party || ''),
+        point: cb.point || cb.point_code || '',
+        direction: cb.direction || '',
         type: cb.booking_type || cb.capacity_type || cb.type || 'FIRM',
         category: cb.capacity_category || 'LONG_TERM',
         from: (cb.period_from || cb.valid_from || '').slice(0,10),
         to: (cb.period_to || cb.valid_to || '').slice(0,10),
-        volume: parseFloat(cb.capacity_kwh_h) || (parseFloat(cb.capacity_mwh_d || 0) * 1000 / 24) || 0,
+        volume: parseFloat(cb.capacity_kwh_h) || Math.round(parseFloat(cb.capacity_mwh_d || 0) * 1000 / 24) || 0,
       }));
     }
 
@@ -1790,7 +1796,7 @@ function populateSelects() {
 function refreshDash() { renderDashboard(); toast('Dashboard обновлён','info'); }
 
 function renderDashboard() {
-  const totNom = nominations.filter(n=>n.status!=='REJECTED').reduce((s,n)=>s+n.volume,0);
+  const totNom = nominations.filter(n=>n.status!=='REJECTED'&&n.dir==='ENTRY').reduce((s,n)=>s+n.volume,0);
   const totInv = invoices.filter(i=>i.status!=='PAID').reduce((s,i)=>s+i.volume*i.tariff,0);
   const violations = shippers.filter(s=>s.exposure>s.creditLimit).length;
   const pending = nominations.filter(n=>n.status==='PENDING').length;
@@ -3045,15 +3051,64 @@ function capTab(el, tab) {
 
 async function renderCapacity() {
   const filter = document.getElementById('cap-filter-point').value;
-  // Bookings tab
   const filtered = filter==='all' ? capacityBookings : capacityBookings.filter(b=>b.point===filter);
+
+  // ── P1: Summary per IP ─────────────────────────────────────────────
+  const TECH = { 'KIREVO-ENTRY': 15280488, 'HORGOS-EXIT': 10240233, 'EXIT-SERBIA': 5040256 };
+  const summaryEl = document.getElementById('cap-ip-summary');
+  if (summaryEl) {
+    const byIP = {};
+    capacityBookings.forEach(b => {
+      const key = b.point;
+      if (!byIP[key]) byIP[key] = { point: key, direction: b.direction || '', booked: 0 };
+      byIP[key].booked += Math.round(b.volume || 0);
+    });
+    summaryEl.innerHTML = Object.entries(TECH).map(([ip, tech]) => {
+      const info = byIP[ip] || { booked: 0, direction: '' };
+      const free = tech - info.booked;
+      const pct = (info.booked / tech * 100).toFixed(1);
+      const freePct = (free / tech * 100).toFixed(1);
+      const cls = pct > 95 ? 'text-red' : pct > 80 ? 'text-yellow' : 'text-green';
+      return `<div style="display:grid;grid-template-columns:160px 60px 1fr 100px 100px;gap:8px;align-items:center;padding:6px 12px;background:var(--bg2);border-radius:4px;font-size:11px">
+        <span class="mono fw7">${ip}</span>
+        <span class="mono text-dim">${ip.includes('ENTRY') ? 'ENTRY' : 'EXIT'}</span>
+        <div style="background:var(--bg1);border-radius:3px;height:16px;position:relative;overflow:hidden">
+          <div style="background:${pct>95?'var(--red)':pct>80?'var(--yellow)':'var(--accent)'};height:100%;width:${Math.min(pct,100)}%;border-radius:3px"></div>
+          <span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:9px;color:var(--text1)">${fmt(info.booked)} / ${fmt(tech)} (${pct}%)</span>
+        </div>
+        <span class="mono ${cls}" style="text-align:right">Free: ${fmt(free)}</span>
+        <span class="mono text-dim" style="text-align:right">${freePct}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── P0: Bookings table ─────────────────────────────────────────────
   const bTbody = document.querySelector('#t-capacity tbody');
   if (bTbody) {
-    bTbody.innerHTML = filtered.map(b=>{
+    bTbody.innerHTML = filtered.map(b => {
       const d = daysLeft(b.to);
-      const dCls = d<0?'text-red':d<7?'text-yellow':'';
-      return `<tr><td class="mono text-accent">${b.id}</td><td>${b.party}</td><td class="mono">${b.point}</td><td>${badge(b.type,b.type.toLowerCase())}</td><td class="mono text-dim">${b.from} — ${b.to}</td><td class="mono">${fmt(b.volume)}</td><td class="mono ${dCls}">${d<0?'ИСТЁКЛО':d}</td><td>${capStatus(b)}</td></tr>`;
-    }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px;">Нет бронирований</td></tr>';
+      const dCls = d < 0 ? 'text-red' : d < 7 ? 'text-yellow' : '';
+      const expired = d < 0;
+      const rowStyle = expired ? 'opacity:0.5' : '';
+      const catBadge = b.category === 'LONG_TERM'
+        ? '<span style="font-size:9px;padding:1px 4px;border-radius:2px;background:#1565c0;color:#fff">LT</span>'
+        : '<span style="font-size:9px;padding:1px 4px;border-radius:2px;background:#e65100;color:#fff">ST</span>';
+      const dirArrow = b.direction === 'ENTRY' ? '<span style="color:var(--green)">ENTRY</span>' : '<span style="color:var(--yellow)">EXIT</span>';
+      const ref = b.id && b.id.length > 20 ? (b.id.slice(0,8) + '...') : b.id;
+      const shipperLabel = b.party || shipperName(b.shipperId || '');
+      return `<tr style="${rowStyle}">
+        <td class="mono text-accent" style="font-size:10px">${ref}</td>
+        <td class="fw7">${shipperLabel}</td>
+        <td class="mono">${b.point}</td>
+        <td>${dirArrow}</td>
+        <td>${catBadge}</td>
+        <td>${badge(b.type, b.type === 'FIRM' ? 'green' : 'yellow')}</td>
+        <td class="mono text-dim" style="font-size:10px">${b.from} / ${b.to}</td>
+        <td class="mono fw7">${fmt(Math.round(b.volume))}</td>
+        <td class="mono ${dCls}">${expired ? 'EXPIRED' : d + 'd'}</td>
+        <td>${capStatus(b)}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">Нет бронирований</td></tr>';
   }
 
   // Backend-only tabs
@@ -3588,14 +3643,22 @@ function renderAuctions() {
   tbody.innerHTML = list.map(a=>{
     const isOpen = a.status==='OPEN';
     const myBidCount = auctionBids.filter(b=>b.aucId===a.id).length;
+    // Tech capacity per IP (AERS)
+    const TECH_BY_IP = {'KIREVO-ENTRY':15280488,'HORGOS-EXIT':10240233,'EXIT-SERBIA':5040256,'HORGOS-ENTRY':0,'EXIT-SERBIA-ENTRY':0,'KIREVO-EXIT':0};
+    const techCap = TECH_BY_IP[a.point] || 0;
+    // Capacity type badge
+    const ctLabel = (a.capacityType || '').includes('REVERSE') ? 'CR' : (a.capacityType || '').includes('INTERRUPTIBLE') ? 'Int' : 'Firm';
+    const ctColor = ctLabel === 'CR' ? '#9c27b0' : ctLabel === 'Int' ? '#ff9800' : '#1565c0';
+    const productLabel = `<span style="font-size:9px;padding:1px 4px;border-radius:2px;background:${ctColor};color:#fff;margin-right:4px">${ctLabel}</span>${PRODUCT_LABELS[a.product]||a.product}`;
     return `<tr>
-      <td class="mono text-accent">${a.id}</td>
-      <td><span class="auc-product">${PRODUCT_LABELS[a.product]||a.product}</span></td>
-      <td class="mono">${(a.point||'').replace('_IP','')}</td>
-      <td class="text-dim" style="font-size:11px">${a.period}</td>
-      <td class="mono">${fmt(a.maxCap)}</td>
-      <td class="mono">€ ${fmtEur(a.reservePrice)}</td>
-      <td class="mono ${isOpen?'text-yellow':''}">${a.bidsDeadline}</td>
+      <td class="mono text-accent" style="font-size:10px">${a.id}</td>
+      <td>${productLabel}</td>
+      <td class="mono">${(a.point||'')}</td>
+      <td class="text-dim" style="font-size:10px">${a.period}</td>
+      <td class="mono text-dim">${techCap ? fmt(techCap) : '—'}</td>
+      <td class="mono fw7 text-accent">${fmt(a.maxCap)}</td>
+      <td class="mono">€ ${a.reservePrice.toFixed(4)}</td>
+      <td class="mono ${isOpen?'text-yellow':''}" style="font-size:10px">${a.bidsDeadline}</td>
       <td class="fw7">${a.winner||'—'}</td>
       <td><span class="auc-status ${a.status}">${a.status}</span></td>
       <td>
@@ -3603,7 +3666,7 @@ function renderAuctions() {
         ${myBidCount>0 ? `<span style="font-size:10px;color:var(--text3);margin-left:4px">${myBidCount} заявок</span>` : ''}
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:20px;">Нет аукционов</td></tr>';
+  }).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:20px;">Нет аукционов</td></tr>';
 
   // My bids
   const bTbody = document.querySelector('#t-my-bids tbody');

@@ -883,11 +883,36 @@ Surrender Premium (NC Art.8.3): `AP = (P_old − P_new) × RC × P`
 
 Неноминированная Annual Firm capacity за Gas Day → Within-Day Interruptible pool. Утилизация по газовым суткам (факт Apr 2025: ~72%).
 
-### 8.8 API Capacity
+### 8.8 Available Capacity Engine (NC Art.7.1.1)
+
+Доступная мощность рассчитывается **в реальном времени** при каждом запросе (Option A: Real-time SQL).
+
+**Формулы (NC Art.7.1.1 + Art.7.3):**
+
+| Тип | Формула | NC Art. |
+|-----|---------|---------|
+| Firm ST (Quarterly/Monthly) | Tech - Contracted + Surrendered | 7.1.1.1-7.1.1.2 |
+| Firm ST (Daily) | Tech - Contracted + Surrendered + Non-nominated | 7.1.1.3 |
+| Firm ST (Within-Day) | Tech - Contracted + Surrendered + Non-nominated (per hour) | 7.1.1.4 |
+| CR | Total Contracted Physical - CR Already Contracted | 7.3.2-7.3.5 |
+| Yearly Firm | Surrendered LT only (0 если нет surrender) | 7.1.2 |
+
+**Частота обновления:**
+
+| Что | Частота | NC Art. |
+|-----|---------|---------|
+| Available Credit | Каждый час | 5.3.4 |
+| Available Capacity | При каждом запросе (real-time SQL) | 7.1.1 |
+| Non-nominated | После 14:00 CET D-1 | 12.7.5 |
+
+`GET /api/v1/capacity/available` — возвращает physical (3 IP) + CR (3 IP) с breakdown: tech, contracted, LT, ST, surrendered, non-nominated, available.
+
+### 8.9 API Capacity
 
 | Метод | URL | Описание |
 |---|---|---|
 | GET | `/api/v1/capacity` | Сводка по всем точкам |
+| GET | `/api/v1/capacity/available` | **Available Capacity (real-time)** |
 | GET | `/api/v1/capacity/tracker` | Трекер: tech/contracted/free |
 | GET | `/api/v1/capacity/:pointCode` | Конкретная точка (NC-код) |
 | GET | `/api/v1/capacity/rbp-offerings` | RBP предложения |

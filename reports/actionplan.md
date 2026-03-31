@@ -33,6 +33,18 @@
 | A-212 | Dashboard: shipper code, active filter, GTA type, capacity KPI blocks | 3 | ✅ |
 | A-213 | Rate limiter: production-only guard | 1 | ✅ |
 
+### P0 — Available Capacity Engine (NC Art.7.1.1)
+
+| # | Задача | SP | Статус |
+|---|---|---|---|
+| A-219 | GET /capacity/available endpoint (real-time SQL) | 3 | ✅ |
+| A-220 | Dynamic available in /auctions/calendar/days (replace hardcoded ST_FREE) | 2 | ✅ |
+| A-221 | Frontend: AVAILABLE column + TECH column in auction table | 1 | ✅ |
+| A-222 | Frontend: capacity_type badge (Firm/CR/Int) | 1 | ✅ |
+| A-223 | CR Monthly dates fix (4th Tuesday M-1, Art.7.4.3.3) | 1 | ✅ |
+| A-224 | Shippers endpoint: +status, +gta_type, +ratings | 1 | ✅ |
+| A-225 | Dashboard: nominations KPI = Entry only, activeShippers filter | 1 | ✅ |
+
 ### P0 — Data Integrity (Contract→Booking→Nomination)
 
 | # | Задача | SP | Статус |

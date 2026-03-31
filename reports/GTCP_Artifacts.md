@@ -449,6 +449,22 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   |  | MET/WIEH/Srbij | MET/WIEH         | Srbijagas        |                 |
   |  +----------------+------------------+------------------+                 |
   |                                                                           |
+  |  AVAILABLE CAPACITY ENGINE (NC Art.7.1.1 + Art.7.3)                       |
+  |  Implementation: Option A (Real-time SQL on every request)                |
+  |  API: GET /capacity/available                                             |
+  |                                                                           |
+  |  Firm ST Available = Tech - Contracted + Surrendered                      |
+  |    Daily/WD: += non-nominated (Art.12.7.5)                                |
+  |  CR Available = Total Contracted Physical - CR Already Contracted         |
+  |  Yearly Available = Surrendered LT only (Art.7.1.2)                       |
+  |                                                                           |
+  |  Recalculation triggers:                                                  |
+  |  - Every request (Option A: real-time SQL, ~10ms)                         |
+  |  - Available Credit: every 1 hour (NC Art.5.3.4)                          |
+  |  - Daily Available: D-1 before 16:30 CET (Art.7.1.1.3)                   |
+  |  - W/D Available: every hour (Art.7.1.1.4)                                |
+  |  - Non-nominated: after 14:00 CET D-1 (Art.12.7.5)                       |
+  |                                                                           |
   |  TARIFFS (AERS 05-145 GY2025/2026)                                       |
   |  +-----------+----------+-----------+-----------+--------+                |
   |  | Product   | Entry    | Horgos    | Serbia    | CR     |                |
