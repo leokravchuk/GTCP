@@ -26,7 +26,7 @@ router.get('/', authorize('capacity:read'), async (req, res, next) => {
       `SELECT cb.*, s.code AS shipper_code
        FROM capacity_bookings cb
        JOIN shippers s ON s.id = cb.shipper_id
-       ${where} ORDER BY cb.start_date DESC LIMIT $${i++} OFFSET $${i++}`,
+       ${where} ORDER BY cb.period_from DESC LIMIT $${i++} OFFSET $${i++}`,
       [...params, limit, offset]
     );
     res.json(rows);
@@ -52,7 +52,7 @@ router.post(
     const { shipperId, contractId, point, capacityKwhH, startDate, endDate, productType } = req.body;
     try {
       const { rows } = await db.query(
-        `INSERT INTO capacity_bookings (shipper_id, contract_id, point, capacity_kwh_h, start_date, end_date, product_type)
+        `INSERT INTO capacity_bookings (shipper_id, contract_id, point, capacity_kwh_h, period_from, period_to, product_type)
          VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
         [shipperId, contractId, point, capacityKwhH, startDate, endDate, productType || 'FIRM_YEARLY']
       );

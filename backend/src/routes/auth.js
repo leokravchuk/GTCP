@@ -58,7 +58,7 @@ router.post(
         description: `User ${user.username} logged in`,
       });
 
-      res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+      res.json({ token, accessToken: token, user: { id: user.id, username: user.username, role: user.role, fullName: user.full_name } });
     } catch (err) { next(err); }
   }
 );

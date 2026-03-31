@@ -107,6 +107,24 @@ Jan–Feb 2026  Mar 2026              Mar 2026                   Mar 2026       
 
 ---
 
+## ✅ Phase 7 — Sprint 14 · Auction Calendar + UAT · ЗАВЕРШЁН (31.03.2026)
+
+### Sprint 14 · Auction Calendar + UAT Fixes + Data Integrity
+**Период:** 30-31.03.2026 | **Velocity:** ~35 SP | **Статус:** ✅ ЗАВЕРШЁН
+
+| Блок | SP | Результат |
+|---|---|---|
+| Auction Calendar (CAM NC MAR0277-24) | 10 | Day-centric calendar, /calendar/grid + /calendar/days, 115 DB auctions + Daily/WD on-the-fly |
+| UAT Frontend Fixes | 10 | 10 backend→frontend compatibility fixes (auth token, response format, shipperId resolve, rate limiter) |
+| Data Integrity | 8 | Contract→Booking→Nomination chain, 90/10 AERS split, capacity balanced per NC Art.12.3 |
+| Dashboard P0 | 5 | Shipper code+name, active filter, GTA type, capacity KPI blocks (booked/free per IP) |
+| NC Compliance Fix | 2 | Yearly Firm = only surrendered LT (Art.7.1.2), publication timing from MAR0277-24 |
+
+**Коммит:** `feat(sprint-14)` — backend routes, frontend, seeds, docs
+**Отчёты:** `session-uat-frontend-2026-03-30.md`, `session-uat-dashboard-2026-03-31.md`, `session-auction-calendar-2026-03-31.md`
+
+---
+
 ## ✅ Phase 6 — Sprint 13 · Testing Infrastructure · ЗАВЕРШЁН (30.03.2026)
 
 ### Sprint 13 · 442 Tests + CI/CD + PostgreSQL + Coverage 95%

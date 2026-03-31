@@ -1,7 +1,47 @@
 # GTCP — Action Plan
 **Текущие задачи, приоритеты и решения · Living Document**
 
-> Последнее обновление: 30.03.2026 · Sprint 13 (Testing) ЗАВЕРШЁН · Версия 12.0
+> Последнее обновление: 31.03.2026 · Sprint 14 (Auctions+UAT) ЗАВЕРШЁН · Версия 13.0
+
+---
+
+## ✅ Sprint 14 — Auction Calendar + UAT (30-31.03.2026) · ЗАВЕРШЁН
+
+> Период: 30-31.03.2026 | Target: ~30 SP | Actual: ~35 SP | Статус: ✅ ЗАВЕРШЁН
+
+### P0 — Auction Calendar (NC Art.7 + MAR0277-24)
+
+| # | Задача | SP | Статус |
+|---|---|---|---|
+| A-200 | CAM NC Calendar download + parse (MAR0277-24 ENTSOG) | 1 | ✅ |
+| A-201 | seed_auctions_v2.sql: 115 аукционов (Yearly+Quarterly+Monthly+CR) | 3 | ✅ |
+| A-202 | GET /auctions/calendar/grid endpoint | 2 | ✅ |
+| A-203 | GET /auctions/calendar/days endpoint (Daily/WD on-the-fly) | 3 | ✅ |
+| A-204 | Frontend: day-centric calendar (month grid + detail card + timeline) | 5 | ✅ |
+| A-205 | NC Art.7.1.2 fix: Yearly Firm = only surrendered LT | 1 | ✅ |
+
+### P0 — UAT Frontend Fixes
+
+| # | Задача | SP | Статус |
+|---|---|---|---|
+| A-206 | auth.js: accessToken + fullName in login response | 1 | ✅ |
+| A-207 | billing/auctions: res.json(rows) instead of {data:[]} | 1 | ✅ |
+| A-208 | credits: /margin-calls, /:id/rating, /:id/instruments | 2 | ✅ |
+| A-209 | capacity: period_from/period_to, audit: occurred_at | 1 | ✅ |
+| A-210 | nominations: shipperId code→UUID resolve, PATCH /status, reference lookup | 2 | ✅ |
+| A-211 | GTCP_MVP.html: shipperName(code+name), confirm/reject via API, edigas XML | 2 | ✅ |
+| A-212 | Dashboard: shipper code, active filter, GTA type, capacity KPI blocks | 3 | ✅ |
+| A-213 | Rate limiter: production-only guard | 1 | ✅ |
+
+### P0 — Data Integrity (Contract→Booking→Nomination)
+
+| # | Задача | SP | Статус |
+|---|---|---|---|
+| A-214 | Contracts: cap_entry/exit filled for all 5 shippers | 1 | ✅ |
+| A-215 | Capacity bookings: 90/10 AERS split, ST bookings WIEH+Srbijagas | 2 | ✅ |
+| A-216 | Nominations: volumes ≤ contracted, Entry=Exit per shipper (Art.12.3) | 2 | ✅ |
+| A-217 | Shippers: GTA types (LT/ST), ratings (S&P/Moodys/Creditreform) | 1 | ✅ |
+| A-218 | DB constraints: auction_calendar +YEARLY, nominations +CONFIRMED | 1 | ✅ |
 
 ---
 

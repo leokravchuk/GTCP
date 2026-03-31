@@ -388,45 +388,140 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
 
 ---
 
-## 11. Auction Lifecycle (CAM NC)
+## 11. Auction System Architecture (CAM NC + MAR0277-24)
 
 ```
-  TSO publishes capacity    RBP Calendar
-  (UploadCapacity)          (ENTSOG MAR0277-24)
-         |                        |
-         v                        v
-  +-------------------------------------------+
-  |           AUCTION ROUND                    |
-  |                                            |
-  |  Yearly:  1st Mon of March (for next GY)  |
-  |  Quarterly: 1st Mon before quarter        |
-  |  Monthly:  3rd Mon before month           |
-  |  Daily:   D-1, 15:30-16:00 CET           |
-  |  Within-Day: hourly, 30min window         |
-  +-------------------------------------------+
-         |
-         v
-  Shippers submit bids
-  (price >= Reserve Price)
-         |
-         v
-  +-------------------------------------------+
-  |  BID EVALUATION                            |
-  |                                            |
-  |  1. Sort by price (descending)             |
-  |  2. Allocate capacity to highest bidders   |
-  |  3. Marginal pricing (uniform price)       |
-  |  4. Bundled: linked with adjacent TSO      |
-  +-------------------------------------------+
-         |
-         v
-  Results published
-  (GetTrades sync)
-         |
-         v
-  Capacity allocated to winning shippers
-  -> Update capacity_bookings
-  -> Auction Premium = (bid - reserve) * cap * hours
+  +==========================================================================+
+  |                     CAM NC AUCTION SYSTEM                                 |
+  |                NC Art.7 + EU 2017/459 + MAR0277-24                        |
+  +==========================================================================+
+  |                                                                           |
+  |  AUCTION CALENDAR (Source: MAR0277-24 ENTSOG)                             |
+  |  +-----------+-----------+-----------+-----------+-------------------+    |
+  |  | YEARLY      | QUARTERLY | MONTHLY   | DAILY     | WITHIN-DAY        |  |
+  |  +-------------+-----------+-----------+-----------+-------------------+  |
+  |  | ONLY if LT  | 4 rounds  | 12x/GY    | 365x/GY   | Continuous        |  |
+  |  | surrendered | Aug-May   | M-1 3rd   | D-1       | Every hour        |  |
+  |  | (Art.7.1.2) |           | Monday    | 15:30 UTC | current Gas Day   |  |
+  |  | NOT for     | ST 10%    | ST 10%    | ST 10%    | ST 10%            |  |
+  |  | ST 10%!     | sold here | sold here | sold here | sold here         |  |
+  |  +-------------+-----------+-----------+-----------+-------------------+  |
+  |  | Firm        | Firm      | Firm      | Firm      | Firm              |  |
+  |  | Int         | Int       | Int       | Int       | Int               |  |
+  |  | CR          | CR        | CR        | CR        | CR=NOT offered    |  |
+  |  +-------------+-----------+-----------+-----------+-------------------+  |
+  |                                                                           |
+  |  CAM NC CALENDAR GY2025/2026 (MAR0277-24)                                |
+  |  +-----------+----+----+----+----+----+----+----+----+----+----+----+    |
+  |  | Product   |Oct |Nov |Dec |Jan |Feb |Mar |Apr |May |Jun |Jul |Aug+Sep| |
+  |  +-----------+----+----+----+----+----+----+----+----+----+----+----+    |
+  |  | YEARLY F  | WO |    |    |    |    |    |    |    |    |    |    |    |
+  |  | YEARLY I  | WO |    |    |    |    |    |    |    |    |    |    |    |
+  |  +-----------+----+----+----+----+----+----+----+----+----+----+----+    |
+  |  | Q1 F+I    | CL |    |    |    |    |    |    |    |    |    |    |    |
+  |  | Q2 F+I    | CL |    |    | CL |    |    |    |    |    |    |    |    |
+  |  | Q3 F+I    | CL |    |    | CL |    |    | CL |    |    |    |    |    |
+  |  | Q4 F+I    | CL |    |    | CL |    |    | CL |    |    | CL |    |    |
+  |  +-----------+----+----+----+----+----+----+----+----+----+----+----+    |
+  |  | MONTHLY F | CL | CL | CL | CL | CL | OP |    |    |    |    |    |    |
+  |  | MONTHLY I | CL | CL | CL | CL | CL | OP |    |    |    |    |    |    |
+  |  +-----------+----+----+----+----+----+----+----+----+----+----+----+    |
+  |  | DAILY     |... |... |... |... |... |... |    |    |    |    |    |    |
+  |  | W/D       |=== |=== |=== |=== |=== |=== |    |    |    |    |    |    |
+  |  +-----------+----+----+----+----+----+----+----+----+----+----+----+    |
+  |                                                                           |
+  |  CL=CLOSED  OP=OPEN  UP=UPCOMING  WO=WON (yearly allocated)              |
+  |  ===  Continuous (Within-Day: not a discrete auction)                     |
+  |                                                                           |
+  |  CAPACITY SPLIT (AERS 90/10)                                              |
+  |  +----------------+------------------+------------------+                 |
+  |  | KIREVO-ENTRY   | HORGOS-EXIT      | EXIT-SERBIA      |                 |
+  |  | 15,280,488     | 10,240,233       | 5,040,256 kWh/h  |                 |
+  |  +----------------+------------------+------------------+                 |
+  |  | LT 90%         | LT 90%           | LT 90%           |                 |
+  |  | 13,752,439     | 9,216,210        | 4,536,230        |                 |
+  |  | Gazprom+NIS    | Gazprom          | Gazprom+NIS      |                 |
+  |  | (Yearly Firm)  | (Yearly Firm)    | (Yearly Firm)    |                 |
+  |  +----------------+------------------+------------------+                 |
+  |  | ST 10%         | ST 10%           | ST 10%           |                 |
+  |  | 1,528,049      | 1,024,023        | 504,026          |                 |
+  |  | -> AUCTIONS    | -> AUCTIONS      | -> AUCTIONS      |                 |
+  |  | MET/WIEH/Srbij | MET/WIEH         | Srbijagas        |                 |
+  |  +----------------+------------------+------------------+                 |
+  |                                                                           |
+  |  TARIFFS (AERS 05-145 GY2025/2026)                                       |
+  |  +-----------+----------+-----------+-----------+--------+                |
+  |  | Product   | Entry    | Horgos    | Serbia    | CR     |                |
+  |  +-----------+----------+-----------+-----------+--------+                |
+  |  | Yearly    | 6.00     | 6.85      | 4.19      | 2.85-  |                |
+  |  | Q1        | 1.81     | 2.07      | 1.27      | 3.25   |                |
+  |  | Month 31d | 0.66     | 0.76      | 0.46      |        |                |
+  |  | Daily     | 0.0329   | 0.0375    | 0.0230    | 0.0156 |                |
+  |  | W/D /hour | 0.0021   | 0.0023    | 0.0014    | N/A    |                |
+  |  +-----------+----------+-----------+-----------+--------+                |
+  |  Unit: EUR/kWh/h/period                                                   |
+  |                                                                           |
+  |  BID LIFECYCLE                                                            |
+  |  DRAFT -> SUBMITTED -> UNDER_REVIEW -> WON / PARTIALLY_WON / LOST        |
+  |    |                                    |                                 |
+  |    +-> CANCELLED                        +-> CONTRACT_CREATED              |
+  |                                                                           |
+  |  Credit Check (NC Art.5):                                                 |
+  |    Available Credit >= bid x tariff x multiplier                          |
+  |    Yearly: 2/12, Quarterly: 2/3, Monthly+: 100%                          |
+  |                                                                           |
+  |  WITHIN-DAY (special case)                                                |
+  |  Gas Day 06:00 CET --------------------------------- 06:00 CET           |
+  |  |                                                    |                   |
+  |  |  14:00 CET (now)                                   |                   |
+  |  |  +-- 15:00 buy ---|                                |                   |
+  |  |  +-- 16:00 buy    | 16 remaining hours             |                   |
+  |  |  +-- 17:00 buy    | each = 1 slot                  |                   |
+  |  |  +-- ...           |                                |                   |
+  |  |  +-- 05:00 buy ---|                                |                   |
+  |  |                                                    |                   |
+  |  |  Fee = cap x EUR 0.0021/h x N hours                |                   |
+  |  |  CR = NOT available (NC Art.6.5.2)                  |                   |
+  |  |  Not a scheduled auction - continuous sale          |                   |
+  |  +----------------------------------------------------+                   |
+  |                                                                           |
+  |  DATA FLOW                                                                |
+  |  MAR0277-24 (.xlsx) -> seed.sql -> auction_calendar (DB)                  |
+  |       -> GET /auctions/calendar/grid -> { rows x months }                |
+  |       -> renderAuctionGrid() -> Calendar UI                               |
+  |       -> Click -> POST /auctions/bids -> Credit Check -> DRAFT            |
+  |       -> Submit -> RBP.EU (FGSZ) -> WON/LOST -> Contract                 |
+  +==========================================================================+
+
+  Auction Schedule GY2025/2026 (MAR0277-24):
+  ==================================================
+  YEARLY
+    Firm:          Publish 07.06.2025, Auction 07.07.2025 07:00 UTC
+    Interruptible: Publish 14.07.2025, Auction 21.07.2025 07:00 UTC
+    Delivery:      01.10.2025 - 01.10.2026
+
+  QUARTERLY (4 rounds)
+    1st (Q1-Q4): Firm 04.08.2025, Int 01.09.2025
+    2nd (Q2-Q4): Firm 03.11.2025, Int 01.12.2025
+    3rd (Q3-Q4): Firm 02.02.2026, Int 02.03.2026
+    4th (Q4):    Firm 04.05.2026, Int 01.06.2026
+    Q1=Oct-Dec  Q2=Jan-Mar  Q3=Apr-Jun  Q4=Jul-Sep
+
+  MONTHLY (3rd Monday of M-1)
+    Oct25: F 15.09 / I 23.09    Jan26: F 15.12 / I 23.12
+    Nov25: F 20.10 / I 28.10    Feb26: F 19.01 / I 27.01
+    Dec25: F 17.11 / I 25.11    Mar26: F 16.02 / I 24.02
+    (continues through Sep 2026)
+
+  DAILY (D-1, repeating)
+    Firm:          15:30 UTC (winter) / 14:30 UTC (summer)
+    Interruptible: 16:30 UTC / 15:30 UTC (1 hour after Firm)
+    Delivery: next Gas Day (06:00 CET -> 06:00 CET)
+
+  WITHIN-DAY (continuous)
+    Not scheduled. Runs every hour for remaining hours of Gas Day.
+    CR not offered (NC Art.6.5.2).
+    Fee: cap x hourly_tariff x hours. NOT /365.
 ```
 
 ---

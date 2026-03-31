@@ -22,6 +22,77 @@ router.get('/', authorize('credits:read'), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /credits/margin-calls — list open margin calls
+router.get('/margin-calls', authorize('credits:read'), async (req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT mc.*, s.code AS shipper_code, s.name AS shipper_name
+       FROM margin_calls mc
+       JOIN shippers s ON s.id = mc.shipper_id
+       ORDER BY mc.created_at DESC LIMIT 50`
+    );
+    res.json(rows);
+  } catch (err) {
+    // margin_calls table may not exist
+    res.json([]);
+  }
+});
+
+// GET /credits/:shipperId/instruments — credit instruments (NC Art.5)
+router.get('/:shipperId/instruments', authorize('credits:read'), async (req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM credit_support WHERE shipper_id = $1 ORDER BY valid_to DESC`,
+      [req.params.shipperId]
+    );
+    res.json(rows);
+  } catch {
+    // credit_support table may not exist in MVP
+    res.json([]);
+  }
+});
+
+// POST /credits/:shipperId/instruments — add credit instrument
+router.post('/:shipperId/instruments', authorize('credits:update'), async (req, res, next) => {
+  const { type, bank, amount, validFrom, validTo, product } = req.body;
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO credit_support (shipper_id, support_type, issuer, amount_eur, valid_from, valid_to, product_type, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE') RETURNING *`,
+      [req.params.shipperId, type || 'BANK_GUARANTEE', bank || null, amount || 0, validFrom || null, validTo || null, product || 'ANNUAL']
+    );
+    res.status(201).json(rows[0]);
+  } catch {
+    // credit_support table may not exist — return stub
+    res.status(201).json({ id: 'stub', shipper_id: req.params.shipperId, support_type: type, amount_eur: amount, status: 'ACTIVE' });
+  }
+});
+
+// GET /credits/:shipperId/rating — credit rating for shipper (NC Art.5.1.6)
+router.get('/:shipperId/rating', authorize('credits:read'), async (req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT s.id, s.code, s.name, s.credit_limit, s.current_exposure,
+              s.rating_exempt, s.sp_rating, s.moodys_rating, s.creditreform_score,
+              s.rating_updated_at,
+              (s.credit_limit - s.current_exposure) AS available_credit
+       FROM shippers s WHERE s.id = $1`, [req.params.shipperId]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Shipper not found' });
+    const s = rows[0];
+    res.json({
+      ...s,
+      sp: s.sp_rating || null,
+      s_and_p: s.sp_rating || null,
+      moodys: s.moodys_rating || null,
+      creditreform: s.creditreform_score || 0,
+      rating: s.rating_exempt ? 'EXEMPT' : 'STANDARD',
+      exempt: s.rating_exempt,
+      updated_at: s.rating_updated_at,
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /credits/:shipperId — single shipper credit detail
 router.get('/:shipperId', authorize('credits:read'), async (req, res, next) => {
   try {

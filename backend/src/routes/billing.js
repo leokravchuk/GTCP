@@ -324,7 +324,9 @@ router.get('/', authorize('billing:read'), async (req, res, next) => {
       params
     );
     const total = parseInt((cRows[0] || {}).count || '0', 10);
-    res.json({ data: rows, total, limit: Number(limit), offset: Number(offset) });
+    // Return plain array for frontend compatibility (.map), with total in header
+    res.setHeader('X-Total-Count', total);
+    res.json(rows);
   } catch (err) { next(err); }
 });
 

@@ -37,7 +37,7 @@ GTCP предназначена для:
 | Ошибки при выставлении счётов | 3–5% | 0% (авторасчёт по NC) |
 | Подготовка отчёта по балансу | 2–4 часа | Мгновенно |
 | Покрытие NC compliance | ~40% | **79% (55/70)** ✅ (Sprint 12, матрица по главам) |
-| Тесты | — | **117/117** passing (Sprint 12) |
+| Тесты | — | **442/442** passing (Sprint 13, ~95% coverage) |
 
 ### 1.3 Техническая архитектура
 
@@ -244,16 +244,19 @@ npm run test:coverage                      # с покрытием
 npx jest tests/billing.test.js --verbose   # один файл
 ```
 
-Текущий результат (Sprint 12, 28.03.2026):
+Текущий результат (Sprint 13, 30.03.2026):
 
 ```
-Test Suites: 6 passed, 6 total
-Tests:       117 passed, 117 total
+Test Suites: 25 passed, 25 total
+Tests:       442 passed, 442 total
+Coverage:    ~95% lines
 ```
 
-Распределение: `billing.test.js` — 18 · `credits.test.js` — 21 · `auctions.test.js` — 17 · `nc-routes.test.js` — 21 · `tariffs.test.js` — 24 · `rbp-mock.test.js` — 16.
+Sprint 12 (6 suites, 117 тестов): `billing` — 18 · `credits` — 21 · `auctions` — 17 · `nc-routes` — 21 · `tariffs` — 24 · `rbp-mock` — 16.
 
-> **Sprint 9:** Добавлены `nc-routes.test.js` и `tariffs.test.js`. Миграция 010 (`reserve_prices`, 57 тарифов АЕРС), KIREVO-EXIT. 11 NC-расхождений → 0. **Sprint 10 P0:** Миграция 011 (`invoice_line_items`, `capacity_category`). **Миграции 012–014:** `shipper_registration`, `nominations_kwh_h`, `rbp_tables`. **Sprint 12:** Добавлен `rbp-mock.test.js` (16 тестов — 11 SOAP-методов, bundled, full cycle).
+Sprint 13 (+19 suites, +325 тестов): NC compliance regression (79), integration (281), unit billing (76), real-DB nominations (6). Подробнее — §18.
+
+> **Sprint 9:** Добавлены `nc-routes.test.js` и `tariffs.test.js`. Миграция 010 (`reserve_prices`, 57 тарифов АЕРС), KIREVO-EXIT. 11 NC-расхождений → 0. **Sprint 10 P0:** Миграция 011 (`invoice_line_items`, `capacity_category`). **Миграции 012–014:** `shipper_registration`, `nominations_kwh_h`, `rbp_tables`. **Sprint 12:** Добавлен `rbp-mock.test.js` (16 тестов). **Sprint 13:** +19 test suites, покрытие ~95%, migration 000 (consolidated) + 015 (views), CI/CD, 3 bug fix.
 
 ---
 
@@ -667,9 +670,11 @@ NC Art.3 описывает полный жизненный цикл шиппе�
 #### Статусы шиппера
 
 ```
-POST /shippers/apply → APPLICANT
+POST /shippers/apply        → APPLICANT
 PATCH /shippers/:id/approve → APPROVED → ACTIVE
-PATCH /shippers/:id/remove → (проверки) → REMOVED
+PATCH /shippers/:id/suspend → SUSPENDED
+PATCH /shippers/:id/reactivate → ACTIVE
+PATCH /shippers/:id/remove  → (проверки) → REMOVED
 ```
 
 | Статус | Описание | UI badge |
@@ -677,7 +682,21 @@ PATCH /shippers/:id/remove → (проверки) → REMOVED
 | `APPLICANT` | Заявка подана, ждёт рассмотрения | Жёлтый |
 | `APPROVED` | Одобрен, подписывает GEDP + Balancing Agreement | Синий |
 | `ACTIVE` | Активный участник — может номинировать и торговать | Зелёный |
+| `SUSPENDED` | Заблокирован (нарушение кредита / регуляторное) — номинации и торговля недоступны | Оранжевый |
 | `REMOVED` | Отозван (NC Art.3.7) | Красный |
+
+#### Переходы между статусами
+
+| От | К | Условие |
+|---|---|---|
+| `APPLICANT` | `APPROVED` | Документы проверены |
+| `APPROVED` | `ACTIVE` | Кредитная поддержка предоставлена |
+| `ACTIVE` | `SUSPENDED` | Нарушение кредитного лимита / регуляторное решение |
+| `SUSPENDED` | `ACTIVE` | Проблема устранена (реактивация) |
+| `ACTIVE` | `REMOVED` | `contracted_capacity = 0` + `outstanding_debt = 0` |
+| `APPLICANT` | `REMOVED` | Заявка отклонена |
+
+Каждый переход логируется в `shipper_changes` (audit trail): `field_name`, `old_value`, `new_value`, `reason`.
 
 #### Условия удаления (NC Art.3.7)
 
@@ -885,57 +904,191 @@ Surrender Premium (NC Art.8.3): `AP = (P_old − P_new) × RC × P`
 
 ## 9. Аукционы (NC Art.7 + CAM NC EU 2017/459)
 
-### 9.1 Календарь аукционов (ENTSOG MAR0277-24)
+### 9.1 Расписание аукционов GY2025/2026
 
-47 аукционов GY2025/2026 (семя от октября 2024):
+**Источник:** MAR0277-24 ENTSOG Auction Calendar (Final, 07.10.2024)
+**Правовая основа:** NC Gastrans Art. 7.4
 
-| Тип | Кол-во | Расписание |
-|---|---|---|
-| Annual Firm | 2 | 07.07.2025 (Horgoš, Joint) |
-| Quarterly | 11 | AQC-1…4 (3 мес. до газового квартала) |
-| Monthly Firm | 24 | 3-й понедельник M-1 |
-| Daily/Within-Day | templates | 4-й вторник M-1 (Interruptible) |
+#### 9.1.1 Публикация аукционов на RBP (CAM NC practice)
+
+NC Gastrans Art.7.4.1: Transporter публикует аукцион на Capacity Booking Platform (RBP.EU) с информацией: (i) Available Capacity, (ii) Reserve Price, (iii) price steps. Конкретные сроки публикации определяются CAM NC (EU 2017/459). Из MAR0277-24:
+
+| Продукт | Публикация на RBP | Пример GY2025/2026 |
+|---------|-------------------|-------------------|
+| Yearly | ~4 недели до аукциона | Publish 07.06.2025, Auction 07.07.2025 |
+| Quarterly | ~2 недели до аукциона | Publish 21.07.2025, Auction 04.08.2025 |
+| Monthly | ~1 неделя до аукциона | Publish 09.02.2026, Auction 16.02.2026 |
+| Daily | В тот же день (D-1) | Publication = Auction start |
+| Within-Day | Непрерывно | Нет отдельной публикации |
+
+Art.7.4.7: Публикация аукциона имеет юридический эффект "приглашения подать оферту" (Art.35 Закона о договорах Сербии).
+
+#### 9.1.2 Yearly Firm (Art. 7.4.2.1)
+
+> **NC Art. 7.1.2 (КРИТИЧНО):** Yearly Firm проводится **только** если LT мощность освободилась (surrender Art.8 или прекращение Long-Term GTA). ST 10% мощность на yearly аукционе **НЕ продаётся**. Если все LT контракты действуют — аукцион не проводится.
+
+| Параметр | Значение |
+|----------|---------|
+| Расписание | 1st Monday of July |
+| Дата GY2025/2026 | **07.07.2025** |
+| Публикация на RBP | **07.06.2025** (~4 недели) |
+| Время подачи заявок | 09:00-18:00 CET |
+| Delivery | 01.10.2025-01.10.2026 |
+| Алгоритм | Ascending clock (Art. 7.6.5) |
+| Текущий статус | CLOSED - no LT surrendered |
+
+#### 9.1.3 Quarterly Firm (Art. 7.4.2.2)
+
+4 раунда в год. ST 10% мощность продаётся здесь (Art. 7.1.1.1).
+
+Available Capacity = Technical - Total Contracted + Surrendered (Art. 7.1.1.1)
+
+| Round | Дата аукциона | Публикация | Правило | Q1 Oct-Dec | Q2 Jan-Mar | Q3 Apr-Jun | Q4 Jul-Sep |
+|-------|-------------|-----------|---------|-----------|-----------|-----------|-----------|
+| **1st** | **04.08.2025** | 21.07.2025 | 1st Mon Aug | 1.81 | 1.78 | 1.80 | 1.81 |
+| **2nd** | **03.11.2025** | 20.10.2025 | 1st Mon Nov | - | 1.78 | 1.80 | 1.81 |
+| **3rd** | **02.02.2026** | 19.01.2026 | 1st Mon Feb | - | - | 1.80 | 1.81 |
+| **4th** | **04.05.2026** | 20.04.2026 | 1st Mon May | - | - | - | 1.81 |
+
+Время: 09:00-18:00 CET. Ascending clock. Reserve prices: EUR/kWh/h/quarter (Entry Kirevo).
+
+#### 9.1.4 Monthly Firm (Art. 7.4.2.3)
+
+3rd Monday of M-1. Публикация ~1 неделя до аукциона. Время: 09:00-18:00 CET.
+
+| Delivery | Auction Date | Publish | Days | Entry | Horgos | Serbia |
+|----------|-------------|---------|------|-------|--------|--------|
+| Oct 2025 | **15.09.2025** | 08.09 | 31 | 0.66 | 0.76 | 0.46 |
+| Nov 2025 | **20.10.2025** | 13.10 | 30 | 0.64 | 0.73 | 0.45 |
+| Dec 2025 | **17.11.2025** | 10.11 | 31 | 0.66 | 0.76 | 0.46 |
+| Jan 2026 | **15.12.2025** | 08.12 | 31 | 0.66 | 0.76 | 0.46 |
+| Feb 2026 | **19.01.2026** | 12.01 | 28 | 0.60 | 0.68 | 0.42 |
+| Mar 2026 | **16.02.2026** | 09.02 | 31 | 0.66 | 0.76 | 0.46 |
+| Apr 2026 | **16.03.2026** | 09.03 | 30 | 0.64 | 0.73 | 0.45 |
+| May 2026 | **20.04.2026** | 13.04 | 31 | 0.66 | 0.76 | 0.46 |
+| Jun 2026 | **18.05.2026** | 11.05 | 30 | 0.64 | 0.73 | 0.45 |
+| Jul 2026 | **15.06.2026** | 08.06 | 31 | 0.66 | 0.76 | 0.46 |
+| Aug 2026 | **20.07.2026** | 13.07 | 31 | 0.66 | 0.76 | 0.46 |
+| Sep 2026 | **17.08.2026** | 10.08 | 30 | 0.64 | 0.73 | 0.45 |
+
+Reserve prices: EUR/kWh/h/month (AERS 05-145). Monthly tariff = за весь месяц, НЕ делить на дни.
+
+#### 9.1.5 Daily Firm (Art. 7.4.2.4)
+
+| Параметр | Значение |
+|----------|---------|
+| Расписание | Каждый день, D-1 |
+| Время подачи заявок | **16:30-17:00 CET** |
+| Delivery | Следующий Gas Day (06:00 CET - 06:00 CET) |
+| Алгоритм | Uniform price (Art. 7.6.14) |
+| Reserve price | Entry 0.0329, Horgos 0.0375, Serbia 0.0230 EUR/kWh/h/day |
+
+#### 9.1.6 Within-Day Firm (Art. 7.4.2.5)
+
+**Within-Day - это НЕ разовый аукцион.** Это непрерывная серия аукционов каждый час в течение Gas Day.
+
+| Параметр | Значение |
+|----------|---------|
+| Расписание | **Непрерывно**, каждый час |
+| Первый аукцион | После публикации результатов Daily (или Interruptible Daily) |
+| Bid window | **30 минут** |
+| Что предлагается | Первый аукцион: все 24 часа. Далее: от (текущий час + 4ч) до конца Gas Day |
+| Последний аукцион | 01:00-01:30 CET Gas Day (последний час) |
+| Reserve price | Entry 0.0021, Horgos 0.0023, Serbia 0.0014 EUR/kWh/h/**hour** |
+| CR | **Не предлагается** (NC Art. 6.5.2) |
+| Формула fee | capacity x hourly_price x hours. **НЕ делить на 365** |
+
+#### 9.1.7 Commercial Reverse (Art. 7.4.3)
+
+| Product | Расписание (NC Art.) | Время | Дата GY2025/2026 |
+|---------|---------------------|-------|-----------------|
+| CR Yearly | 3rd Monday July (7.4.3.1) | 09:00-18:00 CET | **21.07.2025** |
+| CR Quarterly | 1st Mon Sep/Dec/Mar/Jun (7.4.3.2) | 09:00-18:00 CET | 01.09 / 01.12 / 02.03 / 01.06 |
+| CR Monthly | 4th Tuesday M-1 (7.4.3.3) | 09:00-18:00 CET | Per month |
+| CR Daily | Every day D-1 (7.4.3.4) | **17:30-18:00 CET** | Daily |
+
+CR Available = Total Contracted в Physical Direction - уже законтрактованные CR (Art. 7.3.2-7.3.5)
+
+#### 9.1.8 Interruptible (Art. 7.4.4-7.4.5)
+
+| Product | Расписание | Время | Условие |
+|---------|-----------|-------|---------|
+| Int. Daily | Every day D-1 (7.4.4) | **17:30-18:00 CET** | Art. 7.1.3 conditions met |
+| Int. Within-Day | Hourly (7.4.5) | After Firm W/D results | Via Over-Nomination Art. 12.8 |
+
+#### 9.1.9 Хронология типичного дня (D-1 - Gas Day)
+
+```
+D-1  14:00 CET  Nomination deadline (NC Art. 12.6.1.1)
+D-1  16:30 CET  Daily Firm auction opens (Art. 7.4.2.4)
+D-1  17:00 CET  Daily Firm auction closes
+D-1  17:30 CET  CR Daily + Interruptible Daily opens (Art. 7.4.3.4 + 7.4.4)
+D-1  18:00 CET  CR Daily + Interruptible closes
+D-1  ~18:30 CET Results published
+D-1  ~19:00 CET First Within-Day auction starts (Art. 7.4.2.5)
+D-1  ~19:30 CET First W/D bids close (30min window)
+     ...        Hourly W/D auctions continue
+GD   06:00 CET  Gas Day starts
+     ...        W/D auctions every hour (current+4h -> end of GD)
+GD   01:00 CET  Last W/D auction (01:00-01:30 CET)
+GD   06:00 CET  Gas Day ends
+```
 
 ### 9.2 Bid Lifecycle
 
 ```
-FREE CAPACITY → POST /auctions/bids (DRAFT)
-→ POST /bids/:id/submit (SUBMITTED)
-→ POST /bids/:id/result (WON / LOST)
-→ POST /bids/:id/create-contract (CONTRACT_CREATED)
-→ BILLING
+FREE CAPACITY -> POST /auctions/bids (DRAFT)
+-> POST /bids/:id/submit (SUBMITTED)
+-> POST /bids/:id/result (WON / PARTIALLY_WON / LOST)
+-> POST /bids/:id/create-contract (CONTRACT_CREATED)
+-> BILLING
 ```
 
 ### 9.3 Credit Check (NC Art.5.3.1)
 
-Перед подачей заявки — автоматическая проверка доступного кредитного лимита. При нехватке — заявка отклоняется.
+Перед подачей заявки - автоматическая проверка доступного кредитного лимита. При нехватке - заявка отклоняется.
 
-`calcCreditBlock(product_type, capacity_kWh_h, tariff)` — множители по типу продукта (см. раздел 5.3).
+| Продукт | Множитель | Available Credit |
+|---------|----------|-----------------|
+| Yearly | 2/12 | Credit Limit x 12/2 |
+| Quarterly | 2/3 | Credit Limit x 3/2 |
+| Monthly / Daily / W-D | 100% | Credit Limit |
+
+Exempt шипперы (BBB- / Baa3 / CR<=235) - без ограничений (Art. 5.3.5).
 
 ### 9.4 Reserve Price
 
-Стартовая цена аукциона = Reserve Price из АЕРС 05-145 (см. раздел 13). При отсутствии спроса — снижение до нуля не ниже нуля.
+Стартовая цена аукциона = Reserve Price из AERS 05-145 (см. раздел 13). При ascending clock - цена растёт от Reserve Price. При uniform price (Daily/W-D) - все победители платят одну цену.
 
-### 9.5 API Auctions
+### 9.5 Capacity Split 90/10 (AERS)
+
+| IP | Direction | Tech kWh/h | LT 90% | ST 10% (auctions) |
+|---|---|---|---|---|
+| KIREVO-ENTRY | ENTRY | 15,280,488 | 13,752,439 | 1,528,049 |
+| HORGOS-EXIT | EXIT | 10,240,233 | 9,216,210 | 1,024,023 |
+| EXIT-SERBIA | EXIT | 5,040,256 | 4,536,230 | 504,026 |
+
+NC Art. 7.1.2: Yearly auction = ONLY surrendered LT. ST 10% sold via Quarterly/Monthly/Daily/W-D (Art. 7.1.1).
+
+### 9.6 API Auctions
 
 | Метод | URL | Описание |
 |---|---|---|
-| GET | `/api/v1/auctions` | Список аукционов |
-| GET | `/api/v1/auctions/summary` | KPI |
-| GET | `/api/v1/auctions/revenue-forecast` | Revenue forecast |
-| GET | `/api/v1/auctions/calendar` | Календарь MAR0277-24 |
+| GET | `/api/v1/auctions` | Список аукционов (с пагинацией) |
+| GET | `/api/v1/auctions/calendar/grid` | Календарная сетка GY (новый) |
+| GET | `/api/v1/auctions/calendar` | Список по фильтрам |
 | GET | `/api/v1/auctions/calendar/upcoming` | Предстоящие |
 | GET | `/api/v1/auctions/calendar/:id` | Конкретный аукцион |
-| PATCH | `/api/v1/auctions/calendar/:id/status` | Статус аукциона |
-| GET | `/api/v1/auctions/bids` | Все заявки |
+| GET | `/api/v1/auctions/summary` | KPI |
+| GET | `/api/v1/auctions/timeline` | 90-дневный timeline |
 | POST | `/api/v1/auctions/bids` | Создать заявку (DRAFT) |
+| GET | `/api/v1/auctions/bids` | Все заявки |
 | GET | `/api/v1/auctions/bids/:id` | Детали заявки |
-| PATCH | `/api/v1/auctions/bids/:id` | Обновить |
+| PATCH | `/api/v1/auctions/bids/:id` | Обновить параметры |
 | POST | `/api/v1/auctions/bids/:id/submit` | Подать (SUBMITTED) |
 | POST | `/api/v1/auctions/bids/:id/result` | Результат (WON/LOST) |
-| POST | `/api/v1/auctions/bids/:id/create-contract` | Создать контракт |
-| POST | `/api/v1/auctions/bids/:id/cancel` | Отменить |
-| GET | `/api/v1/auctions/timeline` | 90-дневный timeline событий |
+| POST | `/api/v1/auctions/bids/:id/create-contract` | Создать контракт из победы |
+| DELETE | `/api/v1/auctions/bids/:id` | Отменить (только DRAFT/SUBMITTED) |
 
 ---
 
@@ -1232,7 +1385,7 @@ AP = (P_old − P_new) × RC × P
 | OWASP Top 10 Audit | Penetration test | ✅ Sprint 9 |
 | Nomination deadline | 14:00 CET D-1 серверная проверка | ✅ Sprint 9 |
 
-### 16.2 NC Compliance Matrix (79%, Sprint 12)
+### 16.2 NC Compliance Matrix (79%, Sprint 13)
 
 | Глава | Статей | ✅ | ⚠ | 🔲 | Покрытие |
 |---|---|---|---|---|---|
@@ -1275,7 +1428,7 @@ AP = (P_old − P_new) × RC × P
 | **11** | **27.03.2026** | **39** | **✅** | **Nominations 100% (NC Art.12-13), Over-Nomination logic, Balance panel, Renomination 4-rule, migration 013 (nominations_kwh_h); RBP Core: Mock SOAP Server, rbpClient.js, capacityUpload, creditSync, auctionSync, bundledAuction, migration 014 (rbp_tables)** |
 | **12** | **28.03.2026** | **19** | **✅** | **RBP Secondary Market: surrenderApproval, bilateralManager, remitReporter, networkUserSync; RBP Bridge UI (4 вкладки), rbp-mock.test.js (16 тестов), 117/117 тестов** |
 
-**Кумулятив на 28.03.2026: ~456 SP · 117/117 тестов · NC 79% (55/70) · 93 endpoints · Migrations 001–014**
+**Кумулятив на 30.03.2026: ~501 SP · 442/442 тестов · NC 79% (55/70) · 93 endpoints · Migrations 000–015**
 
 ### 17.2 RBP Integration — ✅ Завершено (Sprint 11–12)
 
@@ -1463,6 +1616,18 @@ npm run docker:test:down
 
 Непокрываемые строки (~30 из ~3500): NODE_ENV guards, defensive dead code, complex DB chains.
 
+### 18.7 Ошибки, выявленные при тестировании (Sprint 13)
+
+В ходе Sprint 13 при расширении тестового покрытия были обнаружены и исправлены три ошибки:
+
+| ID | Область | Описание | Исправление |
+|---|---|---|---|
+| **BUG-01** | Billing / Округление | Промежуточные суммы вычислялись с `toFixed(2)`, что приводило к накопленной погрешности ±€0.01 в итоге счёта. Обнаружено в 120 из 436 тестовых комбинаций. | Промежуточный расчёт переведён на `toFixed(4)`, итоговое округление до 2 знаков — в конце. |
+| **BUG-02** | Billing / Generate | `ReferenceError: pts is not defined` в `POST /billing/generate` при наличии нескольких NC-точек в одном счёте. Возвращало HTTP 500. | Переменная `pts` вынесена в правильную область видимости перед циклом по строкам. |
+| **BUG-03** | Nominations / Over-Nomination | `ERROR: column "is_over_nomination" does not exist` при `POST /nominations` с превышением мощности. Возвращало HTTP 500. | Добавлена колонка `is_over_nomination BOOLEAN DEFAULT FALSE` в migration 015. |
+
+> Все три ошибки закрыты в Sprint 13. Тесты: 442/442 ✅.
+
 ---
 
 # ЧАСТЬ II — ENGLISH
@@ -1495,7 +1660,7 @@ GTCP covers:
 | Billing errors | 3–5% | 0% (auto-calc per NC) |
 | Balance report preparation | 2–4 hours | Instant |
 | NC compliance coverage | ~40% | **79% (55/70)** ✅ (Sprint 12, chapter matrix) |
-| Tests | — | **117/117** passing (Sprint 12) |
+| Tests | — | **442/442** passing (Sprint 13, ~95% coverage) |
 
 ### 1.3 Technical Architecture
 
@@ -1685,11 +1850,11 @@ Requires running backend (Option A or B).
 
 ```powershell
 cd C:\Users\leokr\ETRM\backend
-npm test                    # all tests — 117/117 passing
-npm run test:coverage       # with coverage report
+npm test                    # all tests — 442/442 passing
+npm run test:coverage       # with coverage report (~95%)
 ```
 
-Sprint 12 result: **117/117** passing across 6 suites: billing (18), credits (21), auctions (17), nc-routes (21), tariffs (24), rbp-mock (16, added Sprint 12).
+Sprint 13 result: **442/442** passing across 25 suites. Sprint 12 baseline: 6 suites, 117 tests (billing 18, credits 21, auctions 17, nc-routes 21, tariffs 24, rbp-mock 16). Sprint 13 added: NC compliance regression (79), integration (281), unit billing (76), real-DB nominations (6). See §18 for full breakdown.
 
 ---
 
@@ -2069,6 +2234,76 @@ FUEL_GAS (auto): Q_exit_kWh × 0.0325               = [system calculated]
 | `COMM_REV_DAILY` | Comm. Reverse Daily | 1 Gas Day | 6.5.2.4 |
 
 > Capacity always in **kWh/h**. Never MWh/day in business logic.
+
+### 7.4 API Contracts
+
+| Method | URL | Description |
+|---|---|---|
+| GET | `/api/v1/contracts` | List contracts |
+| POST | `/api/v1/contracts` | Create contract |
+| GET | `/api/v1/contracts/:id` | Contract details |
+| PATCH | `/api/v1/contracts/:id` | Update contract |
+| DELETE | `/api/v1/contracts/:id` | Delete contract |
+
+### 7.5 NC Art.3 — Shipper Registration and Lifecycle (Sprint 10 P1)
+
+NC Art.3 defines the full shipper lifecycle as a participant in the transmission system.
+
+#### Shipper Statuses
+
+```
+POST /shippers/apply        → APPLICANT
+PATCH /shippers/:id/approve → APPROVED → ACTIVE
+PATCH /shippers/:id/suspend → SUSPENDED
+PATCH /shippers/:id/reactivate → ACTIVE
+PATCH /shippers/:id/remove  → (checks) → REMOVED
+```
+
+| Status | Description | UI badge |
+|---|---|---|
+| `APPLICANT` | Application submitted, pending review | Yellow |
+| `APPROVED` | Approved, signing GEDP + Balancing Agreement | Blue |
+| `ACTIVE` | Active participant — can nominate and trade | Green |
+| `SUSPENDED` | Blocked (credit breach / regulatory) — nominations and trading unavailable | Orange |
+| `REMOVED` | Removed (NC Art.3.7) | Red |
+
+#### Status Transitions
+
+| From | To | Condition |
+|---|---|---|
+| `APPLICANT` | `APPROVED` | Documents verified |
+| `APPROVED` | `ACTIVE` | Credit support provided |
+| `ACTIVE` | `SUSPENDED` | Credit limit breach / regulatory decision |
+| `SUSPENDED` | `ACTIVE` | Issue resolved (reactivation) |
+| `ACTIVE` | `REMOVED` | `contracted_capacity = 0` + `outstanding_debt = 0` |
+| `APPLICANT` | `REMOVED` | Application rejected |
+
+Every transition is logged in `shipper_changes` (audit trail): `field_name`, `old_value`, `new_value`, `reason`.
+
+#### Removal Conditions (NC Art.3.7)
+
+Before transitioning to `REMOVED`, the system checks:
+- `contracted_capacity = 0` (no active contracts)
+- `outstanding_debt = 0` (no unpaid invoices)
+- On success — GEDP and Balancing Agreement are automatically terminated
+
+#### GTA Types
+
+| Type | Description |
+|---|---|
+| `LONG_TERM` | Long-Term GTA (≥ 1 year, exempt from auctions under Final Exemption Act) |
+| `SHORT_TERM` | Short-Term GTA (via public CAM NC auctions) |
+
+#### API Shippers
+
+| Method | URL | Description |
+|---|---|---|
+| GET | `/api/v1/shippers` | List shippers |
+| POST | `/api/v1/shippers` | Create shipper |
+| POST | `/api/v1/shippers/apply` | Submit application (→ APPLICANT) |
+| PATCH | `/api/v1/shippers/:id/approve` | Approve (→ ACTIVE) |
+| PATCH | `/api/v1/shippers/:id/remove` | Remove (with NC Art.3.7 checks) |
+| GET | `/api/v1/shippers/:id/audit` | Audit trail (old/new values) |
 
 ---
 
@@ -2531,7 +2766,7 @@ Full specification: Swagger UI at `http://localhost:3000/docs`
 | OWASP Top 10 Audit | Penetration test | ✅ Sprint 9 |
 | Nomination Deadline | 14:00 CET D-1 server validation | ✅ Sprint 9 |
 
-### 16.2 NC Compliance Matrix (79%, Sprint 12)
+### 16.2 NC Compliance Matrix (79%, Sprint 13)
 
 | Chapter | Articles | ✅ | ⚠ | 🔲 | Coverage |
 |---|---|---|---|---|---|
@@ -2734,6 +2969,18 @@ GitHub Actions (`.github/workflows/test.yml`) runs on every push/PR to `main`:
 | rbp.js | **100%** | Art.7, 8, 10, 24 |
 | auth.js | **95%** | — |
 | shippers.js | **92%** | Art.3 |
+
+### 18.6 Bugs Found During Testing (Sprint 13)
+
+Three bugs were discovered and fixed during Sprint 13 coverage expansion:
+
+| ID | Area | Description | Fix |
+|---|---|---|---|
+| **BUG-01** | Billing / Rounding | Subtotals computed with `toFixed(2)`, causing accumulated ±€0.01 error in invoice total. Found in 120 of 436 test combinations. | Intermediate calculation changed to `toFixed(4)`; final rounding to 2 decimal places applied at the end only. |
+| **BUG-02** | Billing / Generate | `ReferenceError: pts is not defined` in `POST /billing/generate` when multiple NC points were present in one invoice. Returned HTTP 500. | Variable `pts` moved to correct scope before the line-items loop. |
+| **BUG-03** | Nominations / Over-Nomination | `ERROR: column "is_over_nomination" does not exist` on `POST /nominations` with capacity exceeded. Returned HTTP 500. | Column `is_over_nomination BOOLEAN DEFAULT FALSE` added in migration 015. |
+
+> All three bugs resolved in Sprint 13. Tests: 442/442 ✅.
 
 ---
 

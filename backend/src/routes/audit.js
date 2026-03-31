@@ -21,7 +21,7 @@ router.get('/', authorize('audit:read'), async (req, res, next) => {
 
   try {
     const { rows } = await db.query(
-      `SELECT * FROM audit_log ${where} ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i++}`,
+      `SELECT * FROM audit_log ${where} ORDER BY occurred_at DESC LIMIT $${i++} OFFSET $${i++}`,
       [...params, limit, offset]
     );
     res.json(rows);
