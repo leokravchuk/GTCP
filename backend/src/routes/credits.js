@@ -59,14 +59,29 @@ router.post('/:shipperId/instruments', authorize('credits:update'), async (req, 
   const { type, bank, amount, validFrom, validTo, product } = req.body;
   try {
     const { rows } = await db.query(
-      `INSERT INTO credit_support (shipper_id, support_type, issuer, amount_eur, valid_from, valid_to, product_type, status)
+      `INSERT INTO credit_support (shipper_id, support_type, bank_name, amount_eur, valid_from, valid_to, product_type, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVE') RETURNING *`,
       [req.params.shipperId, type || 'BANK_GUARANTEE', bank || null, amount || 0, validFrom || null, validTo || null, product || 'ANNUAL']
     );
+
+    // NC Art.5.3.2: Credit Limit = sum of all active Credit Support
+    await db.query(
+      `UPDATE shippers SET credit_limit = (
+        SELECT COALESCE(SUM(amount_eur), 0) FROM credit_support
+        WHERE shipper_id = $1 AND status = 'ACTIVE'
+      ) WHERE id = $1`,
+      [req.params.shipperId]
+    );
+
+    await addAudit({
+      actionType: 'CREDIT_INSTRUMENT_ADD', entityType: 'credit_support', entityId: rows[0].id,
+      userId: req.user.id, username: req.user.username, ipAddress: req.ip,
+      description: `Credit instrument added: ${type || 'BANK_GUARANTEE'} ${amount} EUR for shipper ${req.params.shipperId}`,
+    });
+
     res.status(201).json(rows[0]);
-  } catch {
-    // credit_support table may not exist — return stub
-    res.status(201).json({ id: 'stub', shipper_id: req.params.shipperId, support_type: type, amount_eur: amount, status: 'ACTIVE' });
+  } catch (err) {
+    next(err);
   }
 });
 

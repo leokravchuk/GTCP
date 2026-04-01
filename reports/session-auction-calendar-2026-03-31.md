@@ -230,6 +230,32 @@ Per shipper (все Balance = 0):
 
 ## Следующие шаги
 
+## Credit Rating Status — 3 уровня (NC Art.5)
+
+### Было (2 статуса)
+- ОСВОБОЖДЁН (рейтинг >= BBB-)
+- ТРЕБУЕТ ОБЕСПЕЧЕНИЕ (всё остальное)
+
+### Стало (3 статуса)
+| Статус | Условие | NC Ref |
+|--------|---------|--------|
+| **✓ ОСВОБОЖДЁН** | Рейтинг >= BBB- / Baa3 / CR<=235 | Art.5.1.6 |
+| **✓ ОБЕСПЕЧЕН** | Нет рейтинга, но сумма инструментов >= min credit | Art.5.3.2 |
+| **✗ ТРЕБУЕТ ОБЕСПЕЧЕНИЕ** | Нет рейтинга, инструментов < min credit | Art.5.1 |
+
+### Исправления
+
+| # | Проблема | Исправление |
+|---|----------|-------------|
+| 1 | Test Energy + Test1 видны в рейтингах | Фильтр `shippers.filter(s => s.status === 'ACTIVE')` |
+| 2 | Creditreform 0 = EXEMPT | Добавлено `r.creditreform > 0` в `isRatingExempt()` |
+| 3 | Min credit = hardcoded ANNUAL | Теперь зависит от `gta_type`: LT=ANNUAL(2/12), ST=QUARTERLY(2/3) |
+| 4 | POST /instruments не обновлял credit_limit | Добавлен `UPDATE shippers SET credit_limit = SUM(active instruments)` |
+| 5 | Frontend field mismatch (issuer vs bank) | Исправлено: `{type, bank, amount, validFrom, validTo, product}` |
+| 6 | Нет статуса "ОБЕСПЕЧЕН" | Добавлен 3-й статус: инструменты >= min credit → зелёный badge |
+
+---
+
 ## Credit Instruments fix (NC Art.5.1.1)
 
 ### DB

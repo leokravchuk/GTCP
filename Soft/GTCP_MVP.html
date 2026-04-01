@@ -1621,8 +1621,9 @@ async function _refreshFromBackend() {
       } catch {}
     });
     await Promise.all(instrPromises);
-    // Ratings per shipper
-    const ratingPromises = shippers.map(async s => {
+    // Ratings per shipper (active only)
+    const activeForRatings = shippers.filter(s => s.status === 'ACTIVE');
+    const ratingPromises = activeForRatings.map(async s => {
       const { data } = await API.credits.getRating(s.id);
       if (data) return { shipperId: s.id, name: s.name, sp: data.sp || data.s_and_p || '—', moodys: data.moodys || '—', creditreform: data.creditreform || 0, updatedAt: data.updated_at?.slice(0,10) || '' };
       return null;
@@ -3214,9 +3215,10 @@ async function renderCapacity() {
 
 // NC Art.5.3.1 — рейтинговое освобождение
 function isRatingExempt(r) {
+  // NC Art.5.1.6: exempt if rated >= BBB- (S&P/Fitch) or >= Baa3 (Moody's) or <= 235 (Creditreform)
   const spOk = ['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-'].includes((r.sp||'').toUpperCase());
   const moOk = ['Aaa','Aa1','Aa2','Aa3','A1','A2','A3','Baa1','Baa2','Baa3'].includes(r.moodys||'');
-  const crOk = r.creditreform != null && r.creditreform <= 235;
+  const crOk = r.creditreform != null && r.creditreform > 0 && r.creditreform <= 235;
   return spOk || moOk || crOk;
 }
 
@@ -3305,18 +3307,25 @@ function renderCreditRatings() {
   if (!tbody) return;
   tbody.innerHTML = creditRatings.map(r=>{
     const exempt = isRatingExempt(r);
-    const s = shippers.find(x=>x.id===r.shipperId||x.code===r.shipperId)||{creditLimit:0, code:''};
-    const minCr = exempt ? 0 : calcMinCreditSize(s.creditLimit||0, 'ANNUAL');
+    const s = shippers.find(x=>x.id===r.shipperId||x.code===r.shipperId)||{creditLimit:0, code:'', gta_type:''};
+    // Min credit depends on product type: LT=ANNUAL (2/12), ST=varies
+    const product = s.gta_type === 'LONG_TERM' ? 'ANNUAL' : 'QUARTERLY';
+    const minCr = exempt ? 0 : calcMinCreditSize(s.creditLimit||0, product);
     const spCls  = ['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-'].includes((r.sp||'').toUpperCase()) ? 'inv-grade':'sub-grade';
     const moCls  = ['Aaa','Aa1','Aa2','Aa3','A1','A2','A3','Baa1','Baa2','Baa3'].includes(r.moodys||'') ? 'inv-grade':'sub-grade';
     const crCls  = (r.creditreform||999) <= 235 ? 'inv-grade':'sub-grade';
     return `<tr>
-      <td class="fw7">${r.name}</td>
+      <td class="fw7">${s.code ? s.code + ' ' : ''}${r.name}</td>
       <td><span class="rating-badge ${spCls}">${r.sp||'—'}</span></td>
       <td><span class="rating-badge ${moCls}">${r.moodys||'—'}</span></td>
       <td><span class="rating-badge ${crCls}">${r.creditreform||'—'}</span></td>
-      <td><span class="rating-badge ${exempt?'exempt':'not-exempt'}">${exempt?'✓ ОСВОБОЖДЁН':'✗ ТРЕБУЕТ ОБЕСПЕЧЕНИЕ'}</span></td>
-      <td class="mono">${exempt ? '—' : '€ '+fmtEur(minCr)}</td>
+      ${(() => {
+        if (exempt) return '<td><span class="rating-badge exempt">✓ ОСВОБОЖДЁН</span></td><td class="mono">—</td>';
+        // Check if shipper has enough active instruments
+        const instrTotal = creditInstruments.filter(ci => (ci.shipperId === r.shipperId || ci.shipperId === s.code) && ci.status === 'ACTIVE').reduce((sum, ci) => sum + ci.amount, 0);
+        if (instrTotal >= minCr && minCr > 0) return `<td><span class="rating-badge" style="background:var(--green);color:#fff;padding:2px 8px;border-radius:3px;font-size:10px">✓ ОБЕСПЕЧЕН</span></td><td class="mono text-green">€ ${fmtEur(instrTotal)} / ${fmtEur(minCr)}</td>`;
+        return `<td><span class="rating-badge not-exempt">✗ ТРЕБУЕТ ОБЕСПЕЧЕНИЕ</span></td><td class="mono text-red">€ ${fmtEur(instrTotal)} / ${fmtEur(minCr)}</td>`;
+      })()}
       <td class="mono text-dim">${r.updatedAt}</td>
       <td><button class="action-btn" onclick="updateRating('${r.shipperId}')">Обновить</button></td>
     </tr>`;
@@ -3373,8 +3382,8 @@ async function addCreditInstrument() {
   if (STATE.backendMode && window.API) {
     try {
       const { data, error } = await API.credits.addInstrument(sid, {
-        support_type: type, issuer: bank, amount_eur: amount,
-        valid_from: issued||today(), valid_to: expires, product_type: product,
+        type, bank, amount: parseFloat(amount),
+        validFrom: issued||today(), validTo: expires, product,
       });
       if (error) { toast(`Ошибка API: ${error}`, 'error'); return; }
       toast(`Инструмент добавлен в базу — NC Art.5 (${type})`, 'success');
