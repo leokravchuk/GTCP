@@ -203,7 +203,136 @@ Shipper (NC Art.3)
 
 ---
 
+## Balance page fix
+
+✅ Изменено: `Soft/GTCP_MVP.html` — `renderBalance()`:
+
+| # | Проблема | Исправление |
+|---|----------|-------------|
+| 1 | Nominations filter = only CONFIRMED/RENOM | Заменено на `status !== 'REJECTED' && !== 'CANCELLED'` — теперь MATCHED, PENDING, PARTIALLY_MATCHED видны |
+| 2 | SHP-002/004 показывали 0 | Теперь корректно: NIS 2.5M/2.5M, WIEH 1M/1M |
+| 3 | SHP-006 REMOVED + SHP-007 APPLICANT видны | Добавлен `shippers.filter(s => s.status === 'ACTIVE')` |
+| 4 | IP nominated не включал всех шипперов | Исправлено — все non-rejected номинации считаются |
+
+### Результат Balance
+
+IP загрузка:
+- KIREVO-ENTRY: 13,252,416 / 15,280,488 = 86.7%
+- HORGOS-EXIT: 10,216,208 / 10,240,233 = 99.8%
+- EXIT-SERBIA: 3,036,208 / 5,040,256 = 60.2%
+
+Per shipper (все Balance = 0):
+- SHP-001 Газпром: 9,752,416 / 9,752,416
+- SHP-002 NIS: 2,500,000 / 2,500,000
+- SHP-004 WIEH: 1,000,000 / 1,000,000
+
+---
+
 ## Следующие шаги
+
+## Credit Instruments fix (NC Art.5.1.1)
+
+### DB
+- `credit_support` table: добавлены `product_type`, constraint расширен (+ESCROW_DEPOSIT, +STANDBY_LC)
+- 7 instruments seeded: 5 ACTIVE + 1 EXPIRED
+
+| Shipper | Type | Bank | Amount | Product | Status |
+|---------|------|------|--------|---------|--------|
+| SHP-001 Газпром | PARENT_GUARANTEE | PAO Gazprom (Moscow) | 5,000,000 | ANNUAL | ACTIVE |
+| SHP-002 NIS | BANK_GUARANTEE | Banca Intesa Beograd | 3,000,000 | ANNUAL | ACTIVE |
+| SHP-002 NIS | ESCROW_DEPOSIT | Banca Intesa Beograd | 500,000 | QUARTERLY | ACTIVE |
+| SHP-003 MET | STANDBY_LC | Credit Suisse Zurich | 2,500,000 | ANNUAL | ACTIVE |
+| SHP-004 WIEH | PARENT_GUARANTEE | Wintershall Dea GmbH | 4,000,000 | ANNUAL | ACTIVE |
+| SHP-005 Srbijagas | BANK_GUARANTEE | Komercijalna Banka | 2,000,000 | ANNUAL | ACTIVE |
+| SHP-005 Srbijagas | ESCROW_DEPOSIT | Komercijalna Banka | 300,000 | MONTHLY | EXPIRED |
+
+### Backend
+✅ `credits.js`: GET /:shipperId/instruments — JOIN shippers for code+name
+
+### Frontend
+✅ `GTCP_MVP.html`:
+- `_refreshFromBackend`: instruments loaded per shipper via `API.credits.getInstruments(s.id)` (was loading from credits.list = shipper positions)
+- Mapping: `bank_name` (not `issuer`), `shipper_name`, `support_type`
+- Type labels: +PARENT_GUARANTEE, +STANDBY_LC, +ESCROW_DEPOSIT
+- Shipper name: `shipperName || code + name`
+
+---
+
+## EDIGAS v5.1 XML — полная реализация
+
+✅ Переписано: `backend/src/services/edigasService.js` — EDIGAS NOMINT v5.1
+
+### Было (stub)
+```xml
+<nomint:RenominationDocument>
+  <MessageIdentification>NOM-2026-00020</MessageIdentification>
+  <ShipperCode>27X-GA-GAZPROM-0</ShipperCode>
+  <Quantity unit="KWH">536208000</Quantity>  <!-- total kWh, wrong -->
+</nomint:RenominationDocument>
+```
+
+### Стало (EDIGAS v5.1 compliant)
+```xml
+<nomint:NominationDocument xmlns:nomint="urn:edigas:nomint:5:1">
+  <DocumentIdentification>NOMINT-NOM-2026-00001</DocumentIdentification>
+  <DocumentVersion>1</DocumentVersion>
+  <DocumentType>01G</DocumentType>  <!-- 01G=Nomination, P03=Renomination -->
+  <SenderIdentification codingScheme="305">27X-GA-GAZPROM-0</SenderIdentification>
+  <SenderRole>ZSH</SenderRole>
+  <ReceiverIdentification codingScheme="305">21X-RS-GASTRANS-0</ReceiverIdentification>
+  <ReceiverRole>ZSO</ReceiverRole>
+  <NominationTimeSeries>
+    <ContractReference>CTR-2026-001</ContractReference>
+    <ConnectionPointIdentification>KIREVO-ENTRY</ConnectionPointIdentification>
+    <Direction>Z02</Direction>  <!-- Z02=Entry, Z03=Exit -->
+    <GasDay>2026-03-30</GasDay>
+    <NominationCycle>0</NominationCycle>
+    <NominationPeriod>
+      <TimeInterval>2026-03-30T04:00Z/2026-03-31T04:00Z</TimeInterval>
+      <Quantity unit="KWH_H">9752416</Quantity>  <!-- hourly rate, not total -->
+    </NominationPeriod>
+  </NominationTimeSeries>
+</nomint:NominationDocument>
+```
+
+### Исправленные баги
+
+| # | Было | Стало |
+|---|------|-------|
+| 1 | RenominationDocument для всех | NominationDocument (01G) для cycle=0, RenominationDocument (P03) для cycle>0 |
+| 2 | Quantity = volume_kwh_h * 1000 (total kWh) | Quantity = volume_kwh_h (hourly rate, NC Art.12.1) |
+| 3 | GasDay = UTC slice (2026-03-29) | GasDay = local date (2026-03-30) |
+| 4 | Нет sender/receiver/direction/contract | Полный EDIGAS v5.1: EIC codes, roles ZSH/ZSO, Z02/Z03, contract ref |
+| 5 | gas_day_cycle = 1 для seed номинаций | Исправлено на 0 (первичные номинации) |
+| 6 | Нет NOMRES | buildNomres() — mock confirmation XML |
+
+### Функции в edigasService.js
+
+| Функция | Описание |
+|---------|----------|
+| `buildNomint(nom, shipper)` | Основная — NOMINT XML, автоматически выбирает 01G/P03 по gas_day_cycle |
+| `buildRenomint(nom, shipper)` | Alias — принудительно P03 |
+| `buildNomres(nom, shipper, qty)` | NOMRES — confirmation XML от TSO (mock) |
+| `submitToTso(xml, id)` | Submit to RBP.EU (mock mode) |
+
+---
+
+## Matching fix
+
+✅ Изменено: `Soft/GTCP_MVP.html` — `runMatching()`:
+
+| Было | Стало |
+|------|-------|
+| In-memory only (setTimeout → CONFIRMED) | Backend `POST /nominations/match` per gas_day |
+| Статусы откатывались через 1 сек | Статусы сохраняются в БД |
+| Не учитывал timezone offset | `new Date(gasDay).getDate()` → local date (UTC+3 → 2026-03-30) |
+
+### Gas Day timezone issue
+
+DB хранит `gas_day = 2026-03-30` (DATE), JSON возвращает `2026-03-29T21:00:00.000Z` (UTC). 
+`slice(0,10)` = `2026-03-29` (WRONG). `new Date().getDate()` = 30 (CORRECT, local tz).
+
+---
 
 1. **Commit все изменения** — backend + frontend + seeds + docs
 2. **Push на GitHub**

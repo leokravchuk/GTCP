@@ -1597,17 +1597,30 @@ async function _refreshFromBackend() {
       }));
     }
 
-    // ── Credits: instruments, ratings, margin calls ─────────────────────────
-    const { data: crList } = await API.credits.list();
-    if (crList) {
-      creditInstruments = crList.map(ci => ({
-        id: ci.id || `CI-${ci.shipper_code}`,
-        shipperId: ci.shipper_code, type: ci.support_type || ci.type,
-        bank: ci.issuer || ci.bank || '', amount: parseFloat(ci.amount_eur || ci.amount) || 0,
-        issued: ci.valid_from?.slice(0,10) || '', expires: ci.valid_to?.slice(0,10) || '',
-        product: ci.product_type || 'ANNUAL', status: ci.status || 'ACTIVE',
-      }));
-    }
+    // ── Credits: instruments per shipper ─────────────────────────────────
+    creditInstruments = [];
+    const instrPromises = shippers.map(async s => {
+      try {
+        const { data } = await API.credits.getInstruments(s.id);
+        if (data && data.length) {
+          data.forEach(ci => {
+            creditInstruments.push({
+              id: ci.id || `CI-${ci.shipper_code}`,
+              shipperId: ci.shipper_code || s.code,
+              shipperName: ci.shipper_name || s.name,
+              type: ci.support_type || ci.type || '',
+              bank: ci.bank_name || ci.issuer || ci.bank || '',
+              amount: parseFloat(ci.amount_eur || ci.amount) || 0,
+              issued: (ci.valid_from || '').slice(0, 10),
+              expires: (ci.valid_to || '').slice(0, 10),
+              product: ci.product_type || 'ANNUAL',
+              status: ci.status || 'ACTIVE',
+            });
+          });
+        }
+      } catch {}
+    });
+    await Promise.all(instrPromises);
     // Ratings per shipper
     const ratingPromises = shippers.map(async s => {
       const { data } = await API.credits.getRating(s.id);
@@ -2096,28 +2109,51 @@ async function rejectNom(id) {
   renderNominations(); updateNavBadges(); toast(`${id} отклонена`,'warning');
 }
 
-function runMatching() {  // FR-06
+async function runMatching() {  // FR-06
   const pending = nominations.filter(n=>n.status==='PENDING');
   if (!pending.length) { toast('Нет номинаций в статусе PENDING','info'); return; }
+
+  if (STATE.backendMode && window.API) {
+    // Get unique gas days from pending nominations
+    // Gas day: DB stores as DATE (2026-03-30), JSON returns as UTC (2026-03-29T21:00:00Z)
+    // Need to convert UTC back to local date: add timezone offset
+    const gasDays = [...new Set(pending.map(n => {
+      if (!n.gasDay) return null;
+      const d = new Date(n.gasDay);
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }).filter(Boolean))];
+    let totalMatched = 0;
+
+    for (const gasDay of gasDays) {
+      try {
+        const { data, error } = await API.nominations.match(gasDay);
+        if (error) { toast(`Matching error for ${gasDay}: ${error}`, 'error'); continue; }
+        if (data && data.matchedPairs) totalMatched += data.matchedPairs;
+      } catch(e) { toast(`Matching failed: ${e.message}`, 'error'); }
+    }
+
+    await _refreshFromBackend();
+    addAudit('NOM', `Матчинг запущен (backend) · ${gasDays.length} газ. суток · ${totalMatched} пар`);
+    renderNominations(); updateNavBadges();
+    toast(totalMatched > 0 ? `Матчинг: ${totalMatched} пар(ы) matched` : 'Нет полных пар ENTRY/EXIT для матчинга', totalMatched > 0 ? 'success' : 'warning');
+    return;
+  }
+
+  // Demo fallback (no backend)
   let matched = 0;
-  // Group by shipper + gasDay
   const groups = {};
   pending.forEach(n=>{ const k=`${n.shipperId}-${n.gasDay}`; (groups[k]=groups[k]||[]).push(n); });
   Object.values(groups).forEach(grp=>{
     const entry = grp.filter(n=>n.dir==='ENTRY');
     const exit  = grp.filter(n=>n.dir==='EXIT');
     if (entry.length && exit.length) {
-      [...entry,...exit].forEach(n=>{ n.status='MATCHING'; n.ts=nowStr(); });
+      [...entry,...exit].forEach(n=>{ n.status='CONFIRMED'; n.ts=nowStr(); });
       matched++;
-      setTimeout(()=>{
-        [...entry,...exit].forEach(n=>{ n.status='CONFIRMED'; n.ts=nowStr(); });
-        renderNominations(); updateNavBadges();
-      }, 1500);
     }
   });
-  addAudit('NOM', `Матчинг запущен · обработано групп: ${matched}`);
+  addAudit('NOM', `Матчинг запущен [DEMO] · ${matched} пар`);
   renderNominations(); updateNavBadges();
-  toast(matched>0 ? `Матчинг: ${matched} пар(ы) → MATCHING → CONFIRMED` : 'Нет полных пар ENTRY/EXIT', matched>0?'success':'warning');
+  toast(matched>0 ? `Матчинг: ${matched} пар(ы) → CONFIRMED [DEMO]` : 'Нет полных пар ENTRY/EXIT', matched>0?'success':'warning');
 }
 
 function openRenom(id) {  // FR-07
@@ -2274,7 +2310,7 @@ async function renderBalance() {
     } catch(e) { console.warn('[Balance] Could not load tracker data:', e.message); }
   }
 
-  const confirmed = nominations.filter(n=>n.status==='CONFIRMED'||n.status==='RENOM');
+  const confirmed = nominations.filter(n=>n.status!=='REJECTED'&&n.status!=='CANCELLED');
 
   const cards = NC_POINTS.map(pt => {
     // Match nominations by NC code or legacy name
@@ -2308,8 +2344,9 @@ async function renderBalance() {
   });
   document.getElementById('balance-cards').innerHTML = cards.join('');
 
-  // Detail by shipper
-  document.querySelector('#t-balance-detail tbody').innerHTML = shippers.map(s=>{
+  // Detail by shipper (active only)
+  const balanceShippers = shippers.filter(s => s.status === 'ACTIVE');
+  document.querySelector('#t-balance-detail tbody').innerHTML = balanceShippers.map(s=>{
     const entry = confirmed.filter(n=>(n.shipperId===s.id||n.shipperId===s.code)&&n.dir==='ENTRY').reduce((a,n)=>a+n.volume,0);
     const exit  = confirmed.filter(n=>(n.shipperId===s.id||n.shipperId===s.code)&&n.dir==='EXIT' ).reduce((a,n)=>a+n.volume,0);
     const imb = entry - exit;
@@ -3228,6 +3265,10 @@ function renderCreditKPI() {
 function renderCreditInstruments() {
   const typeLabels = {
     BANK_GUARANTEE:'Банк. гарантия (URDG 758)',
+    STANDBY_LC:'Standby LC (аккредитив)',
+    ESCROW:'Эскроу-счёт',
+    ESCROW_DEPOSIT:'Эскроу-депозит (Art.5.1.1.2)',
+    PARENT_GUARANTEE:'Материнская гарантия',
     LETTER_OF_CREDIT:'Аккредитив (UCP 600)',
     CASH_DEPOSIT:'Денежный депозит',
     SURETY_BOND:'Поручительство',
@@ -3245,8 +3286,8 @@ function renderCreditInstruments() {
     const coverOk = i.amount >= minCredit;
     const statusCls = i.status==='ACTIVE'?'green':i.status==='EXPIRING'?'yellow':'red';
     return `<tr>
-      <td class="fw7">${s.name}</td>
-      <td><span class="instr-type">${typeLabels[i.type]||i.type}</span></td>
+      <td class="fw7">${i.shipperName || s.code + ' ' + s.name}</td>
+      <td><span class="instr-type">${typeLabels[i.type]||i.type||'—'}</span></td>
       <td class="text-dim">${i.bank||'—'}</td>
       <td class="mono">€ ${fmtEur(i.amount)}</td>
       <td class="mono ${dCls}">${i.expires} <span style="font-size:10px">(${d<0?'ИСТЁК':d+'д'})</span></td>

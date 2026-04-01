@@ -337,13 +337,30 @@ Difference:   [Entry − Exit]
 - Endpoint: `POST /api/v1/nominations/:id/over-nominate`
 - Штраф при прерывании: fee × **3** (АЕРС п.3)
 
-### 4.6 EDIGAS NOMINT XML
+### 4.6 EDIGAS NOMINT XML (v5.1)
 
-Для подтверждённых номинаций доступен предпросмотр XML в формате EDIGAS (NC Art.4.1.2):
+Полная реализация EDIGAS v5.1 NOMINT (Sprint 14):
 
-`GET /api/v1/nominations/:id/edigas-nomint` → возвращает NOMINT XML
+`GET /api/v1/nominations/:id/edigas-nomint` — возвращает XML
 
-В интерфейсе: кнопка **«XML»** на строке подтверждённой номинации → popup с полным XML.
+**Поля документа:**
+
+| Поле | Значение |
+|------|---------|
+| DocumentType | `01G` (Nomination) / `P03` (Renomination) |
+| SenderIdentification | Shipper EIC (codingScheme=305) |
+| SenderRole | `ZSH` (Shipper) |
+| ReceiverIdentification | `21X-RS-GASTRANS-0` (TSO) |
+| ReceiverRole | `ZSO` (System Operator) |
+| Direction | `Z02` (Entry) / `Z03` (Exit) |
+| Quantity | kWh/h (hourly rate, NC Art.12.1) |
+| GasDay | Local date (не UTC!) |
+| TimeInterval | `GasDay T04:00Z / NextDay T04:00Z` (CEST) |
+| NominationCycle | 0 = initial, 1+ = renomination |
+
+В интерфейсе: кнопка **«XML»** на строке подтверждённой номинации → popup с полным EDIGAS v5.1 XML.
+
+**NOMRES** (подтверждение от TSO): `buildNomres()` — mock, возвращает `CONFIRMED` + confirmed quantity.
 
 ### 4.7 API Nominations
 

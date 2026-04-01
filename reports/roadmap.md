@@ -120,6 +120,10 @@ Jan–Feb 2026  Mar 2026              Mar 2026                   Mar 2026       
 | Dashboard P0 | 5 | Shipper code+name, active filter, GTA type, capacity KPI blocks (booked/free per IP) |
 | NC Compliance Fix | 2 | Yearly Firm = only surrendered LT (Art.7.1.2), publication timing from MAR0277-24 |
 | Available Capacity Engine | 5 | GET /capacity/available (real-time SQL, Option A), dynamic available in auctions, NC Art.7.1.1+7.3 formulas |
+| EDIGAS v5.1 XML | 3 | Full NOMINT (01G/P03), NOMRES mock, sender/receiver EIC, direction Z02/Z03, GasDay timezone fix |
+| Credit Instruments | 2 | credit_support table, 7 seed instruments (URDG 758, SBLC, escrow, parent guarantee), frontend mapping |
+| Balance/Matching fixes | 2 | Matching via backend API, balance filter all non-rejected, gasDay timezone, active shippers only |
+| Real-time analysis | 1 | Polling/WebSocket/PWA comparison document (reports/analysis-realtime-update-options.md) |
 
 **Коммит:** `feat(sprint-14)` — backend routes, frontend, seeds, docs
 **Отчёты:** `session-uat-frontend-2026-03-30.md`, `session-uat-dashboard-2026-03-31.md`, `session-auction-calendar-2026-03-31.md`

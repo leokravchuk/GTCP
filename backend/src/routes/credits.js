@@ -42,12 +42,14 @@ router.get('/margin-calls', authorize('credits:read'), async (req, res, next) =>
 router.get('/:shipperId/instruments', authorize('credits:read'), async (req, res, next) => {
   try {
     const { rows } = await db.query(
-      `SELECT * FROM credit_support WHERE shipper_id = $1 ORDER BY valid_to DESC`,
+      `SELECT cs.*, s.code AS shipper_code, s.name AS shipper_name
+       FROM credit_support cs
+       JOIN shippers s ON s.id = cs.shipper_id
+       WHERE cs.shipper_id = $1 ORDER BY cs.status, cs.valid_to DESC`,
       [req.params.shipperId]
     );
     res.json(rows);
   } catch {
-    // credit_support table may not exist in MVP
     res.json([]);
   }
 });

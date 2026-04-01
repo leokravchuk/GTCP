@@ -45,6 +45,18 @@
 | A-224 | Shippers endpoint: +status, +gta_type, +ratings | 1 | ✅ |
 | A-225 | Dashboard: nominations KPI = Entry only, activeShippers filter | 1 | ✅ |
 
+### P0 — EDIGAS v5.1 + Credit Instruments + Fixes
+
+| # | Задача | SP | Статус |
+|---|---|---|---|
+| A-226 | EDIGAS v5.1 NOMINT full XML (01G/P03, sender/receiver, direction, contract, GasDay) | 3 | ✅ |
+| A-227 | EDIGAS timezone fix: GasDay local date not UTC | 1 | ✅ |
+| A-228 | Credit Instruments: credit_support table + 7 seed rows + frontend mapping | 2 | ✅ |
+| A-229 | Matching via backend API (not in-memory), gasDay timezone fix | 2 | ✅ |
+| A-230 | Balance page: filter all non-rejected nominations, active shippers only | 1 | ✅ |
+| A-231 | NOMRES mock (confirmation XML from TSO) | 1 | ✅ |
+| A-232 | Real-time update analysis: Polling/WebSocket/PWA comparison | 1 | ✅ (analysis only) |
+
 ### P0 — Data Integrity (Contract→Booking→Nomination)
 
 | # | Задача | SP | Статус |

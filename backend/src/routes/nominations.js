@@ -545,12 +545,7 @@ router.get('/:id/edigas-nomint', authorize('nominations:read'), async (req, res,
     const { rows: shipperRows } = await db.query('SELECT * FROM shippers WHERE id = $1', [nom.shipper_id]);
     const shipper = shipperRows[0] || {};
 
-    const nomForEdigas = { ...nom, volume_kwh: Number(nom.volume_kwh_h) * 1000 };
-
-    const isRenom = nom.gas_day_cycle > 0;
-    const xml = isRenom
-      ? edigas.buildRenomint(nomForEdigas, shipper)
-      : edigas.buildNomint(nomForEdigas, shipper);
+    const xml = edigas.buildNomint(nom, shipper);
 
     res.setHeader('Content-Type', 'application/xml; charset=UTF-8');
     res.setHeader('Content-Disposition', `inline; filename="NOMINT-${(nom.id || '').slice(0,8)}.xml"`);

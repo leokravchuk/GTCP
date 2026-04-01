@@ -383,7 +383,29 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   - rbp_auctions:         synced auction data
   - rbp_bundled_auctions: bundled capacity (separate table, Variant B)
 
-  EDIGAS v5.1 XML format for nominations/capacity messages
+  EDIGAS v5.1 NOMINT/NOMRES XML (Sprint 14):
+
+  NOMINT (Nomination):
+    DocumentType: 01G (initial) / P03 (renomination)
+    Sender: Shipper EIC (27X-GA-GAZPROM-0), Role ZSH
+    Receiver: TSO EIC (21X-RS-GASTRANS-0), Role ZSO
+    Direction: Z02 (Entry) / Z03 (Exit)
+    Quantity: kWh/h (hourly rate, NOT total kWh)
+    GasDay: local date (NOT UTC slice)
+    TimeInterval: CEST 04:00Z / CET 05:00Z
+    NominationCycle: 0=initial, 1+=renom
+    Functions: buildNomint(), buildRenomint(), buildNomres()
+
+  NOMRES (Confirmation from TSO):
+    DocumentType: 06G
+    ConfirmedQuantity: kWh/h
+    Status: CONFIRMED
+
+  Credit Instruments (NC Art.5.1.1, Sprint 14):
+    Table: credit_support
+    Types: BANK_GUARANTEE (URDG 758), STANDBY_LC, ESCROW_DEPOSIT,
+           PARENT_GUARANTEE, ESCROW
+    Seed: 7 instruments (5 ACTIVE + 1 EXPIRED + 1 quarterly)
 ```
 
 ---
