@@ -564,38 +564,86 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
 
 ---
 
-## 12. Credit Support Calculation
+## 12. Credit Support System (NC Art.5 — Sprint 14)
 
 ```
-  Credit Limit (Bank Guarantee / Parent Guarantee)
-         |
-         v
-  Available Credit = Credit Limit - Total Exposure
-         |
-         v
-  Exposure = Sum of:
-  +--------------------------------------------------+
-  | Product Type     | Credit Support | Multiplier    |
-  |------------------|----------------|---------------|
-  | Monthly/Daily/WD | 100% of fee    | x 1           |
-  | Quarterly        | 66.67% of fee  | x 3/2         |
-  | Yearly           | 16.67% of fee  | x 12/2        |
-  +--------------------------------------------------+
+  NC ART.5 CREDIT SUPPORT FLOW
+  =====================================================================
 
-  Exemption (NC Art. 5.1.6):
-  No Credit Support needed if:
-  - S&P/Fitch >= BBB-  OR
-  - Moody's >= Baa3    OR
-  - Creditreform <= 235 OR
-  - 100% subsidiary of rated entity
+  1. INSTRUMENTS (Art.5.1.1)
+     Shipper provides: Bank Guarantee (URDG 758) / Escrow / Parent / SBLC
+     DB: credit_support table
+     Total CS = SUM(active instruments)
 
-  Margin Call trigger:
-  If Exposure > 80% of Credit Limit:
-    -> Warning notification
-  If Exposure > 100%:
-    -> Margin Call issued
-    -> Payment deadline: 2 Business Days
-    -> Failure: nominations blocked, capacity surrender
+  2. CREDIT LIMIT (Art.5.3.2)
+     Credit Limit = Total CS - CS used for existing obligations
+     DB: shippers.credit_limit (auto-recalculated on instrument change)
+
+  3. MINIMUM CREDIT SUPPORT (Art.5.1.5)
+     Min CS = Transmission Fee x Multiplier
+     Fee = Contracted Capacity (kWh/h) x Reserve Price (EUR/kWh/h/yr)
+
+     Product      | Multiplier | Example (NIS: 4M kWh/h x EUR 6.00)
+     -------------|------------|------------------------------------
+     Monthly/D/WD | 100%       | 24,000,000 x 1    = EUR 24,000,000
+     Quarterly    | 2/3        | 24,000,000 x 2/3  = EUR 16,000,000
+     Yearly       | 2/12       | 24,000,000 x 2/12 = EUR  4,000,000
+
+  4. AVAILABLE CREDIT (Art.5.3.1) — for auction participation
+     Monthly/D/WD: AC = Credit Limit x 1    (= CL)
+     Quarterly:    AC = Credit Limit x 3/2
+     Yearly:       AC = Credit Limit x 12/2 (= CL x 6)
+
+     WHY multiplier > 1? Inverse of Art.5.1.5:
+       CS = 2/12 of fee -> AC = CL x 12/2
+       If CL = 3.5M, yearly AC = 21M -> can bid on 21M annual fee
+       Because min CS for 21M = 21M x 2/12 = 3.5M = CL. Check!
+
+     Updated every hour on CBP (Art.5.3.4)
+
+  5. RATING EXEMPTION (Art.5.1.6)
+     S&P/Fitch >= BBB- OR Moody's >= Baa3 OR Creditreform <= 235
+     OR 100% subsidiary of rated entity
+     -> No CS needed, no CL check, no Margin Call (Art.5.3.5)
+
+  6. 3-STATUS SYSTEM (Sprint 14)
+     EXEMPT:   rating >= BBB- (Art.5.1.6)
+     SECURED:  no rating, instruments >= min CS (Art.5.1.5)
+     REQUIRES: no rating, instruments < min CS
+
+  7. MARGIN CALL (Art.5.5)
+     Trigger: Exposure > Credit Limit AND NOT exempt
+     Deadline: 2 Business Days
+     Failure: nominations blocked + forced surrender (Art.7.5.4)
+     Auto-generated in GET /credits/margin-calls
+
+  FLOW:
+  Shipper registers
+    |
+    +-- Rating >= BBB-? --YES--> EXEMPT (no CS)
+    |
+    +-- NO --> Provides instruments
+                 |
+                 v
+              Credit Limit = SUM(instruments)
+                 |
+                 v
+              Bid on auction? AC = CL x multiplier >= bid?
+                 |         |
+                YES       NO --> Rejected
+                 |
+                 v
+              Wins --> Exposure increases
+                 |
+                 v
+              Exposure > CL? --> MARGIN CALL (2BD)
+                 |
+                 v
+              Invoice --> Pays --> Exposure decreases
+                 |
+                 v
+              Doesn't pay --> Late interest (Art.20.4.2)
+                              --> Eventually: surrender + removal
 ```
 
 ---

@@ -25,15 +25,59 @@ router.get('/', authorize('credits:read'), async (req, res, next) => {
 // GET /credits/margin-calls — list open margin calls
 router.get('/margin-calls', authorize('credits:read'), async (req, res, next) => {
   try {
-    const { rows } = await db.query(
+    // Return existing margin calls from DB
+    const { rows: existing } = await db.query(
       `SELECT mc.*, s.code AS shipper_code, s.name AS shipper_name
        FROM margin_calls mc
        JOIN shippers s ON s.id = mc.shipper_id
        ORDER BY mc.created_at DESC LIMIT 50`
     );
+
+    // Auto-detect new margin call situations (NC Art.5.5)
+    // Exposure > Credit Limit AND shipper is NOT rating exempt
+    const { rows: violations } = await db.query(
+      `SELECT s.id, s.code AS shipper_code, s.name AS shipper_name,
+              s.credit_limit, s.current_exposure,
+              (s.current_exposure - s.credit_limit) AS shortfall_eur,
+              s.rating_exempt
+       FROM shippers s
+       WHERE s.is_active = true
+         AND s.current_exposure > s.credit_limit
+         AND s.rating_exempt = false
+       ORDER BY (s.current_exposure - s.credit_limit) DESC`
+    );
+
+    // Auto-create margin calls for new violations
+    for (const v of violations) {
+      const alreadyExists = existing.some(mc => mc.shipper_id === v.id && mc.status === 'OPEN');
+      if (!alreadyExists) {
+        try {
+          const deadline = new Date();
+          deadline.setDate(deadline.getDate() + 2); // 2 Business Days (NC Art.5.5)
+          await db.query(
+            `INSERT INTO margin_calls (shipper_id, exposure_eur, limit_eur, status, issued_by, notes)
+             VALUES ($1, $2, $3, 'OPEN', $4, $5)`,
+            [v.id, v.current_exposure, v.credit_limit, req.user.id,
+             `Auto: exposure ${v.current_exposure} > limit ${v.credit_limit}, shortfall ${v.shortfall_eur} EUR. Deadline: 2 BD (NC Art.5.5)`]
+          );
+        } catch (insertErr) {
+          console.error('[Margin Call] Auto-insert failed:', insertErr.message);
+        }
+      }
+    }
+
+    // Re-fetch with any new ones
+    const { rows } = await db.query(
+      `SELECT mc.*, s.code AS shipper_code, s.name AS shipper_name,
+              s.credit_limit, s.current_exposure,
+              (s.current_exposure - s.credit_limit) AS shortfall_eur
+       FROM margin_calls mc
+       JOIN shippers s ON s.id = mc.shipper_id
+       ORDER BY mc.created_at DESC LIMIT 50`
+    );
+
     res.json(rows);
   } catch (err) {
-    // margin_calls table may not exist
     res.json([]);
   }
 });

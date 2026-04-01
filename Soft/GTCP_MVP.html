@@ -3222,10 +3222,32 @@ function isRatingExempt(r) {
   return spOk || moOk || crOk;
 }
 
-// NC Art.5.3.1 — минимальный размер обеспечения (мультипликаторы по продукту)
-const MIN_CREDIT_MULT = { ANNUAL:2/12, QUARTERLY:2/3, MONTHLY:1, DAILY:1/30 };
-function calcMinCreditSize(annualFee, product) {
-  return annualFee * (MIN_CREDIT_MULT[product] || 2/12);
+// NC Art.5.1.5 — минимальный размер обеспечения
+// Min CS = Transmission Fee × Multiplier
+// Transmission Fee = Contracted Capacity × Reserve Price (AERS 05-145)
+// Multiplier: Monthly/Daily/WD = 100%, Quarterly = 2/3, Yearly = 2/12
+const MIN_CREDIT_MULT = { ANNUAL:2/12, LONG_TERM:2/12, QUARTERLY:2/3, MONTHLY:1, DAILY:1, WITHIN_DAY:1 };
+function calcMinCreditSize(shipperId, product) {
+  // Find contract for this shipper to get capacity × tariff
+  const c = contracts.find(ct => ct.shipperId === shipperId || ct.party?.includes(shipperId));
+  if (c && c.capacityKwhDay > 0) {
+    // Legacy: capacity_kwh_day × tariff
+    const fee = c.capacityKwhDay * (c.tariffEntry + c.tariffExit) * 365;
+    return fee * (MIN_CREDIT_MULT[product] || 2/12);
+  }
+  // From bookings: sum capacity × AERS tariff
+  const TARIFF = { 'KIREVO-ENTRY': 6.00, 'HORGOS-EXIT': 6.85, 'EXIT-SERBIA': 4.19 };
+  const shipperBookings = capacityBookings.filter(b =>
+    (b.shipperId === shipperId || b.party?.includes(shipperId)) && b.direction
+  );
+  if (shipperBookings.length) {
+    const annualFee = shipperBookings.reduce((sum, b) => {
+      const tariff = TARIFF[b.point] || 6.00;
+      return sum + (b.volume || 0) * tariff;
+    }, 0);
+    return annualFee * (MIN_CREDIT_MULT[product] || 2/12);
+  }
+  return 0; // No contract/bookings → no min credit
 }
 
 // Credit tab switch
@@ -3283,7 +3305,7 @@ function renderCreditInstruments() {
     const dCls = d<0?'text-red':d<30?'text-yellow':'';
     // estimate annual fee for min credit calc
     const annualFee = (s.creditLimit||0);
-    const minCredit = calcMinCreditSize(annualFee, i.product);
+    const minCredit = calcMinCreditSize(i.shipperId || s.code, i.product);
     const cover = minCredit>0 ? ((i.amount/minCredit)*100).toFixed(0)+'%' : '—';
     const coverOk = i.amount >= minCredit;
     const statusCls = i.status==='ACTIVE'?'green':i.status==='EXPIRING'?'yellow':'red';
@@ -3310,7 +3332,7 @@ function renderCreditRatings() {
     const s = shippers.find(x=>x.id===r.shipperId||x.code===r.shipperId)||{creditLimit:0, code:'', gta_type:''};
     // Min credit depends on product type: LT=ANNUAL (2/12), ST=varies
     const product = s.gta_type === 'LONG_TERM' ? 'ANNUAL' : 'QUARTERLY';
-    const minCr = exempt ? 0 : calcMinCreditSize(s.creditLimit||0, product);
+    const minCr = exempt ? 0 : calcMinCreditSize(r.shipperId || s.code, product);
     const spCls  = ['AAA','AA+','AA','AA-','A+','A','A-','BBB+','BBB','BBB-'].includes((r.sp||'').toUpperCase()) ? 'inv-grade':'sub-grade';
     const moCls  = ['Aaa','Aa1','Aa2','Aa3','A1','A2','A3','Baa1','Baa2','Baa3'].includes(r.moodys||'') ? 'inv-grade':'sub-grade';
     const crCls  = (r.creditreform||999) <= 235 ? 'inv-grade':'sub-grade';
@@ -3355,7 +3377,7 @@ function calcMinCredit() {
   const product = document.getElementById('ci-product').value;
   const sid     = document.getElementById('ci-shipper').value;
   const s       = shippers.find(x=>x.id===sid||x.code===sid)||{creditLimit:0};
-  const minCr   = calcMinCreditSize(s.creditLimit||0, product);
+  const minCr   = calcMinCreditSize(sid || s.code, product);
   const box     = document.getElementById('ci-min-credit');
   if (!box) return;
   box.style.display = 'block';
@@ -3375,7 +3397,7 @@ async function addCreditInstrument() {
   const expires = document.getElementById('ci-expires').value;
   if (!sid || !amount || !expires) { toast('Заполните обязательные поля', 'error'); return; }
   const s = shippers.find(x=>x.id===sid||x.code===sid);
-  const minCr = calcMinCreditSize(s?s.creditLimit:0, product);
+  const minCr = calcMinCreditSize(sid || (s?s.code:''), product);
   if (amount < minCr) {
     toast(`Сумма € ${fmtEur(amount)} < минимум NC Art.5 € ${fmtEur(minCr)}`, 'warning');
   }
