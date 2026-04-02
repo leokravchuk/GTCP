@@ -939,23 +939,33 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
 <!-- Invoice -->
 <div class="overlay" id="modal-inv">
-  <div class="modal" style="width:720px;max-width:98vw;">
-    <div class="modal-head"><span class="modal-title">СОЗДАТЬ СЧЁТ (Variant C — наборные строки NC Art.20.3)</span><button class="modal-close" onclick="closeModal('modal-inv')">✕</button></div>
+  <div class="modal" style="width:780px;max-width:98vw;">
+    <div class="modal-head">
+      <span class="modal-title">СОЗДАТЬ СЧЁТ (NC Art.20.3)</span>
+      <button class="modal-close" onclick="closeModal('modal-inv')">&#10005;</button>
+    </div>
     <div class="modal-body">
+      <!-- Mode tabs -->
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn" id="inv-mode-auto" onclick="setInvMode('auto')" style="font-size:11px;padding:4px 12px;background:var(--accent);color:#fff">&#9889; Авто (из контрактов)</button>
+        <button class="btn" id="inv-mode-manual" onclick="setInvMode('manual')" style="font-size:11px;padding:4px 12px;">&#9998; Ручной (наборные строки)</button>
+      </div>
 
       <div class="form-grid">
         <div class="form-row"><label>ГРУЗООТПРАВИТЕЛЬ *</label><select id="inv-shipper" onchange="onInvShipperChange()"></select></div>
-        <div class="form-row">
-          <label>&nbsp;</label>
-          <button class="btn" style="font-size:11px;padding:6px 12px;" onclick="autoGenerateLines()">🔄 Автозаполнение из контрактов</button>
+        <div class="form-grid">
+          <div class="form-row"><label>ПЕРИОД (С) *</label><input type="date" id="inv-from" oninput="recalcInvLines()"></div>
+          <div class="form-row"><label>ПЕРИОД (ПО) *</label><input type="date" id="inv-to" oninput="recalcInvLines()"></div>
         </div>
       </div>
-      <div class="form-grid">
-        <div class="form-row"><label>ПЕРИОД (С) *</label><input type="date" id="inv-from" oninput="recalcInvLines()"></div>
-        <div class="form-row"><label>ПЕРИОД (ПО) *</label><input type="date" id="inv-to" oninput="recalcInvLines()"></div>
+
+      <!-- Auto mode: preview from backend -->
+      <div id="inv-auto-section">
+        <button class="btn success" style="font-size:11px;margin:8px 0" onclick="autoGeneratePreview()">&#9889; Рассчитать из контрактов (POST /billing/generate)</button>
+        <div id="inv-auto-status" style="font-size:11px;color:var(--text3);margin:4px 0"></div>
       </div>
 
-      <!-- Line items table -->
+      <!-- Line items table (both modes) -->
       <div class="section-wrap" style="margin:10px 0;">
         <div class="section-head" style="padding:8px 12px;">
           <span class="section-title">СТРОКИ СЧЁТА</span>
@@ -963,7 +973,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
         </div>
         <div class="table-wrap" style="max-height:260px;overflow-y:auto;">
           <table id="t-inv-lines" style="font-size:11px;">
-            <thead><tr><th>#</th><th>ТИП</th><th>ПРОДУКТ</th><th>ТОЧКА</th><th>НАПР.</th><th>МОЩНОСТЬ кВт·ч/ч</th><th>ТАРИФ</th><th>ДНИ/ЧАСЫ</th><th>СУММА EUR</th><th></th></tr></thead>
+            <thead><tr><th>#</th><th>ТИП</th><th>ПРОДУКТ</th><th>ТОЧКА</th><th>НАПР.</th><th>МОЩНОСТЬ кВт&#183;ч/ч</th><th>ТАРИФ</th><th>ДНИ/ЧАСЫ</th><th>СУММА EUR</th><th></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -977,7 +987,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div class="ib-row" style="border-top:1px solid #2a3a50;margin-top:6px;padding-top:6px"><span class="ib-label" style="font-weight:700">ИТОГО К ОПЛАТЕ:</span><span class="ib-val" id="inv-total" style="font-size:15px;font-weight:700">0.00 EUR</span></div>
       </div>
     </div>
-    <div class="modal-foot"><button class="btn" onclick="closeModal('modal-inv')">Отмена</button><button class="btn success" onclick="createInvoiceWithLines()">Создать счёт</button></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('modal-inv')">Отмена</button>
+      <button class="btn success" onclick="createInvoiceWithLines()">Создать счёт (POST /billing/with-lines)</button>
+    </div>
   </div>
 </div>
 
@@ -1701,7 +1714,8 @@ async function _refreshFromBackend() {
       }));
     }
 
-    // Re-render current page
+    // Re-render selects and current page
+    populateSelects();
     nav(STATE.currentPage);
   } catch (e) {
     console.warn('[GTCP] Backend refresh failed, using in-memory data:', e.message);
@@ -1790,10 +1804,11 @@ function updateNavBadges() {
 }
 
 function populateSelects() {
-  ['nom-shipper','inv-shipper','mc-counterparty'].forEach(id=>{
+  ['nom-shipper','inv-shipper','mc-counterparty','bid-shipper','ci-shipper'].forEach(id=>{
     const sel = document.getElementById(id);
     if (!sel) return;
-    sel.innerHTML = shippers.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+    const active = shippers.filter(s => s.status === 'ACTIVE');
+    sel.innerHTML = active.map(s=>`<option value="${s.id}">${s.code} ${s.name}</option>`).join('');
   });
   // dates
   const td = today();
@@ -2708,26 +2723,59 @@ function renderInvLines() {
 
 function recalcInvLines() { renderInvLines(); }
 
-async function autoGenerateLines() {
+let invMode = 'auto';
+function setInvMode(mode) {
+  invMode = mode;
+  document.getElementById('inv-mode-auto').style.background = mode === 'auto' ? 'var(--accent)' : 'var(--bg2)';
+  document.getElementById('inv-mode-auto').style.color = mode === 'auto' ? '#fff' : 'var(--text2)';
+  document.getElementById('inv-mode-manual').style.background = mode === 'manual' ? 'var(--accent)' : 'var(--bg2)';
+  document.getElementById('inv-mode-manual').style.color = mode === 'manual' ? '#fff' : 'var(--text2)';
+  document.getElementById('inv-auto-section').style.display = mode === 'auto' ? '' : 'none';
+}
+
+async function autoGeneratePreview() {
   const sid = document.getElementById('inv-shipper')?.value;
   const from = document.getElementById('inv-from')?.value;
   const to = document.getElementById('inv-to')?.value;
   if (!sid || !from || !to) { toast('Укажите грузоотправителя и период', 'error'); return; }
 
+  const statusEl = document.getElementById('inv-auto-status');
+  if (statusEl) statusEl.textContent = 'Расчёт...';
+
   if (STATE.backendMode && window.API) {
     try {
-      const { data, error } = await API.post('/billing/generate', { shipperId: sid, periodFrom: from, periodTo: to });
-      if (error) { toast(`Ошибка: ${error}`, 'error'); return; }
+      const token = sessionStorage.getItem('gtcp_access_token');
+      const BASE = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+      const resp = await fetch(`${BASE}/billing/generate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipperId: sid, periodFrom: from, periodTo: to }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { toast(`Ошибка: ${data.error || resp.status}`, 'error'); if (statusEl) statusEl.textContent = data.error || 'Ошибка'; return; }
+
       invLines = (data.lines || []).map(l => ({
         lineType: l.lineType, productType: l.productType || '', pointCode: l.pointCode || '',
         direction: l.direction || '', capacityKwhH: l.capacityKwhH || '', tariffEur: l.tariffEur || '',
         periodDays: l.periodDays || '', hours: l.hours || '', quantityKwh: l.quantityKwh || '',
-        unitPriceEur: l.unitPriceEur || '', amount: 0,
+        unitPriceEur: l.unitPriceEur || '', overdueAmountEur: l.overdueAmountEur || '', overdueDays: l.overdueDays || '',
+        amount: 0,
       }));
       renderInvLines();
-      toast(`Автозаполнение: ${invLines.length} строк из ${data.contractsFound} контрактов`, 'success');
-    } catch(e) { toast(`Ошибка: ${e.message}`, 'error'); }
+      const info = `${data.contractsFound} контрактов, ${invLines.length} строк, ${data.overdueInvoices || 0} просроченных`;
+      if (statusEl) statusEl.innerHTML = `<span style="color:var(--green)">OK:</span> ${info}. <span style="color:var(--text3)">Проверьте строки и нажмите "Создать счёт"</span>`;
+      toast(`Авто: ${info}`, 'success');
+    } catch(e) { toast(`Ошибка: ${e.message}`, 'error'); if (statusEl) statusEl.textContent = e.message; }
   } else {
+    toast('Автозаполнение доступно только в backend mode', 'warning');
+  }
+}
+
+async function autoGenerateLines() {
+  return autoGeneratePreview();
+  // Legacy fallback below kept for demo mode
+  const sid = ''; const from = ''; const to = '';
+  if (false) {
     // Demo fallback
     invLines = [
       { lineType:'CAPACITY', productType:'FIRM_YEARLY', pointCode:'KIREVO-ENTRY', direction:'ENTRY', capacityKwhH:'13752230', tariffEur:'6.00', periodDays:'', amount:0 },
@@ -2757,12 +2805,21 @@ async function createInvoiceWithLines() {
       if (l.hours) out.hours = Number(l.hours);
       if (l.quantityKwh) out.quantityKwh = Number(l.quantityKwh);
       if (l.unitPriceEur) out.unitPriceEur = Number(l.unitPriceEur);
+      if (l.overdueAmountEur) out.overdueAmountEur = Number(l.overdueAmountEur);
+      if (l.overdueDays) out.overdueDays = Number(l.overdueDays);
       return out;
     });
     try {
-      const { data, error } = await API.post('/billing/with-lines', { shipperId: sid, periodFrom: from, periodTo: to, lines });
-      if (error) { toast(`Ошибка: ${error}`, 'error'); return; }
-      toast(`Счёт ${data.invoice_no} создан (${data.lines?.length || 0} строк, TOTAL €${data.total_amount_eur})`, 'success');
+      const token = sessionStorage.getItem('gtcp_access_token');
+      const BASE = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+      const resp = await fetch(`${BASE}/billing/with-lines`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shipperId: sid, periodFrom: from, periodTo: to, lines }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { toast(`Ошибка: ${data.error || resp.status}`, 'error'); return; }
+      toast(`Счёт ${data.invoice_no} создан (${data.lines?.length || 0} строк, TOTAL EUR ${fmtEur(data.total_amount_eur||0)})`, 'success');
       invLines = [];
       closeModal('modal-inv');
       await _refreshFromBackend();
@@ -2933,7 +2990,7 @@ async function renderGasQuality() {
   if (data) {
     const rows = Array.isArray(data) ? data : (data.data || []);
     tbody.innerHTML = rows.map(q =>
-      `<tr><td class="mono fw7">${q.point_code||q.point||''}</td><td class="mono text-dim">${q.period||q.month||''}</td><td class="mono">${(q.gcv||q.gcv_kwh_nm3||0).toFixed(3)}</td><td class="mono">${(q.wobbe||q.wobbe_index||0).toFixed(3)}</td><td class="mono">${(q.ch4||q.ch4_pct||0).toFixed(2)}</td><td class="mono">${(q.h2s||q.h2s_mg_m3||0).toFixed(2)}</td><td class="mono">${(q.density||q.density_kg_m3||0).toFixed(4)}</td></tr>`
+      `<tr><td class="mono fw7">${q.point_code||q.point||''}</td><td class="mono text-dim">${q.period||q.month||''}</td><td class="mono">${Number(q.gcv||q.gcv_kwh_nm3||0).toFixed(3)}</td><td class="mono">${Number(q.wobbe||q.wobbe_index||0).toFixed(3)}</td><td class="mono">${Number(q.ch4||q.ch4_pct||0).toFixed(2)}</td><td class="mono">${Number(q.h2s||q.h2s_mg_m3||0).toFixed(2)}</td><td class="mono">${Number(q.density||q.density_kg_m3||0).toFixed(4)}</td></tr>`
     ).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px;">Нет данных о качестве газа</td></tr>';
   }
 }
@@ -3229,7 +3286,10 @@ function isRatingExempt(r) {
 const MIN_CREDIT_MULT = { ANNUAL:2/12, LONG_TERM:2/12, QUARTERLY:2/3, MONTHLY:1, DAILY:1, WITHIN_DAY:1 };
 function calcMinCreditSize(shipperId, product) {
   // Find contract for this shipper to get capacity × tariff
-  const c = contracts.find(ct => ct.shipperId === shipperId || ct.party?.includes(shipperId));
+  const ss = shippers.find(x => x.id === shipperId || x.code === shipperId);
+  const mId = ss ? ss.id : shipperId;
+  const mCode = ss ? ss.code : shipperId;
+  const c = contracts.find(ct => ct.shipperId === mId || ct.shipperId === mCode || ct.party?.includes(mCode));
   if (c && c.capacityKwhDay > 0) {
     // Legacy: capacity_kwh_day × tariff
     const fee = c.capacityKwhDay * (c.tariffEntry + c.tariffExit) * 365;
@@ -3237,8 +3297,12 @@ function calcMinCreditSize(shipperId, product) {
   }
   // From bookings: sum capacity × AERS tariff
   const TARIFF = { 'KIREVO-ENTRY': 6.00, 'HORGOS-EXIT': 6.85, 'EXIT-SERBIA': 4.19 };
+  // Match by UUID, code, or party name
+  const s = shippers.find(x => x.id === shipperId || x.code === shipperId);
+  const matchId = s ? s.id : shipperId;
+  const matchCode = s ? s.code : shipperId;
   const shipperBookings = capacityBookings.filter(b =>
-    (b.shipperId === shipperId || b.party?.includes(shipperId)) && b.direction
+    (b.shipperId === matchId || b.shipperId === matchCode || b.party?.includes(matchCode)) && b.direction
   );
   if (shipperBookings.length) {
     const annualFee = shipperBookings.reduce((sum, b) => {
