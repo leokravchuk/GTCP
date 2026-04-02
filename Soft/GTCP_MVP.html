@@ -987,9 +987,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div class="ib-row" style="border-top:1px solid #2a3a50;margin-top:6px;padding-top:6px"><span class="ib-label" style="font-weight:700">ИТОГО К ОПЛАТЕ:</span><span class="ib-val" id="inv-total" style="font-size:15px;font-weight:700">0.00 EUR</span></div>
       </div>
     </div>
-    <div class="modal-foot">
+    <div class="modal-foot" style="display:flex;gap:8px;justify-content:flex-end">
       <button class="btn" onclick="closeModal('modal-inv')">Отмена</button>
-      <button class="btn success" onclick="createInvoiceWithLines()">Создать счёт (POST /billing/with-lines)</button>
+      <button class="btn" onclick="previewInvoiceBeforeCreate()" style="border-color:var(--accent);color:var(--accent)">&#128424; Предпросмотр</button>
+      <button class="btn success" onclick="createInvoiceWithLines()">Создать счёт</button>
     </div>
   </div>
 </div>
@@ -2773,18 +2774,66 @@ async function autoGeneratePreview() {
 
 async function autoGenerateLines() {
   return autoGeneratePreview();
-  // Legacy fallback below kept for demo mode
-  const sid = ''; const from = ''; const to = '';
-  if (false) {
-    // Demo fallback
-    invLines = [
-      { lineType:'CAPACITY', productType:'FIRM_YEARLY', pointCode:'KIREVO-ENTRY', direction:'ENTRY', capacityKwhH:'13752230', tariffEur:'6.00', periodDays:'', amount:0 },
-      { lineType:'CAPACITY', productType:'FIRM_YEARLY', pointCode:'HORGOS-EXIT', direction:'EXIT', capacityKwhH:'9216209', tariffEur:'6.85', periodDays:'', amount:0 },
-      { lineType:'FUEL_GAS', quantityKwh:'28798810', unitPriceEur:'0.0325', amount:0 },
-    ];
-    renderInvLines();
-    toast('Автозаполнение (демо): 3 строки', 'info');
-  }
+}
+
+function previewInvoiceBeforeCreate() {
+  const sid = document.getElementById('inv-shipper')?.value;
+  const from = document.getElementById('inv-from')?.value;
+  const to = document.getElementById('inv-to')?.value;
+  const s = shippers.find(x => x.id === sid || x.code === sid) || { code: '', name: 'Unknown' };
+  if (!invLines.length) { toast('Добавьте строки для предпросмотра', 'warning'); return; }
+
+  // Calculate subtotals from current lines
+  const capTotal = invLines.filter(l => ['CAPACITY','CAPACITY_WITHIN_DAY','TRANSFER'].includes(l.lineType)).reduce((s,l) => s + (l.amount||0), 0);
+  const fgTotal = invLines.filter(l => l.lineType === 'FUEL_GAS').reduce((s,l) => s + (l.amount||0), 0);
+  const penTotal = invLines.filter(l => ['LATE_PAYMENT','IMBALANCE','INTERRUPTION_PENALTY','AUCTION_PREMIUM','SURRENDER_PREMIUM'].includes(l.lineType)).reduce((s,l) => s + (l.amount||0), 0);
+  const total = capTotal + fgTotal + penTotal;
+
+  const w = window.open('', 'Invoice Preview', 'width=900,height=700');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice Preview</title>
+<style>
+  @media print { body{margin:0} .no-print{display:none} }
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1a1a2e;padding:30px;max-width:800px;margin:0 auto;line-height:1.5}
+  h1{font-size:22px;color:#0d47a1;margin:0} h2{font-size:14px;color:#333;margin:20px 0 8px;border-bottom:2px solid #0d47a1;padding-bottom:4px}
+  .header{display:flex;justify-content:space-between;margin-bottom:20px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:15px 0}
+  .info-block{background:#f8f9fa;border-radius:6px;padding:12px;border-left:3px solid #0d47a1}
+  .info-block h3{margin:0 0 6px;font-size:11px;color:#0d47a1;text-transform:uppercase}
+  .info-block p{margin:2px 0;font-size:11px}
+  table{width:100%;border-collapse:collapse;margin:10px 0;font-size:11px}
+  th{background:#e3f2fd;padding:6px 8px;text-align:left;font-size:10px;color:#0d47a1;border-bottom:2px solid #0d47a1}
+  td{padding:5px 8px;border-bottom:1px solid #e0e0e0} .amount{text-align:right;font-family:monospace}
+  .total-row td{font-weight:700;font-size:13px;border-top:2px solid #0d47a1}
+  .footer{margin-top:30px;font-size:10px;color:#888;border-top:1px solid #ddd;padding-top:10px}
+  .stamp{float:right;border:2px solid #ff9800;border-radius:4px;padding:8px 16px;color:#ff9800;font-weight:700;font-size:14px;transform:rotate(-5deg)}
+  .btn-print{padding:8px 20px;background:#0d47a1;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px}
+</style></head><body>
+<div class="no-print" style="margin-bottom:20px;text-align:right">
+  <button class="btn-print" onclick="window.print()">&#128424; Печать / Сохранить как PDF</button>
+  <span style="margin-left:12px;color:#888;font-size:11px">ПРЕДВАРИТЕЛЬНЫЙ ПРОСМОТР — счёт ещё не создан</span>
+</div>
+<div class="header">
+  <div><h1>MONTHLY INVOICE / МЕСЯЧНЫЙ СЧЁТ</h1><p style="color:#555;font-size:11px">NC Art.20.1 — Monthly Statement</p></div>
+  <div style="text-align:right"><div class="stamp">PREVIEW</div><p>Period: ${from} / ${to}</p></div>
+</div>
+<div class="info-grid">
+  <div class="info-block"><h3>TSO / Транспортёр</h3><p><strong>Gastrans d.o.o. Novi Sad</strong></p><p>Narodnog fronta 12, 21000 Novi Sad</p><p>VAT: 107350223</p></div>
+  <div class="info-block"><h3>Shipper / Грузоотправитель</h3><p><strong>${s.code} ${s.name}</strong></p></div>
+</div>
+<h2>Line Items / Строки счёта (${invLines.length})</h2>
+<table><thead><tr><th>#</th><th>Type</th><th>Product</th><th>Point</th><th>Direction</th><th>Capacity</th><th>Tariff</th><th class="amount">Amount EUR</th></tr></thead><tbody>
+${invLines.map((l,i) => `<tr><td>${i+1}</td><td>${l.lineType}</td><td>${l.productType||''}</td><td>${l.pointCode||''}</td><td>${l.direction||''}</td><td class="amount">${l.capacityKwhH ? Number(l.capacityKwhH).toLocaleString() : '—'}</td><td class="amount">${l.tariffEur||'—'}</td><td class="amount">${(l.amount||0).toLocaleString('de-DE',{minimumFractionDigits:2})}</td></tr>`).join('')}
+</tbody></table>
+<h2>Summary / Итого</h2>
+<table>
+  <tr><td>Capacity Fee (ship-or-pay)</td><td class="amount">${capTotal.toLocaleString('de-DE',{minimumFractionDigits:2})} EUR</td></tr>
+  <tr><td>Fuel Gas (NC Art.18)</td><td class="amount">${fgTotal.toLocaleString('de-DE',{minimumFractionDigits:2})} EUR</td></tr>
+  <tr><td>Penalties / Premium</td><td class="amount">${penTotal.toLocaleString('de-DE',{minimumFractionDigits:2})} EUR</td></tr>
+  <tr class="total-row"><td>TOTAL / ИТОГО К ОПЛАТЕ</td><td class="amount" style="color:#0d47a1;font-size:16px">${total.toLocaleString('de-DE',{minimumFractionDigits:2})} EUR</td></tr>
+</table>
+<div class="footer"><p>Generated by GTCP — Gastrans d.o.o. | NC Art.20 | AERS 05-145</p></div>
+</body></html>`);
+  w.document.close();
 }
 
 async function createInvoiceWithLines() {
@@ -2922,13 +2971,126 @@ function erpSync() {  // FR-12
 
 // Statement viewer (backend only)
 async function viewStatement(invId) {
-  if (!STATE.backendMode || !window.API) return;
-  const { data, error } = await API.billing.statement(invId);
-  if (error) { toast(`Ошибка: ${error}`, 'error'); return; }
-  const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
-  const w = window.open('', `Statement ${invId}`, 'width=700,height=500');
-  w.document.write(`<pre style="font-size:12px;white-space:pre-wrap;padding:16px;background:#1a1a2e;color:#e0e0ff;font-family:monospace;">${content.replace(/</g,'&lt;')}</pre>`);
-  w.document.title = `Выписка — ${invId}`;
+  if (!STATE.backendMode) return;
+  try {
+    const token = sessionStorage.getItem('gtcp_access_token');
+    const BASE = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+    const resp = await fetch(`${BASE}/billing/${invId}/statement`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!resp.ok) { toast(`Ошибка: ${resp.status}`, 'error'); return; }
+    const data = await resp.json();
+    const s = data.statement;
+    const tso = data.tso;
+    const lines = data.lineItems || [];
+
+    const periodFrom = (s.period_from||'').slice(0,10);
+    const periodTo = (s.period_to||'').slice(0,10);
+    const dueDate = (s.due_date||'').slice(0,10);
+    const totalEur = parseFloat(s.total_amount_eur||s.amount_eur||0);
+
+    const w = window.open('', `Invoice ${s.invoice_no}`, 'width=900,height=700');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${s.invoice_no}</title>
+<style>
+  @media print { body { margin: 0; } .no-print { display: none; } }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1a1a2e; padding: 30px; max-width: 800px; margin: 0 auto; line-height: 1.5; }
+  h1 { font-size: 22px; color: #0d47a1; margin: 0; }
+  h2 { font-size: 14px; color: #333; margin: 20px 0 8px; border-bottom: 2px solid #0d47a1; padding-bottom: 4px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .header-left { flex: 1; }
+  .header-right { text-align: right; font-size: 11px; color: #555; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 15px 0; }
+  .info-block { background: #f8f9fa; border-radius: 6px; padding: 12px; border-left: 3px solid #0d47a1; }
+  .info-block h3 { margin: 0 0 6px; font-size: 11px; color: #0d47a1; text-transform: uppercase; }
+  .info-block p { margin: 2px 0; font-size: 11px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11px; }
+  th { background: #e3f2fd; padding: 6px 8px; text-align: left; font-size: 10px; color: #0d47a1; border-bottom: 2px solid #0d47a1; }
+  td { padding: 5px 8px; border-bottom: 1px solid #e0e0e0; }
+  .total-row td { font-weight: 700; font-size: 13px; border-top: 2px solid #0d47a1; }
+  .amount { text-align: right; font-family: monospace; }
+  .footer { margin-top: 30px; font-size: 10px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }
+  .nc-ref { color: #0d47a1; font-weight: 600; }
+  .btn-print { padding: 8px 20px; background: #0d47a1; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .btn-print:hover { background: #1565c0; }
+  .stamp { float: right; border: 2px solid #0d47a1; border-radius: 4px; padding: 8px 16px; color: #0d47a1; font-weight: 700; font-size: 14px; transform: rotate(-5deg); }
+</style></head><body>
+<div class="no-print" style="margin-bottom:20px;text-align:right">
+  <button class="btn-print" onclick="window.print()">&#128424; Печать / Сохранить как PDF</button>
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <h1>MONTHLY INVOICE / МЕСЯЧНЫЙ СЧЁТ</h1>
+    <p style="color:#555;font-size:11px">NC Art.20.1 — Monthly Statement for Gas Transmission Services</p>
+  </div>
+  <div class="header-right">
+    <div class="stamp">${s.status||'DRAFT'}</div>
+    <p><strong>${s.invoice_no}</strong></p>
+    <p>Date: ${(s.created_at||'').slice(0,10)}</p>
+    <p>Due: ${dueDate || 'N/A'}</p>
+  </div>
+</div>
+
+<div class="info-grid">
+  <div class="info-block">
+    <h3>TSO / Транспортёр</h3>
+    <p><strong>${tso.name}</strong></p>
+    <p>${tso.address}</p>
+    <p>VAT: ${tso.vatNumber} | Account: ${tso.bankAccount}</p>
+  </div>
+  <div class="info-block">
+    <h3>Shipper / Грузоотправитель</h3>
+    <p><strong>${s.shipper_code} ${s.shipper_name}</strong></p>
+    <p>Contract: ${s.contract_no || 'N/A'}</p>
+    <p>Route: ${s.flow_direction || 'N/A'}</p>
+  </div>
+</div>
+
+<h2>Billing Period / Расчётный период</h2>
+<table>
+  <tr><td>Period</td><td>${periodFrom} — ${periodTo}</td><td>Days</td><td>${s.billing_days||'—'}</td></tr>
+  <tr><td>Entry Capacity</td><td class="amount">${s.cap_entry_kwh_h ? Number(s.cap_entry_kwh_h).toLocaleString() + ' kWh/h' : '—'}</td>
+      <td>Exit Capacity</td><td class="amount">${s.cap_exit_kwh_h ? Number(s.cap_exit_kwh_h).toLocaleString() + ' kWh/h' : '—'}</td></tr>
+</table>
+
+${lines.length ? `
+<h2>Line Items / Строки счёта (${lines.length})</h2>
+<table>
+  <thead><tr><th>#</th><th>Type</th><th>Product</th><th>Point</th><th>Capacity</th><th>Tariff</th><th class="amount">Amount EUR</th><th>NC Ref</th></tr></thead>
+  <tbody>
+${lines.map((l,i) => `<tr>
+  <td>${i+1}</td><td>${l.line_type||''}</td><td>${l.product_type||''}</td><td>${l.point_code||''}</td>
+  <td class="amount">${l.capacity_kwh_h ? Number(l.capacity_kwh_h).toLocaleString() : '—'}</td>
+  <td class="amount">${l.tariff_eur ? Number(l.tariff_eur).toFixed(4) : '—'}</td>
+  <td class="amount">${l.amount_eur ? Number(l.amount_eur).toLocaleString('de-DE',{minimumFractionDigits:2}) : '0.00'}</td>
+  <td><span class="nc-ref">${l.nc_ref||''}</span></td>
+</tr>`).join('')}
+  </tbody>
+</table>` : ''}
+
+<h2>Summary / Итого</h2>
+<table>
+  <tr><td>Capacity Fee (ship-or-pay)</td><td class="amount">${s.cap_entry_fee_eur ? Number(s.cap_entry_fee_eur).toLocaleString('de-DE',{minimumFractionDigits:2}) + ' (entry) + ' + Number(s.cap_exit_fee_eur||0).toLocaleString('de-DE',{minimumFractionDigits:2}) + ' (exit)' : Number(s.transit_amount_eur||s.amount_eur||0).toLocaleString('de-DE',{minimumFractionDigits:2})} EUR</td></tr>
+  <tr><td>Fuel Gas (NC Art.18)</td><td class="amount">${Number(s.fuel_gas_amount_eur||0).toLocaleString('de-DE',{minimumFractionDigits:2})} EUR</td></tr>
+  <tr><td>Balancing Gas</td><td class="amount">${Number(s.balancing_gas_eur||0).toLocaleString('de-DE',{minimumFractionDigits:2})} EUR</td></tr>
+  <tr class="total-row"><td>TOTAL / ИТОГО К ОПЛАТЕ</td><td class="amount" style="color:#0d47a1;font-size:16px">${totalEur.toLocaleString('de-DE',{minimumFractionDigits:2})} EUR</td></tr>
+</table>
+
+<h2>Payment / Оплата</h2>
+<table>
+  <tr><td>Due Date (NC Art.20.4.1)</td><td>${dueDate || '20th of month following Gas Month'}</td></tr>
+  <tr><td>Late Payment Interest</td><td>EURIBOR 6M + 3%, act/360 basis (NC Art.20.4.2)</td></tr>
+  <tr><td>Bank</td><td>${tso.name} — Account ${tso.bankAccount}</td></tr>
+</table>
+
+<div class="footer">
+  <p>Generated by GTCP (Gas Trading & Commercial Platform) — Gastrans d.o.o. Novi Sad</p>
+  <p>NC Reference: Gastrans Network Code, adopted 03.04.2020, Art.20 (Invoicing and Payment)</p>
+  <p>AERS Decision 05-145, 17.07.2025 (Reserve Prices GY2025/2026)</p>
+</div>
+</body></html>`);
+    w.document.close();
+  } catch(e) { toast(`Ошибка: ${e.message}`, 'error'); }
 }
 
 // View invoice line items (Variant C — Sprint 10)

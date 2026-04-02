@@ -373,40 +373,53 @@ router.get('/:id', authorize('billing:read'), async (req, res, next) => {
 // GET /billing/:id/statement — Monthly Statement (NC Art. 20.1)
 router.get('/:id/statement', authorize('billing:read'), async (req, res, next) => {
   try {
-    const { rows } = await db.query(
-      `SELECT ms.*, s.iban, s.vat_number
-       FROM v_monthly_statement ms
-       JOIN shippers s ON s.code = ms.shipper_code
-       WHERE ms.invoice_no = (
-         SELECT invoice_no FROM invoices WHERE id = $1
-       )`,
-      [req.params.id]
+    // Support both UUID and invoice_no (INV-2026-0001)
+    const idParam = req.params.id;
+    const isUUID = idParam.length === 36 && idParam.includes('-') && !idParam.startsWith('INV');
+    const { rows: invRows } = await db.query(
+      isUUID
+        ? `SELECT i.*, s.code AS shipper_code, s.name AS shipper_name FROM invoices i JOIN shippers s ON s.id = i.shipper_id WHERE i.id = $1`
+        : `SELECT i.*, s.code AS shipper_code, s.name AS shipper_name FROM invoices i JOIN shippers s ON s.id = i.shipper_id WHERE i.invoice_no = $1`,
+      [idParam]
     );
-    if (!rows.length) return res.status(404).json({ error: 'Invoice not found' });
+    if (!invRows.length) return res.status(404).json({ error: 'Invoice not found' });
+    const inv = invRows[0];
 
-    // Fetch daily MDAP data for the period
-    const inv = rows[0];
-    const { rows: mdap } = await db.query(
-      `SELECT * FROM mdap_daily
-       WHERE contract_id IN (
-         SELECT id FROM contracts WHERE shipper_id = $1
-       )
-       AND gas_day BETWEEN $2 AND $3
-       ORDER BY gas_day, point_code`,
-      [inv.shipper_id, inv.period_from, inv.period_to]
-    );
+    // Line items (if exist)
+    let lineItems = [];
+    try {
+      const { rows: li } = await db.query(
+        `SELECT * FROM invoice_line_items WHERE invoice_id = $1 ORDER BY line_no`,
+        [inv.id]
+      );
+      lineItems = li;
+    } catch {}
+
+    // Shipper contract info
+    let contract = null;
+    try {
+      const { rows: c } = await db.query(
+        `SELECT * FROM contracts WHERE shipper_id = $1 AND status = 'ACTIVE' LIMIT 1`,
+        [inv.shipper_id]
+      );
+      if (c.length) contract = c[0];
+    } catch {}
 
     res.json({
-      statement: inv,
-      daily_data: mdap,
-      // NC Art. 20.1 required fields checklist
-      nc_fields: {
-        contracted_capacity: !!(inv.cap_entry_kwh_h || inv.cap_exit_kwh_h || inv.capacity_kwh_h),
-        allocated_quantities: mdap.length > 0,
-        fuel_gas: !!(inv.fuel_gas_kwh || inv.fuel_gas_volume_mwh),
-        transmission_imbalance: inv.balancing_gas_mwh != null,
-        interruption_data: false, // Sprint 6
-        gas_quality: mdap.some(r => r.gcv_kwh_nm3),
+      statement: {
+        ...inv,
+        contract_no: contract?.contract_no,
+        flow_direction: contract?.flow_direction || inv.flow_direction,
+        cap_entry_kwh_h: contract?.cap_entry_kwh_h || inv.cap_entry_kwh_h,
+        cap_exit_kwh_h: contract?.cap_exit_kwh_h || inv.cap_exit_kwh_h,
+      },
+      lineItems,
+      tso: {
+        name: 'Gastrans d.o.o. Novi Sad',
+        address: 'Narodnog fronta 12, 21000 Novi Sad, Republika Srbija',
+        vatNumber: '107350223',
+        bankAccount: '160-4473-43',
+        ncRef: 'NC Art.20.1 — Monthly Statement',
       },
     });
   } catch (err) { next(err); }
