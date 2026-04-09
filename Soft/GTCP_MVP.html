@@ -3171,7 +3171,7 @@ async function renderGasQuality() {
   if (data) {
     const rows = Array.isArray(data) ? data : (data.data || []);
     tbody.innerHTML = rows.map(q =>
-      `<tr><td class="mono fw7">${q.point_code||q.point||''}</td><td class="mono text-dim">${q.period||q.month||''}</td><td class="mono">${Number(q.gcv||q.gcv_kwh_nm3||0).toFixed(3)}</td><td class="mono">${Number(q.wobbe||q.wobbe_index||0).toFixed(3)}</td><td class="mono">${Number(q.ch4||q.ch4_pct||0).toFixed(2)}</td><td class="mono">${Number(q.h2s||q.h2s_mg_nm3||q.h2s_mg_m3||0).toFixed(2)}</td><td class="mono">${Number(q.density||q.density_kg_m3||0).toFixed(4)}</td></tr>`
+      `<tr><td class="mono fw7">${q.point_code||q.point||''}</td><td class="mono text-dim">${(q.gas_day||q.period||q.month||'').slice(0,10)}</td><td class="mono">${Number(q.gcv_kwh_nm3||q.gcv||0).toFixed(3)}</td><td class="mono">${Number(q.wobbe_kwh_nm3||q.wobbe||q.wobbe_index||0).toFixed(3)}</td><td class="mono">${Number(q.methane_pct||q.ch4_pct||q.ch4||0).toFixed(2)}</td><td class="mono">${Number(q.h2s_mg_nm3||q.h2s||q.h2s_mg_m3||0).toFixed(2)}</td><td class="mono">${Number(q.density_kg_nm3||q.density||q.density_kg_m3||0).toFixed(4)}</td></tr>`
     ).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px;">Нет данных о качестве газа</td></tr>';
   }
 }
