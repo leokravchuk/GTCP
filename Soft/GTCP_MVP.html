@@ -568,7 +568,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
           </div>
           <div class="table-wrap">
             <table id="t-billing">
-              <thead><tr><th>НОМЕР СЧЁТА</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>ПЕРИОД</th><th>СТРОКИ</th><th>СРОК ОПЛАТЫ</th><th>СУММА EUR</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
+              <thead><tr><th>НОМЕР СЧЁТА</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>ПЕРИОД</th><th>СРОК ОПЛАТЫ</th><th>СУММА EUR</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -2437,8 +2437,7 @@ function renderBillingTable() {
     if (i.status==='ISSUED')  actions = `<button class="action-btn" onclick="sendInvoice('${i.id}')">Отправить</button>`;
     if (STATE.backendMode) actions += ` <button class="action-btn" onclick="viewStatement('${i.id}')" title="Выписка NC Art.20.1">📄</button>`;
     if (STATE.backendMode) actions += ` <button class="action-btn" onclick="viewInvoiceLines('${i.id}')" title="Строки счёта">📋</button>`;
-    const linesInfo = i.lineCount > 0 ? `${i.lineCount} строк` : '';
-    return `<tr><td class="mono text-accent">${i.id}</td><td>${shipperName(i.shipperId)}</td><td class="mono">${i.from} — ${i.to}</td><td class="mono">${linesInfo}</td><td class="mono">${i.dueDate||''}</td><td class="mono fw7">${fmtEur(amt)}</td><td>${badge(i.status,cls)}</td><td>${actions}</td></tr>`;
+    return `<tr><td class="mono text-accent">${i.id}</td><td>${shipperName(i.shipperId)}</td><td class="mono">${i.from} — ${i.to}</td><td class="mono">${i.dueDate||''}</td><td class="mono fw7">${fmtEur(amt)}</td><td>${badge(i.status,cls)}</td><td>${actions}</td></tr>`;
   }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">Нет записей</td></tr>';
 }
 
