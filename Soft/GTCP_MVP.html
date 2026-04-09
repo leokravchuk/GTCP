@@ -3629,10 +3629,19 @@ function calcMinCredit() {
   const product = document.getElementById('ci-product').value;
   const sid     = document.getElementById('ci-shipper').value;
   const s       = shippers.find(x=>x.id===sid||x.code===sid)||{creditLimit:0};
-  const minCr   = calcMinCreditSize(sid || s.code, product);
   const box     = document.getElementById('ci-min-credit');
   if (!box) return;
   box.style.display = 'block';
+
+  // NC Art.5.1.6: check if shipper is rating-exempt
+  const rating = creditRatings.find(r => r.shipperId === sid || r.shipperId === s.code);
+  if (rating && isRatingExempt(rating)) {
+    document.getElementById('ci-min-val').innerHTML = '<span style="color:var(--accent)">ОСВОБОЖДЁН (NC Art.5.1.6)</span>';
+    document.getElementById('ci-coverage').innerHTML = '<span style="color:var(--accent)">Рейтинг ≥ BBB- — обеспечение не требуется</span>';
+    return;
+  }
+
+  const minCr   = calcMinCreditSize(sid || s.code, product);
   document.getElementById('ci-min-val').textContent = '€ ' + fmtEur(minCr);
   const ok = amount >= minCr;
   const cvg = minCr > 0 ? ((amount/minCr)*100).toFixed(1)+'%' : '—';
@@ -3649,9 +3658,13 @@ async function addCreditInstrument() {
   const expires = document.getElementById('ci-expires').value;
   if (!sid || !amount || !expires) { toast('Заполните обязательные поля', 'error'); return; }
   const s = shippers.find(x=>x.id===sid||x.code===sid);
-  const minCr = calcMinCreditSize(sid || (s?s.code:''), product);
-  if (amount < minCr) {
-    toast(`Сумма € ${fmtEur(amount)} < минимум NC Art.5 € ${fmtEur(minCr)}`, 'warning');
+  const rating = creditRatings.find(r => r.shipperId === sid || r.shipperId === (s?s.code:''));
+  const exempt = rating && isRatingExempt(rating);
+  if (!exempt) {
+    const minCr = calcMinCreditSize(sid || (s?s.code:''), product);
+    if (amount < minCr) {
+      toast(`Сумма € ${fmtEur(amount)} < минимум NC Art.5 € ${fmtEur(minCr)}`, 'warning');
+    }
   }
   if (STATE.backendMode && window.API) {
     try {
