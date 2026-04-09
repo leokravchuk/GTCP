@@ -568,7 +568,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
           </div>
           <div class="table-wrap">
             <table id="t-billing">
-              <thead><tr><th>НОМЕР СЧЁТА</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>ПЕРИОД</th><th>ОБЪЁМ кВт·ч/ч</th><th>ТАРИФ EUR/кВт·ч/ч</th><th>СУММА EUR</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
+              <thead><tr><th>НОМЕР СЧЁТА</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>ПЕРИОД</th><th>СТРОКИ</th><th>СРОК ОПЛАТЫ</th><th>СУММА EUR</th><th>СТАТУС</th><th>ДЕЙСТВИЯ</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -1588,10 +1588,16 @@ async function _refreshFromBackend() {
     const { data: iData } = await API.billing.list({ limit: 50 });
     if (iData) {
       invoices = iData.map(inv => ({
-        id: inv.invoice_no, shipperId: inv.shipper_code, shipperName: inv.shipper_name || '',
-        from: inv.period_from, to: inv.period_to,
-        volume: parseFloat(inv.volume_mwh),
-        tariff: parseFloat(inv.tariff_eur_mwh),
+        id: inv.invoice_no, invoiceId: inv.id,
+        shipperId: inv.shipper_code || inv.shipper_id, shipperName: inv.shipper_name || '',
+        from: (inv.period_from||'').slice(0,10), to: (inv.period_to||'').slice(0,10),
+        volume: parseFloat(inv.volume_mwh) || 0,
+        tariff: parseFloat(inv.tariff_eur_mwh) || 0,
+        totalAmount: parseFloat(inv.total_amount_eur || inv.amount_eur) || 0,
+        lineCount: parseInt(inv.line_items_count) || 0,
+        subtotalCapacity: parseFloat(inv.subtotal_capacity_eur) || 0,
+        subtotalFuelGas: parseFloat(inv.subtotal_fuel_gas_eur) || 0,
+        dueDate: (inv.due_date||'').slice(0,10),
         status: inv.status, ts: inv.created_at?.slice(0, 10) || '',
       }));
     }
@@ -2424,14 +2430,15 @@ function renderBilling() {
 function renderBillingTable() {
   const filtered = STATE.billingFilter==='all' ? invoices : invoices.filter(i=>i.status===STATE.billingFilter);
   document.querySelector('#t-billing tbody').innerHTML = filtered.map(i=>{
-    const amt = i.volume * i.tariff;
+    const amt = i.totalAmount || (i.volume * i.tariff) || 0;
     const cls = {PAID:'paid',ISSUED:'issued',WAITING:'waiting',OVERDUE:'overdue'}[i.status]||'';
     let actions = '';
-    if (i.status==='WAITING') actions = `<button class="action-btn text-green" onclick="payInvoice('${i.id}')">✓ Оплачен</button>`;
+    if (i.status==='WAITING') actions = `<button class="action-btn text-green" onclick="payInvoice('${i.id}')">OK</button>`;
     if (i.status==='ISSUED')  actions = `<button class="action-btn" onclick="sendInvoice('${i.id}')">Отправить</button>`;
     if (STATE.backendMode) actions += ` <button class="action-btn" onclick="viewStatement('${i.id}')" title="Выписка NC Art.20.1">📄</button>`;
     if (STATE.backendMode) actions += ` <button class="action-btn" onclick="viewInvoiceLines('${i.id}')" title="Строки счёта">📋</button>`;
-    return `<tr><td class="mono text-accent">${i.id}</td><td>${shipperName(i.shipperId)}</td><td class="mono">${i.from} — ${i.to}</td><td class="mono">${fmt(i.volume)}</td><td class="mono">${(i.tariff||0).toFixed(2)}</td><td class="mono fw7">${fmtEur(amt || i._total || 0)}</td><td>${badge(i.status,cls)}</td><td>${actions}</td></tr>`;
+    const linesInfo = i.lineCount > 0 ? `${i.lineCount} строк` : '';
+    return `<tr><td class="mono text-accent">${i.id}</td><td>${shipperName(i.shipperId)}</td><td class="mono">${i.from} — ${i.to}</td><td class="mono">${linesInfo}</td><td class="mono">${i.dueDate||''}</td><td class="mono fw7">${fmtEur(amt)}</td><td>${badge(i.status,cls)}</td><td>${actions}</td></tr>`;
   }).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">Нет записей</td></tr>';
 }
 
