@@ -217,7 +217,7 @@ router.get('/calendar/days', authorize('capacity:read'), async (req, res, next) 
     try {
       const TECH = { 'KIREVO-ENTRY': 15280488, 'HORGOS-EXIT': 10240233, 'EXIT-SERBIA': 5040256 };
       const { rows: bk } = await db.query(`
-        SELECT point, ROUND(SUM(capacity_mwh_d * 1000.0 / 24.0))::bigint AS contracted
+        SELECT point, ROUND(SUM(capacity_kwh_h))::bigint AS contracted
         FROM capacity_bookings WHERE status = 'ACTIVE'
           AND period_from <= CURRENT_DATE AND period_to >= CURRENT_DATE
         GROUP BY point

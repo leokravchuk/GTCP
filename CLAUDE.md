@@ -115,6 +115,19 @@ Available Credit (Art.5.3.4):
 API: `GET /capacity/available` — real-time SQL, always fresh.
 Implementation: Option A (real-time SQL on every request).
 
+**Sprint 14 Auction Calendar Endpoints (31.03.2026):**
+- `GET /auctions/calendar/grid` — Product × Month grid for Gas Year (Yearly/Quarterly/Monthly status per month)
+- `GET /auctions/calendar/days?year=YYYY&month=M` — Day-centric calendar: DB auctions (Y/Q/M) + on-the-fly Daily/WD per day
+
+Total API endpoints: **96** (was 93 at Sprint 12)
+
+**Sprint 16 capacity_kwh_h (09.04.2026):**
+- Migration 017: `capacity_bookings.capacity_kwh_h` — native kWh/h column (АЕРС-exact)
+- All 12 runtime conversions `capacity_mwh_d * 1000 / 24` replaced with `capacity_kwh_h` in 6 files
+- `capacity_mwh_d` kept for backward compatibility (deprecated, do not use in new code)
+- Bug fixed: nominations.js over-nomination compared MWh/d with kWh/h (BUG-04/05)
+- Migrations: 000–017
+
 ---
 
 **Key rules:**
@@ -196,15 +209,37 @@ Capacity is always expressed in **kWh per hour** (kWh/h). Never use MWh/day for 
 
 ## Technical Capacity (AERS, GY 2022/2023)
 
-| Point | Technical kWh/h | Reserved (Long-Term ~90%) | Free (Short-Term ~10%) |
+| Point | Technical kWh/h | LT Reserved (90%) | ST Free for Auctions (10%) |
 |---|---|---|---|
-| Entry Kirevo/Zaječar | **15,280,488** | 13,752,230 (90%) | 1,528,258 (10%) |
-| Exit Domestic (3 pts) | **5,040,256** | 4,536,021 (90%) | 504,235 (10%) |
-| Exit Horgoš | **10,240,233** | 9,216,209 (90%) | 1,024,024 (10%) |
+| Entry Kirevo/Zaječar | **15,280,488** | 13,752,439 | **1,528,049** |
+| Exit Domestic (3 pts) | **5,040,256** | 4,536,230 | **504,026** |
+| Exit Horgoš | **10,240,233** | 9,216,209 | **1,024,024** |
 
-> **Critical rule:** Reserved Entry (13,752,230) ≠ Reserved Exit Horgoš (9,216,209).
-> Difference 4,536,021 kWh/h = domestic exit zone capacity.
+> **Critical rule:** Reserved Entry (13,752,439) ≠ Reserved Exit Horgoš (9,216,209).
+> Difference = domestic exit zone capacity.
 > Billing MUST use separate entry/exit capacity values — never assume cap_entry == cap_exit.
+> **ST Free balance:** Entry Free (1,528,049) = Exit Horgoš Free (1,024,024) + Exit Serbia Free (504,026) − 1 (rounding)
+
+## LT Booking Rules (Sprint 16, 09.04.2026)
+
+**Binding rule — enforced in seed data, billing, and capacity checks.**
+
+| Rule | Description | NC / Legal Basis |
+|---|---|---|
+| **Газпром HORGOS-EXIT = 90% Tech** | 9,216,209 kWh/h. NOT higher. | Final Exemption Act + NC Art.7.1.2 |
+| **LT total per IP ≤ 90% Tech** | Газпром + NIS combined must not exceed floor(Tech × 0.9) | AERS 90/10 split |
+| **ST = 10% fully free for auctions** | No ST pre-bookings. ST pool = Tech − LT = available for Quarterly/Monthly/Daily/WD auctions | NC Art.7.1.1 |
+| **Shipper balance: Entry = Σ Exit** | Each shipper's total Entry kWh/h must equal total Exit kWh/h | NC Art.12.3 |
+| **capacity_kwh_h is authoritative** | Use `capacity_kwh_h` column (not `capacity_mwh_d × 1000 / 24`) | Migration 017 |
+
+### Current LT Bookings (seed data, 09.04.2026)
+
+| Shipper | KIREVO-ENTRY | HORGOS-EXIT | EXIT-SERBIA | Balance |
+|---|---|---|---|---|
+| Газпром Экспорт | 9,752,230 | 9,216,209 | 536,021 | Δ=0 ✅ |
+| NIS | 4,000,209 | — | 4,000,209 | Δ=0 ✅ |
+| **LT Total** | **13,752,439** | **9,216,209** | **4,536,230** | |
+| % of Tech | 90.0% | 90.0% | 90.0% | |
 
 ---
 

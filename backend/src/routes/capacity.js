@@ -47,9 +47,9 @@ router.get('/available', authorize('capacity:read'), async (req, res, next) => {
     // Total contracted per IP (from active bookings)
     const { rows: bookings } = await db.query(`
       SELECT point, direction,
-             ROUND(SUM(capacity_mwh_d * 1000.0 / 24.0))::bigint AS contracted_kwh_h,
-             SUM(CASE WHEN capacity_category = 'LONG_TERM' THEN ROUND(capacity_mwh_d * 1000.0 / 24.0) ELSE 0 END)::bigint AS lt_kwh_h,
-             SUM(CASE WHEN capacity_category = 'SHORT_TERM' THEN ROUND(capacity_mwh_d * 1000.0 / 24.0) ELSE 0 END)::bigint AS st_kwh_h
+             ROUND(SUM(capacity_kwh_h))::bigint AS contracted_kwh_h,
+             SUM(CASE WHEN capacity_category = 'LONG_TERM' THEN ROUND(capacity_kwh_h) ELSE 0 END)::bigint AS lt_kwh_h,
+             SUM(CASE WHEN capacity_category = 'SHORT_TERM' THEN ROUND(capacity_kwh_h) ELSE 0 END)::bigint AS st_kwh_h
       FROM capacity_bookings
       WHERE status = 'ACTIVE'
         AND period_from <= CURRENT_DATE AND period_to >= CURRENT_DATE
@@ -89,7 +89,7 @@ router.get('/available', authorize('capacity:read'), async (req, res, next) => {
     let crContracted = {};
     try {
       const { rows: cr } = await db.query(`
-        SELECT point, ROUND(SUM(capacity_mwh_d * 1000.0 / 24.0))::bigint AS cr_kwh_h
+        SELECT point, ROUND(SUM(capacity_kwh_h))::bigint AS cr_kwh_h
         FROM capacity_bookings
         WHERE status = 'ACTIVE' AND booking_type = 'COMMERCIAL_REVERSE'
           AND period_from <= CURRENT_DATE AND period_to >= CURRENT_DATE

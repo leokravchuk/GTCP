@@ -331,16 +331,23 @@ router.get('/', authorize('billing:read'), async (req, res, next) => {
 });
 
 // GET /billing/gas-quality?point_code=HORGOS-EXIT&month=2025-04
+// If point_code omitted — returns all IPs (NC Art.17: quality at every IP)
 router.get('/gas-quality', authorize('billing:read'), async (req, res, next) => {
-  const { point_code = 'HORGOS-EXIT', month } = req.query;
+  const { point_code, month } = req.query;
   try {
-    let query = `SELECT * FROM gas_quality_daily WHERE point_code = $1`;
-    const params = [point_code];
-    if (month) {
-      query += ` AND TO_CHAR(gas_day, 'YYYY-MM') = $2`;
-      params.push(month);
+    let query = `SELECT *, TO_CHAR(gas_day, 'YYYY-MM-DD') AS period FROM gas_quality_daily`;
+    const conditions = [];
+    const params = [];
+    if (point_code) {
+      params.push(point_code);
+      conditions.push(`point_code = $${params.length}`);
     }
-    query += ` ORDER BY gas_day`;
+    if (month) {
+      params.push(month);
+      conditions.push(`TO_CHAR(gas_day, 'YYYY-MM') = $${params.length}`);
+    }
+    if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
+    query += ` ORDER BY point_code, gas_day`;
     const { rows } = await db.query(query, params);
     res.json(rows);
   } catch (err) { next(err); }
@@ -739,12 +746,12 @@ router.post(
         if (tariff === 0 && l.pointCode) {
           try {
             const { rows: rp } = await db.query(
-              `SELECT tariff_eur FROM reserve_prices
+              `SELECT price_eur FROM reserve_prices
                WHERE product_type = $1 AND point_code = $2 AND gas_year = '2025/2026' LIMIT 1`,
               [pt, l.pointCode]
             );
             if (rp.length) {
-              tariff = parseFloat(rp[0].tariff_eur);
+              tariff = parseFloat(rp[0].price_eur);
               l.tariffEur = tariff;
               l.tariffSource = 'AERS_05_145';  // auto-looked up
             }
@@ -1034,15 +1041,14 @@ router.post(
         // Fallback: if contract has no capacity, try capacity_bookings for this shipper
         if (capEntry === 0 && capExit === 0) {
           const { rows: bk } = await db.query(
-            `SELECT point, direction, capacity_mwh_d FROM capacity_bookings
+            `SELECT point, direction, capacity_kwh_h FROM capacity_bookings
              WHERE shipper_id = $1 AND status = 'ACTIVE'
                AND period_from <= $3 AND period_to >= $2
              ORDER BY direction`,
             [shipperId, periodFrom, periodTo]
           );
           for (const b of bk) {
-            // Convert MWh/day → kWh/h: MWh/d × 1000 / 24
-            const kwhH = parseFloat(b.capacity_mwh_d) * 1000 / 24;
+            const kwhH = parseFloat(b.capacity_kwh_h);
             if (b.direction === 'ENTRY') capEntry = Math.max(capEntry, kwhH);
             else capExit = Math.max(capExit, kwhH);
           }
@@ -1069,23 +1075,25 @@ router.post(
         let tariffSourceExit  = 'CONTRACT';
 
         // Auto-lookup from reserve_prices if contract has no tariff
-        const productType = c.contract_type || 'FIRM_YEARLY';
+        // Map contract_type → reserve_prices product_type (e.g. FIRM → FIRM_YEARLY)
+        const PRODUCT_MAP = { 'FIRM': 'FIRM_YEARLY', 'INTERRUPTIBLE': 'INTERRUPTIBLE_DAILY', 'COMM_REV': 'COMM_REV_YEARLY' };
+        const productType = PRODUCT_MAP[c.contract_type] || c.contract_type || 'FIRM_YEARLY';
         if (tariffEntry === 0 && pts.entry) {
           try {
             const { rows: rp } = await db.query(
-              `SELECT tariff_eur FROM reserve_prices WHERE product_type = $1 AND point_code = $2 AND gas_year = '2025/2026' LIMIT 1`,
+              `SELECT price_eur FROM reserve_prices WHERE product_type = $1 AND point_code = $2 AND gas_year = '2025/2026' LIMIT 1`,
               [productType, pts.entry]
             );
-            if (rp.length) { tariffEntry = parseFloat(rp[0].tariff_eur); tariffSourceEntry = 'AERS_05_145'; }
+            if (rp.length) { tariffEntry = parseFloat(rp[0].price_eur); tariffSourceEntry = 'AERS_05_145'; }
           } catch(e) {}
         }
         if (tariffExit === 0 && pts.exit) {
           try {
             const { rows: rp } = await db.query(
-              `SELECT tariff_eur FROM reserve_prices WHERE product_type = $1 AND point_code = $2 AND gas_year = '2025/2026' LIMIT 1`,
+              `SELECT price_eur FROM reserve_prices WHERE product_type = $1 AND point_code = $2 AND gas_year = '2025/2026' LIMIT 1`,
               [productType, pts.exit]
             );
-            if (rp.length) { tariffExit = parseFloat(rp[0].tariff_eur); tariffSourceExit = 'AERS_05_145'; }
+            if (rp.length) { tariffExit = parseFloat(rp[0].price_eur); tariffSourceExit = 'AERS_05_145'; }
           } catch(e) {}
         }
         // Final fallback to system params

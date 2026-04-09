@@ -1,7 +1,41 @@
 # GTCP — Action Plan
 **Текущие задачи, приоритеты и решения · Living Document**
 
-> Последнее обновление: 31.03.2026 · Sprint 14 (Auctions+UAT) ЗАВЕРШЁН · Версия 13.0
+> Последнее обновление: 09.04.2026 · Sprint 16 в процессе · Версия 17.0
+
+---
+
+## 📋 Sprint 16 · NC Compliance Push + Data Integrity + Analytics (06–19.04.2026)
+
+> Детали: `reports/SPRINT_16_PLAN.md`
+
+### ✅ P0 — Выполнено (09.04.2026)
+
+- [x] **US-1610** · Migration 017: capacity_kwh_h native column (ADD COLUMN + backfill + view) (3 SP) ✅
+- [x] **US-1611** · Replace all 12 runtime MWh/d→kWh/h conversions in 6 files (2 SP) ✅
+- [x] **US-1612** · BUG-04/05: Over-nomination unit mismatch fix (nominations.js:453,489) (1 SP) ✅
+- [x] **US-1613** · Seed data АЕРС alignment (capacity_kwh_h exact values) (2 SP) ✅
+- [x] **US-1614** · 90/10 rule enforcement: LT=90% exact, ST=10% free for auctions, shipper balance Δ=0 (3 SP) ✅
+- [x] **US-1615** · Газпром HORGOS-EXIT=90% rule + CTR-2026-006 domestic contract + billing tariff lookup fix (price_eur) (2 SP) ✅
+- [x] **US-1616** · CLAUDE.md + Artifacts + memory: LT Booking Rules, capacity 90/10 updated (1 SP) ✅
+
+### 🔴 P0 — Критический путь
+
+- [ ] **US-1601** · Adjacent TSO Auto-Matching (NC Art.13.5) — matchWithAdjacentTso(), Lesser Rule, mock FGSZ/BulgarTransgaz (5 SP)
+- [ ] **US-1602** · Double-Sided Nomination Matching Result (NC Art.13.3) — matching-result endpoint + UI panel (3 SP)
+- [ ] **US-1603** · Imbalance Charge Calculation (NC Art.15.3) — calcImbalanceCharge(), migration 016: daily_imbalances, balance endpoints (5 SP)
+
+### 🟡 P1 — Важно
+
+- [ ] **US-1604** · Analytics Dashboard — графики объёмов, revenue по шипперам, утилизация (Chart.js) (5 SP)
+- [ ] **US-1605** · Export to Excel/CSV — Billing, Contracts, Nominations (SheetJS) (4 SP)
+- [ ] **US-1606** · k6 Load Testing — ≥100 RPS, p95<500ms, отчёт (3 SP)
+- [ ] **US-1607** · UserGuide v3.4 — финальная версия для диплома (.md + .docx) (4 SP)
+- [x] **US-1608** · Artifacts + CLAUDE.md update — Sprint 16 state (2 SP) ✅
+
+### 🟢 P2 — Перенос если нет времени
+
+- [ ] **US-1609** · VTP Basic Implementation (NC Art.11) — VTP trades, balancing impact (4 SP)
 
 ---
 
@@ -253,50 +287,51 @@
 
 ---
 
-## ✅ Sprint 9 — NC Full Compliance + AERS Tariff Alignment (27.03–10.04.2026)
+## ✅ Sprint 9 — NC Full Compliance + AERS Tariff Alignment (27.03.2026) · ЗАВЕРШЁН
 
 > Источники: NC Gastrans 2020, АЕРС Decision 05-145 (17.07.2025, GY2025/26), NC Audit 26.03.2026
 > Детали: `reports/SPRINT_9_PLAN.md` (25 задач, 46 SP)
+> **Аудит 03.04.2026:** Все 20 задач верифицированы в codebase. Backend NC-compliant.
 
-### P0 — Тарифы АЕРС 05-145 (12 SP)
+### P0 — Тарифы АЕРС 05-145 (12 SP) · ✅ ВСЕ РЕАЛИЗОВАНЫ
 
-| # | Задача | Ответственный | Срок | Статус |
-|---|---|---|---|---|
-| A-147 | Entry Kirevo annual tariff = **6.00** (в коде 4.19 — это domestic exit!) | Backend+FE | 02.04.2026 | 🔲 |
-| A-148 | Daily Entry tariff = **0.0329** (в коде 0.0230 — domestic exit daily!) | Backend+FE | 02.04.2026 | 🔲 |
-| A-149 | Quarterly тарифы — 4Q × 3 точки × 3 режима (Firm/Int/CR) | Backend | 02.04.2026 | 🔲 |
-| A-150 | Monthly тарифы — 28/30/31 × 3 точки × 2 режима | Backend | 02.04.2026 | 🔲 |
-| A-151 | Within-Day тарифы — Entry 0.0021, Dom 0.0014, Horgoš 0.0023 | Backend+FE | 02.04.2026 | 🔲 |
-| A-152 | CR тарифы для Entry (2.85) и Domestic (1.99) — в коде только Horgoš 3.25 | Backend+FE | 02.04.2026 | 🔲 |
-| A-153 | Миграция 010: `reserve_prices` таблица + seed GY2025/26 + KIREVO-EXIT IP | Backend | 02.04.2026 | 🔲 |
+| # | Задача | Статус | Верификация (аудит 03.04.2026) |
+|---|---|---|---|
+| A-147 | Entry Kirevo annual tariff = **6.00** | ✅ | migration 010:45, GTCP_MVP.html:2426 |
+| A-148 | Daily Entry tariff = **0.0329** | ✅ | migration 010:100, GTCP_MVP.html:2436 |
+| A-149 | Quarterly тарифы — 4Q × 3 точки × 3 режима | ✅ | migration 010:53-82 (36 rows seeded) |
+| A-150 | Monthly тарифы — 28/30/31 × 3 точки × 2 режима | ✅ | migration 010:83-97 |
+| A-151 | Within-Day тарифы — 0.0021/0.0014/0.0023 | ✅ | migration 010:110-116, billing.js:177-189 |
+| A-152 | CR тарифы 2.85/1.99/3.25 | ✅ | migration 010:49-51 |
+| A-153 | Миграция 010: `reserve_prices` + KIREVO-EXIT | ✅ | `010_reserve_prices.sql` (116 строк, 69 seed rows) |
 
-### P0 — Формулы биллинга (10 SP)
+### P0 — Формулы биллинга (10 SP) · ✅ ВСЕ РЕАЛИЗОВАНЫ
 
-| # | Задача | Ответственный | Срок | Статус |
-|---|---|---|---|---|
-| A-154 | Раздельный entry/exit capacity fee (cap_entry=13.7M ≠ cap_exit=9.2M) | Backend | 02.04.2026 | 🔲 |
-| A-155 | Within-Day hourly fee: cap × price/hour × hours (не / 365) | Backend | 02.04.2026 | 🔲 |
-| A-156 | Late payment: EURIBOR **6M** (не 3M!) — billing.js + CLAUDE.md | Backend | 02.04.2026 | ✅ CLAUDE.md fixed |
-| A-157 | Invoice due date = 30 days от даты выставления (NC Art.20.3) | Backend | 02.04.2026 | 🔲 |
-| A-158 | Interruption penalty ×3 (АЕРС п.3) | Backend | 02.04.2026 | 🔲 |
-| A-159 | Over-Nomination endpoint (NC Art.12.8) | Backend | 02.04.2026 | 🔲 |
+| # | Задача | Статус | Верификация |
+|---|---|---|---|
+| A-154 | Раздельный entry/exit capacity fee | ✅ | `calcCapacityFee()` billing.js:158-218, returns `{entryFeeEur, exitFeeEur}` |
+| A-155 | Within-Day hourly fee (NOT /365) | ✅ | billing.js:177-189 `cap × price/hour × hours` |
+| A-156 | EURIBOR **6M** (не 3M!) | ✅ | billing.js:272, seed `euribor_6m_pct = 2.64` |
+| A-157 | Invoice due 20th of month (NC Art.20.4.1) | ✅ | billing.js:573-581 (NC-correct: 20-е число, не 30 дней) |
+| A-158 | Interruption penalty ×3 | ✅ | `calcInterruptionPenalty()` billing.js:282-296 |
+| A-159 | Over-Nomination endpoint (NC Art.12.8) | ✅ | nominations.js:477-526 `POST /over-nominate` |
 
-### P0 — Маршруты и точки (7 SP)
+### P0 — Маршруты и точки (7 SP) · ✅ ВСЕ РЕАЛИЗОВАНЫ
 
-| # | Задача | Ответственный | Срок | Статус |
-|---|---|---|---|---|
-| A-160 | contracts/meta — все 7 NC-маршрутов с АЕРС тарифами | Backend | 02.04.2026 | 🔲 |
-| A-161 | KIREVO-EXIT — добавить в interconnection_points | Backend | 02.04.2026 | 🔲 |
-| A-162 | Frontend nomination points — NC-коды вместо legacy | Frontend | 02.04.2026 | 🔲 |
-| A-163 | Capacity units — «кВт·ч/ч» вместо «МВт/ч» во всех таблицах | Frontend | 02.04.2026 | 🔲 |
+| # | Задача | Статус | Верификация |
+|---|---|---|---|
+| A-160 | 7 NC-маршрутов в contracts/meta | ✅ | ncRoutes.js:57-128, migration 009 |
+| A-161 | KIREVO-EXIT в interconnection_points | ✅ | migration 010:7-17, ncRoutes.js:30 |
+| A-162 | Frontend nomination NC-коды | ✅ | GTCP_MVP.html:804 (6 NC кодов в dropdown) |
+| A-163 | Capacity units кВт·ч/ч | ✅ | migration 013, весь codebase |
 
-### P1 — Security (7 SP)
+### P1 — Security (7 SP) · ✅ РЕАЛИЗОВАНО (express-validator вместо Joi/Zod)
 
-| # | Задача | Ответственный | Срок | Статус |
-|---|---|---|---|---|
-| A-164 | OWASP audit — SQL injection, XSS | QA | 10.04.2026 | 🔲 |
-| A-165 | Input validation — Joi/Zod schemas для POST/PATCH | Backend | 10.04.2026 | 🔲 |
-| A-166 | Nomination deadline 14:00 CET D-1 серверная валидация | Backend | 10.04.2026 | ✅ Sprint 13: nc-compliance.test.js подтверждает 14:00 CET (Art.12.6.1.1) |
+| # | Задача | Статус | Верификация |
+|---|---|---|---|
+| A-164 | OWASP audit — SQL injection, XSS | ✅ | 100% parameterized queries ($1,$2), Helmet, CORS whitelist |
+| A-165 | Input validation | ✅ | express-validator ^7.3.1 (92 правила, 9 routes). Joi/Zod не нужен — P2 |
+| A-166 | Nomination deadline 14:00 CET D-1 | ✅ | nominations.js:107-126, nc-compliance.test.js подтверждает |
 
 ### P1 — Docs & Testing (10 SP)
 
@@ -748,6 +783,8 @@ Git: tag sprint-7 · branch main
 | 26.03.2026 | 4.1 | Sprint 6 ЗАВЕРШЁН ✅: ✅ A-113 migrations 004/007/008 fix (UUID FK, JSONB quoting, column names), ✅ routes billing/credits/auctions — API контракт исправлен под тесты, ✅ 56/56 Jest тестов (18+21+17). Коммит e63fceb, тег sprint-6. Версии roadmap+actionplan+LOCAL_RUN обновлены. Pending → Sprint 7: VPS deploy + руководство пользователя. |
 | 26.03.2026 | 5.0 | Sprint 7 ЗАВЕРШЁН ✅: ✅ A-124 Migration 009 NC route alignment (7 маршрутов, nc_routes ref table), ✅ A-125 ncRoutes.js (POINTS×6, NC_ROUTES×7, helpers), ✅ A-126 seed NC-correct (EXIT-пары, убраны plain-text точки), ✅ A-127 CLAUDE.md (NC compliance checklist 18 областей + Discrepancy Protocol), ✅ A-128 KIREVO-EXIT NC §2.1 симметрия (3 физических точки × 2 = 6 кодов), ✅ A-129 GTCP_UserGuide_v1.1 (.md+.docx, 1279 параграфов). ADR-012/013 добавлены. Тег sprint-7. Pending → Sprint 8: VPS deploy + WebSocket + OWASP. |
 | 26.03.2026 | 5.1 | Sprint 5 завершён, отчёт сформирован (SPRINT_5_REPORT.md): ~72 SP доставлено (план 36 SP, +100%). P0 CAP-FIX верифицирован €10 255 724. Credit Support NC Art.5, Auction Management CAM NC MAR0277-24, OpenAPI 3.0, CI/CD — все в DoD. |
+| 06.04.2026 | 14.1 | Sprint 15 завершён, отчёт сформирован (SPRINT_15_REPORT.md): ~16 SP доставлено (план 16 SP, 100%). 9/9 задач: NC IP codes в demo data, документация Sprint 14 alignment, CLAUDE.md endpoints updated. NC coverage 79%. |
+| 06.04.2026 | 16.0 | Sprint 16 plan сформирован автоматически: 9 US, 35 SP. P0: NC Art.13 Matching (100%), Art.15 Balancing (75%). P1: Analytics Dashboard, Export CSV/Excel, k6, UserGuide v3.4. P2: VTP Art.11. |
 
 ---
 

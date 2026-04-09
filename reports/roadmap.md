@@ -1,7 +1,7 @@
 # GTCP — Project Roadmap
 **Gas Trading & Commercial Platform · Full Delivery Plan**
 
-> Последнее обновление: 30.03.2026 · Версия 10.0
+> Последнее обновление: 09.04.2026 · Версия 12.0 · Sprint 16 в процессе (8/43 SP)
 
 ---
 
@@ -422,7 +422,11 @@ Jan–Feb 2026  Mar 2026              Mar 2026                   Mar 2026       
 | Phase 4 · NC Compliance | Sprint 10 | 27.03.2026 | ~62 SP | ✅ ЗАВЕРШЕНО (Invoice Lines + 90/10 + NC Art.3) |
 | Phase 5 · Nominations + RBP | Sprint 11 | 27.03.2026 | ~39 SP | ✅ ЗАВЕРШЕНО (Nominations 100% + RBP Core mock) |
 | Phase 5 · RBP + Analytics | Sprint 12 | 28.03.2026 | ~19 SP | ✅ ЗАВЕРШЕНО (RBP Secondary + UI + Tests, 117/117) |
-| **ИТОГО** | **12 спринтов** | **Янв–Июн 2026** | **~465 SP** | |
+| Phase 6 · Testing | Sprint 13 | 30.03.2026 | ~45 SP | ✅ ЗАВЕРШЕНО (442 tests, CI/CD, PostgreSQL) |
+| Phase 7 · Auction Calendar | Sprint 14 | 31.03.2026 | ~35 SP | ✅ ЗАВЕРШЕНО (Auction Calendar + UAT) |
+| Phase 8 · NC Consistency | Sprint 15 | 03.04.2026 | ~16 SP | ✅ ЗАВЕРШЕНО (NC consistency + docs alignment) |
+| **Phase 9 · NC Push + Analytics** | **Sprint 16** | **06.04.2026** | **35 SP** | **🔄 В РАБОТЕ (NC Art.13+15 + Analytics + Diploma)** |
+| **ИТОГО** | **16 спринтов** | **Янв–Июн 2026** | **~587 SP** | |
 
 ---
 
@@ -524,7 +528,17 @@ C:\Users\leokr\ETRM\
 | Sprint 5 | 25.03.2026 (досрочно) | 58 | **~72** | **+24 SP досрочно** ✅ |
 | Sprint 6 | 26.03.2026 (досрочно) | 40 | **~38** | **досрочно** ✅ |
 | Sprint 7 | 26.03.2026 (досрочно) | 32 | **~21** | **досрочно** ✅ |
-| Sprint 8 | 10.04–30.04.2026 | ~32 | — | 📋 |
+| Sprint 8 | 26.03.2026 | ~32 | **~22** | **досрочно** ✅ |
+| Sprint 9 | 27.03.2026 | 46 | **~46** | ✅ NC Full Compliance |
+| Sprint 10 | 27.03.2026 | 62 | **~62** | ✅ Invoice Lines + 90/10 + Art.3 |
+| Sprint 11 | 27.03.2026 | 39 | **~39** | ✅ Nominations + RBP Core |
+| Sprint 12 | 28.03.2026 | 33 | **~19** | ✅ RBP Secondary |
+| Sprint 13 | 30.03.2026 | 45 | **~45** | ✅ Testing 442/442 |
+| Sprint 14 | 31.03.2026 | 35 | **~35** | ✅ Auction Calendar + UAT |
+| Sprint 15 | 03.04.2026 | 16 | **~16** | ✅ NC consistency + docs |
+| Sprint 16 | 06–19.04.2026 | 43 | **~8** (WIP) | 🔄 capacity_kwh_h ✅ + NC Art.13+15 + Analytics |
+────────────────────────────────────────────────────────────────
+Total: ~560 SP delivered (552+8) + 35 SP remaining · Migrations: 17 (000-017) · Tests: 442/442 · NC: 79% → target 87%
 
 ---
 
@@ -533,3 +547,4 @@ C:\Users\leokr\ETRM\
 *26.03.2026 v4.0 — Sprint 6 завершён досрочно (~38 SP). ✅ Credit Support UI · ✅ Auction Management UI · ✅ ERP Connector · ✅ VPS infra конфиги · ✅ Migrations 004/007/008 fix (UUID FK, JSONB) · ✅ **56/56 Jest тестов** (billing+credits+auctions) · sprint-close.sh skill. Тег sprint-6. Sprint 7 планируется с 10.04.2026.*
 *26.03.2026 v5.0 — Sprint 7 завершён досрочно (~21 SP). ✅ Migration 009 NC route alignment · ✅ ncRoutes.js (7 маршрутов, 6 IP-кодов) · ✅ KIREVO-EXIT NC §2.1 симметрия · ✅ CLAUDE.md Discrepancy Protocol · ✅ GTCP_UserGuide_v1.1 (.md+.docx). Тег sprint-7. Migrations 001–009 clean. Sprint 8 с 10.04.2026.*
 *26.03.2026 v5.1 — Sprint 5 отчёт сформирован (SPRINT_5_REPORT.md). Статус Sprint 5: ✅ ЗАВЕРШЕНО ДОСРОЧНО (~72 SP). P0 Gate Review пройден, все формулы NC верифицированы.*
+*06.04.2026 v10.1 — Sprint 15 отчёт сформирован (SPRINT_15_REPORT.md). ~16 SP, 9/9 задач. NC IP codes в demo data исправлены, документация синхронизирована до Sprint 14. NC coverage 79%.*

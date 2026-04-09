@@ -179,7 +179,7 @@ router.patch(
       // NC Art.3.7: Removal checks — contracted capacity = 0 + outstanding debt = 0
       if (status === 'REMOVED') {
         const { rows: caps } = await db.query(
-          `SELECT COALESCE(SUM(capacity_mwh_d), 0) AS total_cap
+          `SELECT COALESCE(SUM(capacity_kwh_h), 0) AS total_cap
            FROM capacity_bookings WHERE shipper_id = $1 AND status = 'ACTIVE'`,
           [req.params.id]
         );

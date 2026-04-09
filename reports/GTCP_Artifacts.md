@@ -1,8 +1,8 @@
 # GTCP Artifacts — Diagrams, Schemes & Session Artifacts
 
-**Gas Trading & Commercial Platform · Compilation v1.0**
-**Date:** 28.03.2026 · Sprint 12 Complete
-**Source:** Sessions Sprint 8–12
+**Gas Trading & Commercial Platform · Compilation v1.1**
+**Date:** 09.04.2026 · Sprint 16 In Progress
+**Source:** Sessions Sprint 8–16
 
 ---
 
@@ -154,20 +154,22 @@ Shipper Registration (NC Art.3)
 ## 5. Capacity 90/10 Split
 
 ```
-  TECHNICAL CAPACITY (AERS certified)
-  ====================================
+  TECHNICAL CAPACITY (AERS certified) — Updated 09.04.2026
+  =========================================================
 
   Entry Kirevo:  15,280,488 kWh/h (100%)
   +-----------------------------------------+
   | Long-Term Reserved (90%)                |
-  | 13,752,230 kWh/h                        |
+  | 13,752,439 kWh/h                        |
+  |   Газпром: 9,752,230 (transit+domestic) |
+  |   NIS:     4,000,209 (domestic)         |
   | Final Exemption Act, 20 years           |
-  | NOT available for ST auctions           |
   +-------------------+---------------------+
                       |
   +-------------------v---------------------+
-  | Short-Term Available (10%)              |
-  | 1,528,258 kWh/h                         |
+  | Short-Term FREE for Auctions (10%)     |
+  | 1,528,049 kWh/h                         |
+  | No ST pre-bookings — fully available    |
   +---+---------------+-----------+---------+
       |               |           |
   +---v---+     +-----v---+  +---v-------+
@@ -177,13 +179,15 @@ Shipper Registration (NC Art.3)
   +-------+     +---------+  +-----------+
 
   Exit Horgos:   10,240,233 kWh/h
-  Reserved:       9,216,209 (90%) | Free: 1,024,024 (10%)
+  LT Reserved:    9,216,209 (90%) Газпром only | Free: 1,024,024 (10%)
 
   Exit Domestic:  5,040,256 kWh/h
-  Reserved:       4,536,021 (90%) | Free:   504,235 (10%)
+  LT Reserved:    4,536,230 (90%) Газпром 536,021 + NIS 4,000,209 | Free: 504,026 (10%)
 
-  NOTE: cap_entry (13.75M) != cap_exit_horgos (9.22M)
-        Difference = domestic exit zone (4.54M)
+  RULE: Газпром HORGOS-EXIT = 90% Tech (9,216,209). NOT higher.
+  RULE: ST Free Entry = ST Free Horgoš + ST Free Serbia (±1 rounding)
+  NOTE: cap_entry_LT (13.75M) != cap_exit_horgos_LT (9.22M)
+        Difference = domestic exit zone (GP 536K + NIS 4M)
 ```
 
 ---
@@ -829,8 +833,10 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   11     |  39  | 101   |   1        | Nominations NC, RBP Core
   12     |  19  | 117   |   1        | RBP Secondary, UI, Tests
   13     |  45  | 442   |   2        | Testing infra, CI/CD, coverage 95%
+  14     |  35  | 442   |   0        | Auction Calendar, Available Capacity, EDIGAS v5.1, UAT
+  15     |  16  | 442   |   0        | NC consistency, documentation alignment
   -------|------|-------|------------|----------------------------------
-  TOTAL  | ~501 | 442   |  16        | 93 endpoints, NC 79%, 3 bugs fixed
+  TOTAL  | ~552 | 442   |  16        | 96 endpoints, NC 79%, 3 bugs fixed
 
   Velocity trend (SP/week):
   Sprint 1-4:  ~12 SP/wk (foundation)
@@ -841,12 +847,15 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   Sprint 11:   ~20 SP/wk (nominations+RBP)
   Sprint 12:   ~10 SP/wk (polish)
   Sprint 13:   ~45 SP/1d (testing blitz)
+  Sprint 14:   ~35 SP/1d (auctions+UAT)
+  Sprint 15:   ~16 SP/1d (consistency)
 
   NC Coverage:
   Sprint 7:  ~60% (42/70 articles)
   Sprint 9:  ~68% (48/70)
   Sprint 10: ~73% (51/70)
   Sprint 12: ~79% (55/70)
+  Sprint 14: ~79% (55/70) + NC verified against full PDF (111 pages)
   Sprint 13: ~79% (55/70) + 79 NC compliance regression tests
   Remaining: Art.10 Transfer, Art.11 VTP workflow,
              Art.14 Restrictions, Art.16 Maintenance

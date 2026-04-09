@@ -30,7 +30,7 @@ LEFT JOIN LATERAL (
     END AS reserved_kwh_h
 ) tc ON true
 LEFT JOIN LATERAL (
-  SELECT COALESCE(SUM(capacity_mwh_d * 1000.0 / 24.0), 0) AS contracted_kwh_h
+  SELECT COALESCE(SUM(capacity_kwh_h), 0) AS contracted_kwh_h
   FROM capacity_bookings
   WHERE point = ip.code AND status = 'ACTIVE'
     AND period_from <= CURRENT_DATE AND period_to >= CURRENT_DATE

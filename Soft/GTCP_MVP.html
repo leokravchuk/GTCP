@@ -1031,10 +1031,12 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <table style="width:100%;font-size:11px;border-collapse:collapse">
         <thead><tr style="color:var(--text-muted,#8a9bb0)"><th style="text-align:left;padding:4px">КОД</th><th style="text-align:left;padding:4px">НАИМЕНОВАНИЕ</th><th style="text-align:left;padding:4px">EIC</th><th style="text-align:left;padding:4px">ТИП</th></tr></thead>
         <tbody id="fg-points-tbody">
-          <tr><td style="padding:3px 4px" class="mono">HORGOS-ENTRY</td><td style="padding:3px 4px">Хоргош — ВХОД (из Венгрии)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-HORGOS-ENTR-Y</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
-          <tr style="background:#0d1520"><td style="padding:3px 4px" class="mono">HORGOS-EXIT</td><td style="padding:3px 4px">Хоргош — ВЫХОД (реверс в Венгрию)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-HORGOS-EXIT-Y</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
-          <tr><td style="padding:3px 4px" class="mono">GOSPODJINCI-EXIT</td><td style="padding:3px 4px">Господжинцы — ВЫХОД (на юг)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-GOSPO-EXIT--Y</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
-          <tr style="background:#0d1520"><td style="padding:3px 4px" class="mono">GOSPODJINCI-ENTRY</td><td style="padding:3px 4px">Господжинцы — ВХОД (реверс с юга)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-GOSPO-ENTR-Y</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
+          <tr><td style="padding:3px 4px" class="mono">KIREVO-ENTRY</td><td style="padding:3px 4px">Кирево/Заечар — ВХОД (из Болгарии)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z000000000074K</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
+          <tr style="background:#0d1520"><td style="padding:3px 4px" class="mono">HORGOS-EXIT</td><td style="padding:3px 4px">Хоргош/Кишкундорожма — ВЫХОД (в Венгрию)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z000000000075H</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
+          <tr><td style="padding:3px 4px" class="mono">EXIT-SERBIA</td><td style="padding:3px 4px">Сербия — ВЫХОД (Госпођинци+Панчево+Парачин)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z000000000076F</td><td style="padding:3px 4px"><span style="color:#4caf50">ФИЗИЧ.</span></td></tr>
+          <tr style="background:#0d1520"><td style="padding:3px 4px" class="mono">HORGOS-ENTRY</td><td style="padding:3px 4px">Хоргош — ВХОД (реверс из Венгрии)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z000000000075H</td><td style="padding:3px 4px"><span style="color:#ff9800">CR</span></td></tr>
+          <tr><td style="padding:3px 4px" class="mono">EXIT-SERBIA-ENTRY</td><td style="padding:3px 4px">Сербия — ВХОД (реверс)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z000000000076F</td><td style="padding:3px 4px"><span style="color:#ff9800">CR</span></td></tr>
+          <tr style="background:#0d1520"><td style="padding:3px 4px" class="mono">KIREVO-EXIT</td><td style="padding:3px 4px">Кирево/Заечар — ВЫХОД (реверс в Болгарию)</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z000000000074K</td><td style="padding:3px 4px"><span style="color:#ff9800">CR</span></td></tr>
           <tr><td style="padding:3px 4px" class="mono">VTP-SERBIA</td><td style="padding:3px 4px">VTP Сербия — виртуальная торговая точка</td><td class="mono" style="padding:3px 4px;font-size:10px">21Z-RS-VTP-SERBIA-Y</td><td style="padding:3px 4px"><span style="color:#2196f3">VTP</span></td></tr>
         </tbody>
       </table>
@@ -1199,14 +1201,14 @@ let shippers = [
 ];
 
 let nominations = [
-  { id:'NOM-2026-00001', shipperId:'SHP-002', point:'HORGOS',     dir:'ENTRY', volume:1200, gasDay:'2026-03-23', status:'CONFIRMED', ts:'06:12 CET', user:'dispatcher' },
-  { id:'NOM-2026-00002', shipperId:'SHP-002', point:'GOSPODJINCI', dir:'EXIT',  volume:1200, gasDay:'2026-03-23', status:'CONFIRMED', ts:'06:12 CET', user:'dispatcher' },
-  { id:'NOM-2026-00003', shipperId:'SHP-004', point:'HORGOS',     dir:'ENTRY', volume:900,  gasDay:'2026-03-23', status:'CONFIRMED', ts:'07:30 CET', user:'dispatcher' },
-  { id:'NOM-2026-00004', shipperId:'SHP-004', point:'GOSPODJINCI', dir:'EXIT',  volume:900,  gasDay:'2026-03-23', status:'CONFIRMED', ts:'07:31 CET', user:'dispatcher' },
-  { id:'NOM-2026-00005', shipperId:'SHP-005', point:'HORGOS',     dir:'ENTRY', volume:800,  gasDay:'2026-03-23', status:'PENDING',   ts:'08:44 CET', user:'dispatcher' },
-  { id:'NOM-2026-00006', shipperId:'SHP-005', point:'GOSPODJINCI', dir:'EXIT',  volume:750,  gasDay:'2026-03-23', status:'PENDING',   ts:'08:45 CET', user:'dispatcher' },
-  { id:'NOM-2026-00007', shipperId:'SHP-001', point:'HORGOS',     dir:'ENTRY', volume:2000, gasDay:'2026-03-23', status:'PENDING',   ts:'09:10 CET', user:'dispatcher' },
-  { id:'NOM-2026-00008', shipperId:'SHP-003', point:'HORGOS',     dir:'ENTRY', volume:1500, gasDay:'2026-03-23', status:'RENOM',     ts:'09:44 CET', user:'dispatcher' },
+  { id:'NOM-2026-00001', shipperId:'SHP-002', point:'KIREVO-ENTRY', dir:'ENTRY', volume:1200, gasDay:'2026-03-23', status:'CONFIRMED', ts:'06:12 CET', user:'dispatcher' },
+  { id:'NOM-2026-00002', shipperId:'SHP-002', point:'HORGOS-EXIT',  dir:'EXIT',  volume:1200, gasDay:'2026-03-23', status:'CONFIRMED', ts:'06:12 CET', user:'dispatcher' },
+  { id:'NOM-2026-00003', shipperId:'SHP-004', point:'KIREVO-ENTRY', dir:'ENTRY', volume:900,  gasDay:'2026-03-23', status:'CONFIRMED', ts:'07:30 CET', user:'dispatcher' },
+  { id:'NOM-2026-00004', shipperId:'SHP-004', point:'HORGOS-EXIT',  dir:'EXIT',  volume:900,  gasDay:'2026-03-23', status:'CONFIRMED', ts:'07:31 CET', user:'dispatcher' },
+  { id:'NOM-2026-00005', shipperId:'SHP-005', point:'KIREVO-ENTRY', dir:'ENTRY', volume:800,  gasDay:'2026-03-23', status:'PENDING',   ts:'08:44 CET', user:'dispatcher' },
+  { id:'NOM-2026-00006', shipperId:'SHP-005', point:'EXIT-SERBIA',  dir:'EXIT',  volume:750,  gasDay:'2026-03-23', status:'PENDING',   ts:'08:45 CET', user:'dispatcher' },
+  { id:'NOM-2026-00007', shipperId:'SHP-001', point:'KIREVO-ENTRY', dir:'ENTRY', volume:2000, gasDay:'2026-03-23', status:'PENDING',   ts:'09:10 CET', user:'dispatcher' },
+  { id:'NOM-2026-00008', shipperId:'SHP-003', point:'KIREVO-ENTRY', dir:'ENTRY', volume:1500, gasDay:'2026-03-23', status:'RENOM',     ts:'09:44 CET', user:'dispatcher' },
 ];
 
 let invoices = [
@@ -1254,22 +1256,22 @@ const FLOW_DIR_DESC = {
 };
 
 let contracts = [
-  // id, contractType, flowDir, shipperId (demo=party name), start, end, capacityKwhDay, tariffEntry, tariffExit, status
-  { id:'GTA-2024-001', contractType:'TSA_FIRM_ANNUAL',    flowDir:'GOSPODJINCI_HORGOS', party:'Gazprom Export',    start:'2024-01-01', end:'2026-12-31', capacityKwhDay:60483072, tariffEntry:0.004246, tariffExit:0.004246, status:'ACTIVE' },
-  { id:'GTA-2024-002', contractType:'TSA_FIRM_ANNUAL',    flowDir:'GOSPODJINCI_HORGOS', party:'Repower Gas',       start:'2024-03-01', end:'2026-06-30', capacityKwhDay:43200000, tariffEntry:0.004246, tariffExit:0.004246, status:'ACTIVE' },
-  { id:'GTA-2023-003', contractType:'TSA_FIRM_ANNUAL',    flowDir:'GOSPODJINCI_HORGOS', party:'MET International', start:'2023-07-01', end:'2026-04-15', capacityKwhDay:52800000, tariffEntry:0.004246, tariffExit:0.004246, status:'ACTIVE' },
-  { id:'GTA-2024-004', contractType:'TSA_FIRM_QUARTERLY', flowDir:'GOSPODJINCI_HORGOS', party:'Axpo Solutions',    start:'2024-01-01', end:'2027-12-31', capacityKwhDay:36000000, tariffEntry:0.004246, tariffExit:0.004246, status:'ACTIVE' },
-  { id:'GTA-2024-005', contractType:'TSA_COMMERCIAL_REVERSE', flowDir:'HORGOS_GOSPODJINCI', party:'Energo-Pro',   start:'2024-06-01', end:'2026-05-31', capacityKwhDay:28800000, tariffEntry:0.002500, tariffExit:0.000000, status:'ACTIVE' },
+  // id, contractType, flowDir (NC §2.1), party, start, end, capacityKwhDay, tariffEntry (AERS 05-145), tariffExit, status
+  { id:'GTA-2024-001', contractType:'TSA_FIRM_ANNUAL',    flowDir:'KIREVO_HORGOS',       party:'Gazprom Export',    start:'2024-01-01', end:'2026-12-31', capacityKwhDay:60483072, tariffEntry:0.016438, tariffExit:0.018767, status:'ACTIVE' },
+  { id:'GTA-2024-002', contractType:'TSA_FIRM_ANNUAL',    flowDir:'KIREVO_HORGOS',       party:'Repower Gas',       start:'2024-03-01', end:'2026-06-30', capacityKwhDay:43200000, tariffEntry:0.016438, tariffExit:0.018767, status:'ACTIVE' },
+  { id:'GTA-2023-003', contractType:'TSA_FIRM_ANNUAL',    flowDir:'KIREVO_EXIT_SERBIA',   party:'MET International', start:'2023-07-01', end:'2026-04-15', capacityKwhDay:52800000, tariffEntry:0.016438, tariffExit:0.011479, status:'ACTIVE' },
+  { id:'GTA-2024-004', contractType:'TSA_FIRM_QUARTERLY', flowDir:'KIREVO_HORGOS',       party:'Axpo Solutions',    start:'2024-01-01', end:'2027-12-31', capacityKwhDay:36000000, tariffEntry:0.016438, tariffExit:0.018767, status:'ACTIVE' },
+  { id:'GTA-2024-005', contractType:'TSA_COMMERCIAL_REVERSE', flowDir:'HORGOS_KIREVO',   party:'Energo-Pro',        start:'2024-06-01', end:'2026-05-31', capacityKwhDay:28800000, tariffEntry:0.008904, tariffExit:0.007808, status:'ACTIVE' },
 ];
 
 let capacityBookings = [
-  { id:'CAP-001', party:'Gazprom Export',    point:'HORGOS',      type:'FIRM', from:'2026-01-01', to:'2026-12-31', volume:2500 },
-  { id:'CAP-002', party:'Gazprom Export',    point:'GOSPODJINCI', type:'FIRM', from:'2026-01-01', to:'2026-12-31', volume:2500 },
-  { id:'CAP-003', party:'Repower Gas',       point:'HORGOS',      type:'FIRM', from:'2026-01-01', to:'2026-06-30', volume:1800 },
-  { id:'CAP-004', party:'Repower Gas',       point:'GOSPODJINCI', type:'FIRM', from:'2026-01-01', to:'2026-06-30', volume:1800 },
-  { id:'CAP-005', party:'MET International', point:'HORGOS',      type:'INT',  from:'2026-01-01', to:'2026-04-15', volume:2200 },
-  { id:'CAP-006', party:'Axpo Solutions',    point:'HORGOS',      type:'FIRM', from:'2026-01-01', to:'2027-12-31', volume:1500 },
-  { id:'CAP-007', party:'Energo-Pro',        point:'HORGOS',      type:'INT',  from:'2026-01-01', to:'2026-05-31', volume:1200 },
+  { id:'CAP-001', party:'Gazprom Export',    point:'KIREVO-ENTRY', direction:'ENTRY', type:'FIRM', category:'LONG_TERM', from:'2026-01-01', to:'2026-12-31', volume:2500 },
+  { id:'CAP-002', party:'Gazprom Export',    point:'HORGOS-EXIT',  direction:'EXIT',  type:'FIRM', category:'LONG_TERM', from:'2026-01-01', to:'2026-12-31', volume:2500 },
+  { id:'CAP-003', party:'Repower Gas',       point:'KIREVO-ENTRY', direction:'ENTRY', type:'FIRM', category:'LONG_TERM', from:'2026-01-01', to:'2026-06-30', volume:1800 },
+  { id:'CAP-004', party:'Repower Gas',       point:'HORGOS-EXIT',  direction:'EXIT',  type:'FIRM', category:'LONG_TERM', from:'2026-01-01', to:'2026-06-30', volume:1800 },
+  { id:'CAP-005', party:'MET International', point:'KIREVO-ENTRY', direction:'ENTRY', type:'INT',  category:'SHORT_TERM', from:'2026-01-01', to:'2026-04-15', volume:2200 },
+  { id:'CAP-006', party:'Axpo Solutions',    point:'HORGOS-EXIT',  direction:'EXIT',  type:'FIRM', category:'SHORT_TERM', from:'2026-01-01', to:'2027-12-31', volume:1500 },
+  { id:'CAP-007', party:'Energo-Pro',        point:'EXIT-SERBIA',  direction:'EXIT',  type:'INT',  category:'SHORT_TERM', from:'2026-01-01', to:'2026-05-31', volume:1200 },
 ];
 
 let mcHistory = [];
@@ -1597,18 +1599,35 @@ async function _refreshFromBackend() {
     // ── Contracts ───────────────────────────────────────────────────────────
     const { data: cData } = await API.contracts.list({ limit: 100 });
     if (cData && cData.length) {
-      contracts = cData.map(c => ({
-        id:              c.contract_no,
-        contractType:    c.contract_type    || 'TSA_FIRM_ANNUAL',
-        flowDir:         c.flow_direction   || 'KIREVO_HORGOS',
-        party:           c.shipper_name     || c.shipper_code || '?',
-        start:           c.start_date?.slice(0,10)  || '',
-        end:             c.end_date?.slice(0,10)    || '',
-        capacityKwhDay:  parseFloat(c.capacity_kwh_day)         || 0,
-        tariffEntry:     parseFloat(c.tariff_entry_eur_kwh_day) || 0,
-        tariffExit:      parseFloat(c.tariff_exit_eur_kwh_day)  || 0,
-        status:          c.status || 'ACTIVE',
-      }));
+      // AERS 05-145 annual tariffs by IP (for credit calc NC Art.5.1.5)
+      const AERS_T = { 'KIREVO-ENTRY': 6.00, 'HORGOS-EXIT': 6.85, 'EXIT-SERBIA': 4.19 };
+      const FLOW_PTS = {
+        KIREVO_HORGOS: { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' },
+        KIREVO_EXIT_SERBIA: { entry: 'KIREVO-ENTRY', exit: 'EXIT-SERBIA' },
+        KIREVO_HORGOS_AND_SERBIA: { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' },
+        HORGOS_KIREVO: { entry: 'HORGOS-ENTRY', exit: 'KIREVO-EXIT' },
+        EXIT_SERBIA_KIREVO: { entry: 'EXIT-SERBIA-ENTRY', exit: 'KIREVO-EXIT' },
+      };
+      contracts = cData.map(c => {
+        const pts = FLOW_PTS[c.flow_direction] || { entry: 'KIREVO-ENTRY', exit: 'HORGOS-EXIT' };
+        const capE = parseFloat(c.cap_entry_kwh_h || 0);
+        const capX = parseFloat(c.cap_exit_kwh_h || 0);
+        return {
+          id:              c.contract_no,
+          shipperId:       c.shipper_id,
+          contractType:    c.contract_type    || 'TSA_FIRM_ANNUAL',
+          flowDir:         c.flow_direction   || 'KIREVO_HORGOS',
+          party:           c.shipper_name     || c.shipper_code || '?',
+          start:           c.start_date?.slice(0,10)  || '',
+          end:             c.end_date?.slice(0,10)    || '',
+          capEntryKwhH:    capE,
+          capExitKwhH:     capX,
+          tariffEntry:     AERS_T[pts.entry] || 6.00,
+          tariffExit:      AERS_T[pts.exit]  || 6.85,
+          capacityKwhDay:  parseFloat(c.capacity_kwh_day) || (capE > 0 ? capE * 24 / 1000 : 0),
+          status:          c.status || 'ACTIVE',
+        };
+      });
     }
 
     // ── Credits: instruments per shipper ─────────────────────────────────
@@ -3152,7 +3171,7 @@ async function renderGasQuality() {
   if (data) {
     const rows = Array.isArray(data) ? data : (data.data || []);
     tbody.innerHTML = rows.map(q =>
-      `<tr><td class="mono fw7">${q.point_code||q.point||''}</td><td class="mono text-dim">${q.period||q.month||''}</td><td class="mono">${Number(q.gcv||q.gcv_kwh_nm3||0).toFixed(3)}</td><td class="mono">${Number(q.wobbe||q.wobbe_index||0).toFixed(3)}</td><td class="mono">${Number(q.ch4||q.ch4_pct||0).toFixed(2)}</td><td class="mono">${Number(q.h2s||q.h2s_mg_m3||0).toFixed(2)}</td><td class="mono">${Number(q.density||q.density_kg_m3||0).toFixed(4)}</td></tr>`
+      `<tr><td class="mono fw7">${q.point_code||q.point||''}</td><td class="mono text-dim">${q.period||q.month||''}</td><td class="mono">${Number(q.gcv||q.gcv_kwh_nm3||0).toFixed(3)}</td><td class="mono">${Number(q.wobbe||q.wobbe_index||0).toFixed(3)}</td><td class="mono">${Number(q.ch4||q.ch4_pct||0).toFixed(2)}</td><td class="mono">${Number(q.h2s||q.h2s_mg_nm3||q.h2s_mg_m3||0).toFixed(2)}</td><td class="mono">${Number(q.density||q.density_kg_m3||0).toFixed(4)}</td></tr>`
     ).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:20px;">Нет данных о качестве газа</td></tr>';
   }
 }
@@ -3447,33 +3466,40 @@ function isRatingExempt(r) {
 // Multiplier: Monthly/Daily/WD = 100%, Quarterly = 2/3, Yearly = 2/12
 const MIN_CREDIT_MULT = { ANNUAL:2/12, LONG_TERM:2/12, QUARTERLY:2/3, MONTHLY:1, DAILY:1, WITHIN_DAY:1 };
 function calcMinCreditSize(shipperId, product) {
-  // Find contract for this shipper to get capacity × tariff
-  const ss = shippers.find(x => x.id === shipperId || x.code === shipperId);
-  const mId = ss ? ss.id : shipperId;
-  const mCode = ss ? ss.code : shipperId;
-  const c = contracts.find(ct => ct.shipperId === mId || ct.shipperId === mCode || ct.party?.includes(mCode));
-  if (c && c.capacityKwhDay > 0) {
-    // Legacy: capacity_kwh_day × tariff
-    const fee = c.capacityKwhDay * (c.tariffEntry + c.tariffExit) * 365;
-    return fee * (MIN_CREDIT_MULT[product] || 2/12);
-  }
-  // From bookings: sum capacity × AERS tariff
-  const TARIFF = { 'KIREVO-ENTRY': 6.00, 'HORGOS-EXIT': 6.85, 'EXIT-SERBIA': 4.19 };
-  // Match by UUID, code, or party name
+  // NC Art.5.1.5: Min CS = Annual Transmission Fee × Multiplier
+  // Annual Fee = Σ (cap_entry × tariff_entry + cap_exit × tariff_exit) per contract
+  // Multiplier: Yearly=2/12, Quarterly=2/3, Monthly/Daily/WD=1 month=1/12 of annual
   const s = shippers.find(x => x.id === shipperId || x.code === shipperId);
   const matchId = s ? s.id : shipperId;
-  const matchCode = s ? s.code : shipperId;
+
+  // Sum annual fee from all contracts for this shipper
+  const shipperContracts = contracts.filter(ct =>
+    ct.shipperId === matchId || ct.party?.includes(s?.code)
+  );
+  if (shipperContracts.length) {
+    const annualFee = shipperContracts.reduce((sum, c) => {
+      return sum + (c.capEntryKwhH || 0) * (c.tariffEntry || 0)
+                 + (c.capExitKwhH  || 0) * (c.tariffExit  || 0);
+    }, 0);
+    // Multiplier converts annual fee to min credit for product type
+    // Monthly: 100% of 1 month fee = annualFee / 12
+    // Quarterly: 2/3 of quarterly fee = annualFee × 2/3 / 4 ≈ annualFee / 6
+    // Yearly: 2/12 of annual fee
+    const MULT = { ANNUAL:2/12, LONG_TERM:2/12, QUARTERLY:2/12*2/3*12/1, MONTHLY:1/12, DAILY:1/365, WITHIN_DAY:1/365 };
+    return annualFee * (MULT[product] || 1/12);
+  }
+
+  // Fallback: from bookings
+  const TARIFF = { 'KIREVO-ENTRY': 6.00, 'HORGOS-EXIT': 6.85, 'EXIT-SERBIA': 4.19 };
   const shipperBookings = capacityBookings.filter(b =>
-    (b.shipperId === matchId || b.shipperId === matchCode || b.party?.includes(matchCode)) && b.direction
+    (b.shipperId === matchId || b.party?.includes(s?.code)) && b.direction
   );
   if (shipperBookings.length) {
-    const annualFee = shipperBookings.reduce((sum, b) => {
-      const tariff = TARIFF[b.point] || 6.00;
-      return sum + (b.volume || 0) * tariff;
-    }, 0);
-    return annualFee * (MIN_CREDIT_MULT[product] || 2/12);
+    const annualFee = shipperBookings.reduce((sum, b) => sum + (b.volume || 0) * (TARIFF[b.point] || 6.00), 0);
+    const MULT = { ANNUAL:2/12, LONG_TERM:2/12, MONTHLY:1/12, DAILY:1/365, WITHIN_DAY:1/365 };
+    return annualFee * (MULT[product] || 1/12);
   }
-  return 0; // No contract/bookings → no min credit
+  return 0;
 }
 
 // Credit tab switch

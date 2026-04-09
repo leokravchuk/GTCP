@@ -135,7 +135,7 @@ router.post(
       // Lookup contracted capacity from capacity_bookings + contracts
       try {
         const { rows: bk } = await db.query(
-          `SELECT COALESCE(SUM(capacity_mwh_d * 1000.0 / 24.0), 0) AS contracted_kwh_h
+          `SELECT COALESCE(SUM(capacity_kwh_h), 0) AS contracted_kwh_h
            FROM capacity_bookings
            WHERE shipper_id = $1 AND point = $2 AND direction = $3
              AND status = 'ACTIVE'
@@ -168,7 +168,7 @@ router.post(
         // AND total nominations < Total Contracted (spare capacity exists)
         try {
           const { rows: totalCap } = await db.query(
-            `SELECT COALESCE(SUM(capacity_mwh_d * 1000.0 / 24.0), 0) AS total
+            `SELECT COALESCE(SUM(capacity_kwh_h), 0) AS total
              FROM capacity_bookings WHERE point = $1 AND direction = $2
                AND status = 'ACTIVE' AND period_from <= $3 AND period_to >= $3`,
             [point, direction, gasDay]
@@ -450,7 +450,7 @@ router.post(
     try {
       // 1. Check shipper's contracted capacity at this point
       const { rows: bookings } = await db.query(
-        `SELECT COALESCE(SUM(capacity_mwh_d), 0) AS contracted
+        `SELECT COALESCE(SUM(capacity_kwh_h), 0) AS contracted
          FROM capacity_bookings
          WHERE point = $1 AND direction = $2 AND status = 'ACTIVE'
            AND period_from <= $3 AND period_to >= $3`,
@@ -486,7 +486,7 @@ router.post(
 
       // 3. Get shipper's own contracted capacity
       const { rows: myBookings } = await db.query(
-        `SELECT COALESCE(SUM(capacity_mwh_d), 0) AS my_contracted
+        `SELECT COALESCE(SUM(capacity_kwh_h), 0) AS my_contracted
          FROM capacity_bookings
          WHERE shipper_id = $1 AND point = $2 AND direction = $3 AND status = 'ACTIVE'
            AND period_from <= $4 AND period_to >= $4`,
