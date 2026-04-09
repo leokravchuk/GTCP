@@ -618,7 +618,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <div class="section-head"><span class="section-title">РЕЕСТР ДОГОВОРОВ GTA</span></div>
           <div class="table-wrap">
             <table id="t-contracts">
-              <thead><tr><th>НОМЕР GTA</th><th>ТИП ДОГОВОРА</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>НАПРАВЛЕНИЕ</th><th>МОЩНОСТЬ кВт/ч/д</th><th>ТАРИФ вх+вых</th><th>ОКОНЧАНИЕ</th><th>ОСТАЛОСЬ</th><th>СТАТУС</th></tr></thead>
+              <thead><tr><th>НОМЕР GTA</th><th>ТИП ДОГОВОРА</th><th>ГРУЗООТПРАВИТЕЛЬ</th><th>НАПРАВЛЕНИЕ</th><th>МОЩНОСТЬ Entry/Exit кВт·ч/ч</th><th>ТАРИФ вх/вых EUR</th><th>ОКОНЧАНИЕ</th><th>ОСТАЛОСЬ</th><th>СТАТУС</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -3197,10 +3197,9 @@ function renderContracts() {
     const dCls = d<0?'text-red':d<30?'text-yellow':'';
     const typeLabel = CONTRACT_TYPE_LABELS[c.contractType] || c.contractType || '—';
     const dirLabel  = FLOW_DIR_LABELS[c.flowDir] || c.flowDir || '—';
-    const capFmt    = c.capacityKwhDay ? `${(c.capacityKwhDay/1000000).toFixed(1)} ТВт` : '—';
-    const tariffFmt = (c.tariffEntry||0) + (c.tariffExit||0) > 0
-      ? `${((c.tariffEntry||0)+(c.tariffExit||0)).toFixed(6)}`
-      : '—';
+    const capE = c.capEntryKwhH || 0, capX = c.capExitKwhH || 0;
+    const capFmt = capE > 0 ? `${fmt(capE)} / ${fmt(capX)}` : (c.capacityKwhDay ? `${(c.capacityKwhDay/1000000).toFixed(1)} ТВт` : '—');
+    const tariffFmt = (c.tariffEntry||0) > 0 ? `${c.tariffEntry.toFixed(2)} / ${c.tariffExit.toFixed(2)}` : '—';
     const dirBadge = c.flowDir==='HORGOS_GOSPODJINCI'
       ? `<span style="color:var(--yellow);font-size:10px;">${dirLabel}</span>`
       : `<span style="color:var(--accent);font-size:10px;">${dirLabel}</span>`;
