@@ -1,13 +1,46 @@
 # GTCP — Action Plan
 **Текущие задачи, приоритеты и решения · Living Document**
 
-> Последнее обновление: 10.04.2026 · Sprint 16 в процессе · Версия 17.1
+> Последнее обновление: 10.04.2026 · Sprint 16 закрыт (rescoped) · Sprint 17 запланирован · Версия 17.3
 
 ---
 
-## 📋 Sprint 16 · NC Compliance Push + Data Integrity + Analytics (06–19.04.2026)
+## 📋 Sprint 17 · NC Art.13 + Analytics + Sprint 16 Debt + Diploma (13–24.04.2026)
 
-> Детали: `reports/SPRINT_16_PLAN.md`
+> Детали: [`SPRINT_17_PLAN.md`](SPRINT_17_PLAN.md) · Target: 26 SP (+2 резерв)
+
+### 🔴 P0 — Sprint 16 Debt
+
+- [ ] **US-1701** · Sprint 16 Test Coverage (DEBT-01) — ≥18 новых тестов: OBA integration (8), capacity_kwh_h dbspec (6), shipper balance (4) (4 SP)
+- [ ] **US-1702** · Endpoint Count Audit (DEBT-02) — сверка router.*/app.* с openapi.yaml, единое число в CLAUDE.md + Artifacts + UserGuide, `npm run count-endpoints` script (2 SP)
+
+### 🔴 P0 — NC Art.13 Matching Completion
+
+- [ ] **US-1703** · Adjacent TSO Auto-Matching — `matchWithAdjacentTso()` + mock FGSZ/Bulgartransgaz/TRANSPORTGAS SRBIJA + Lesser Rule + migration 019 + `POST /nominations/:id/match-adjacent` + статус `MATCHED_ADJACENT` + ≥12 тестов (5 SP) *(перенос US-1601)*
+- [ ] **US-1704** · Double-Sided Matching Result — `GET /nominations/:id/matching-result` + UI panel в nomination detail modal + ≥6 тестов (3 SP) *(перенос US-1602)*
+
+### 🟡 P1 — Analytics & Export
+
+- [ ] **US-1705** · Analytics Dashboard — новый router `analytics.js`, endpoints `/volumes` `/revenue` `/utilization`, Chart.js via CDN, Analytics tab в GTCP_MVP.html, Line + Bar + Gauge, period/shipper filters, ≥6 тестов (5 SP) *(перенос US-1604)*
+- [ ] **US-1706** · Export to CSV — `/billing/export` `/contracts/export` `/nominations/export`, кнопки Export в UI, csv-stringify streaming, ≥5 тестов (3 SP) *(перенос US-1605, упрощено: CSV only, xlsx → Sprint 18)*
+
+### 🟡 P1 — Documentation
+
+- [ ] **US-1707** · UserGuide v3.4 Final — секции Sprint 15–17, новые endpoints (Analytics/Export/Matching/OBA), architecture decisions (Art.12.3 binding, capacity_kwh_h), pandoc `.docx` (4 SP) *(перенос US-1607)*
+
+### ❌ Отменено / отложено из Sprint 16
+
+- ~~**US-1603** · Shipper Imbalance Charge~~ — **отменено навсегда**, противоречит NC Art.12.3 (shippers always balanced). Замещено US-1603b OBA в Sprint 16.
+- **US-1606** k6 Load Testing → Sprint 18 (не критично для диплома, нет VPS)
+- **US-1609** VTP Basic (NC Art.11) → Sprint 18+ (P2 stretch, полный эпик)
+- **US-1605 Excel/xlsx** → Sprint 18, в Sprint 17 только CSV (US-1706)
+
+---
+
+## 📋 Sprint 16 · NC Art.15 Re-interpretation + capacity_kwh_h + UI Cleanup (06–10.04.2026) · ✅ ЗАКРЫТ (RESCOPED)
+
+> Детали: [`SPRINT_16_PLAN.md`](SPRINT_16_PLAN.md) (устарел к 10.04) · Отчёт: [`SPRINT_16_REPORT.md`](SPRINT_16_REPORT.md)
+> **Факт:** ~13/35 SP (37%). Pivot на Sprint 3-м дне после пересмотра NC Art.12.3.
 
 ### ✅ P0 — Выполнено (09.04.2026)
 
@@ -25,24 +58,32 @@
 - [x] **US-1621** · Billing table: totalAmount + lineCount + dueDate (instead of volume*tariff=0) (1 SP) ✅ (10.04)
 - [x] **US-1622** · Contracts table: cap_entry/cap_exit kWh/h + separate AERS tariffs (1 SP) ✅ (10.04)
 - [x] **US-1623** · Data cleanup: delete 7 stale invoices + 3 orphan ST contracts + generate 8 monthly Jan-Apr 2026 (3 SP) ✅ (10.04)
+- [x] **US-1603b** · OBA Settlement NC Art.15 — migration 018, 3 endpoints, Balance UI section, nominations allocated=matched enforcement (5 SP) ✅ (10.04)
+- [x] **US-1608** · Artifacts + CLAUDE.md update — Sprint 16 state + endpoint count 96→99 + binding rules (2 SP) ✅ (10.04)
 
-### 🔴 P0 — Критический путь
+### ❌ Не выполнено → перенесено в Sprint 17
 
-- [ ] **US-1601** · Adjacent TSO Auto-Matching (NC Art.13.5) — matchWithAdjacentTso(), Lesser Rule, mock FGSZ/BulgarTransgaz (5 SP)
-- [ ] **US-1602** · Double-Sided Nomination Matching Result (NC Art.13.3) — matching-result endpoint + UI panel (3 SP)
-- [ ] **US-1603** · Imbalance Charge Calculation (NC Art.15.3) — calcImbalanceCharge(), migration 016: daily_imbalances, balance endpoints (5 SP)
+- [ ] ~~**US-1601**~~ → **US-1703** · Adjacent TSO Auto-Matching (5 SP)
+- [ ] ~~**US-1602**~~ → **US-1704** · Double-Sided Matching Result (3 SP)
+- ~~**US-1603**~~ · **ОТМЕНЕНО НАВСЕГДА** — противоречит NC Art.12.3 (shippers always balanced). Замещено US-1603b.
+- [ ] ~~**US-1604**~~ → **US-1705** · Analytics Dashboard (5 SP)
+- [ ] ~~**US-1605**~~ → **US-1706** · Export CSV (3 SP, упрощено из 4 SP)
+- [ ] ~~**US-1606**~~ → Sprint 18 · k6 Load Testing
+- [ ] ~~**US-1607**~~ → **US-1707** · UserGuide v3.4 (4 SP)
+- [ ] ~~**US-1609**~~ → Sprint 18+ · VTP Basic
 
-### 🟡 P1 — Важно
+### ⚠️ Technical Debt из Sprint 16
 
-- [ ] **US-1604** · Analytics Dashboard — графики объёмов, revenue по шипперам, утилизация (Chart.js) (5 SP)
-- [ ] **US-1605** · Export to Excel/CSV — Billing, Contracts, Nominations (SheetJS) (4 SP)
-- [ ] **US-1606** · k6 Load Testing — ≥100 RPS, p95<500ms, отчёт (3 SP)
-- [ ] **US-1607** · UserGuide v3.4 — финальная версия для диплома (.md + .docx) (4 SP)
-- [x] **US-1608** · Artifacts + CLAUDE.md update — Sprint 16 state (2 SP) ✅
+- [ ] **DEBT-01** · Нет тестов на OBA endpoints и capacity_kwh_h migration → US-1701 в Sprint 17
+- [ ] **DEBT-02** · Endpoint count drift: docs `99`, grep `~84` → US-1702 в Sprint 17
 
-### 🟢 P2 — Перенос если нет времени
+### 🎯 Sprint 16 — Выводы (retro)
 
-- [ ] **US-1609** · VTP Basic Implementation (NC Art.11) — VTP trades, balancing impact (4 SP)
+**Что прошло хорошо:** Pivot на NC Art.12.3 binding rule поймал архитектурную ошибку до implementation. Migration 017 устранила 12 runtime conversions одним заходом + поймала BUG-04/05.
+
+**Что можно улучшить:** Plan 35 SP был слишком амбициозным; тесты отстают; NC re-interpretation должен был произойти **до** sprint planning, а не в середине.
+
+**Действия:** Fresh NC review перед Sprint 17 Planning. Test debt — P0 в Sprint 17.
 
 ---
 

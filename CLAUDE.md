@@ -66,7 +66,7 @@ Before writing or changing any code in the following areas, verify against the N
 | Interruption penalty | AERS 05-145 item 3 | Interruptible daily/within-day interruption fee = value × **3** |
 | Over-Nomination | NC Art. 12.8 | Within-Day Interruptible via over-nomination when Firm fully contracted |
 | Invoice due date | NC Art. 20.4.1 | Payment by **20th of month** in which invoice received (issued by 5th, Art. 20.3.1) |
-| Balancing | NC Art. 15 | Imbalance Charge per Gas Day |
+| Balancing | NC Art. 15 | **Shippers always balanced** (nominated=allocated, Art.12.3). OBA TSO-to-TSO separate. |
 | Secondary trading | NC Art. 10 | Surrender / UIOLI / RBP |
 | Gas quality | NC Art. 17 | GCV, Wobbe index, H2S limits |
 | Nominations format | NC Art. 12.1 | kWh, equally allocated to hours |
@@ -119,7 +119,8 @@ Implementation: Option A (real-time SQL on every request).
 - `GET /auctions/calendar/grid` — Product × Month grid for Gas Year (Yearly/Quarterly/Monthly status per month)
 - `GET /auctions/calendar/days?year=YYYY&month=M` — Day-centric calendar: DB auctions (Y/Q/M) + on-the-fly Daily/WD per day
 
-Total API endpoints: **96** (was 93 at Sprint 12)
+Total API endpoints: **99** (Sprint 16: +3 OBA endpoints; was 96 at Sprint 14, 93 at Sprint 12)
+> ⚠️ Docs count (99) differs from actual grep count (~84). Endpoint audit deferred to Sprint 17 (DEBT-02).
 
 **Sprint 16 capacity_kwh_h (09.04.2026):**
 - Migration 017: `capacity_bookings.capacity_kwh_h` — native kWh/h column (АЕРС-exact)
@@ -127,6 +128,38 @@ Total API endpoints: **96** (was 93 at Sprint 12)
 - `capacity_mwh_d` kept for backward compatibility (deprecated, do not use in new code)
 - Bug fixed: nominations.js over-nomination compared MWh/d with kWh/h (BUG-04/05)
 - Migrations: 000–017
+
+**Sprint 16 OBA Settlement (10.04.2026) — Binding Rule for Art.15:**
+
+Balancing (NC Art.15) is split into two separate scopes:
+
+### 1. Shipper-level (GTCP scope, always balanced)
+- **Rule:** `nominated_kwh_h = allocated_kwh_h = matched_kwh_h` (NC Art.12.3)
+- Enforced in `nominations.js` matching: `UPDATE SET allocated_kwh_h = matched_kwh_h`
+- **Shippers are NEVER charged** for imbalance. No `BALANCING_NEUTRALITY` line in invoices.
+- No `daily_imbalances` table per shipper. Every shipper Δ=0 by design.
+
+### 2. TSO-to-TSO level (OBA, read-only informational)
+- **OBA** = Operational Balancing Agreement between adjacent TSOs
+- Covers: **metering accuracy** (±0.2%), **line pack** changes, **GCV corrections**
+- Adjacent TSOs at each IP:
+  - KIREVO-ENTRY ↔ **Bulgartransgaz** (Bulgaria)
+  - HORGOS-EXIT ↔ **FGSZ** (Hungary)
+  - EXIT-SERBIA ↔ **TRANSPORTGAS SRBIJA** (domestic)
+- Table: `oba_daily_imbalances` (migration 018)
+- **Scope for GTCP: read-only view** — no calculation, no settlement logic
+- Retention: **12-month rolling window** (`WHERE gas_day >= CURRENT_DATE - INTERVAL '12 months'`)
+- Metering variance in seed: **±0.2%** (typical metering accuracy)
+- Imbalance breakdown in seed: 70% metering / 20% linepack / 10% GCV
+- Status lifecycle: PENDING (0-2d) → RECONCILED (3-7d) → SETTLED (>7d)
+- Endpoints: `GET /balance/oba/daily|monthly/:month|summary`
+- UI: Balance page → OBA Settlement section (read-only)
+
+**DO NOT add:**
+- Shipper imbalance charge calculation
+- `BALANCING_NEUTRALITY` line item in invoices
+- `daily_imbalances` per-shipper table
+- Settlement logic (OBA is external process)
 
 **Sprint 16 UI cleanup (10.04.2026):**
 - Billing tariff SQL: `tariff_eur` → `price_eur` (reserve_prices column), contract_type mapping FIRM→FIRM_YEARLY

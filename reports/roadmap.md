@@ -1,7 +1,7 @@
 # GTCP — Project Roadmap
 **Gas Trading & Commercial Platform · Full Delivery Plan**
 
-> Последнее обновление: 10.04.2026 · Версия 12.1 · Sprint 16 в процессе (18/43 SP)
+> Последнее обновление: 10.04.2026 · Версия 12.3 · Sprint 16 ЗАКРЫТ (rescoped, ~13/35 SP) · Sprint 17 запланирован (26 SP)
 
 ---
 
@@ -425,8 +425,9 @@ Jan–Feb 2026  Mar 2026              Mar 2026                   Mar 2026       
 | Phase 6 · Testing | Sprint 13 | 30.03.2026 | ~45 SP | ✅ ЗАВЕРШЕНО (442 tests, CI/CD, PostgreSQL) |
 | Phase 7 · Auction Calendar | Sprint 14 | 31.03.2026 | ~35 SP | ✅ ЗАВЕРШЕНО (Auction Calendar + UAT) |
 | Phase 8 · NC Consistency | Sprint 15 | 03.04.2026 | ~16 SP | ✅ ЗАВЕРШЕНО (NC consistency + docs alignment) |
-| **Phase 9 · NC Push + Analytics** | **Sprint 16** | **06.04.2026** | **35 SP** | **🔄 В РАБОТЕ (NC Art.13+15 + Analytics + Diploma)** |
-| **ИТОГО** | **16 спринтов** | **Янв–Июн 2026** | **~587 SP** | |
+| Phase 9 · NC Art.15 + capacity_kwh_h | Sprint 16 | 06–10.04.2026 | ~13 / 35 SP | ✅ ЗАКРЫТО (rescoped): Art.15 re-interpreted, migration 017/018, OBA, UI cleanup |
+| **Phase 10 · NC Art.13 + Analytics + Diploma** | **Sprint 17** | **13–24.04.2026** | **26 SP** | **📋 ЗАПЛАНИРОВАН (Matching + Analytics + Export + Sprint 16 debt + UserGuide v3.4)** |
+| **ИТОГО** | **17 спринтов** | **Янв–Июн 2026** | **~591 SP** (Sprint 16 делiver ~13) | |
 
 ---
 
@@ -536,9 +537,10 @@ C:\Users\leokr\ETRM\
 | Sprint 13 | 30.03.2026 | 45 | **~45** | ✅ Testing 442/442 |
 | Sprint 14 | 31.03.2026 | 35 | **~35** | ✅ Auction Calendar + UAT |
 | Sprint 15 | 03.04.2026 | 16 | **~16** | ✅ NC consistency + docs |
-| Sprint 16 | 06–19.04.2026 | 43 | **~18** (WIP) | 🔄 capacity_kwh_h ✅ + UI cleanup ✅ + NC Art.13+15 |
+| Sprint 16 | 06–10.04.2026 | 35 | **~13** | ✅ ЗАКРЫТО (rescoped): capacity_kwh_h + OBA Art.15 + UI cleanup. Pivot на NC Art.12.3 binding rule. US-1601/1602/1604/1605/1607 → Sprint 17. US-1603 отменено навсегда. |
+| Sprint 17 | 13–24.04.2026 | 26 | **0** (plan) | 📋 PLANNED: NC Art.13 (Matching), Analytics, Export CSV, Sprint 16 test debt, UserGuide v3.4 |
 ────────────────────────────────────────────────────────────────
-Total: ~570 SP delivered (552+18) + 25 SP remaining · Migrations: 17 (000-017) · Tests: 442/442 · NC: 79% → 84% → target 87%
+Total: ~565 SP delivered (552+13) + 26 SP planned Sprint 17 · Migrations: 18 (000–018), +1 в Sprint 17 (019) · Tests: 442/442 (Sprint 16 debt: +18 в Sprint 17) · NC: 79% (Art.15 sub-coverage 50→83%; Art.13 → 100% в Sprint 17) · Endpoints: 99 docs / ~84 actual (DEBT-02 в Sprint 17)
 
 ---
 
@@ -548,3 +550,4 @@ Total: ~570 SP delivered (552+18) + 25 SP remaining · Migrations: 17 (000-017) 
 *26.03.2026 v5.0 — Sprint 7 завершён досрочно (~21 SP). ✅ Migration 009 NC route alignment · ✅ ncRoutes.js (7 маршрутов, 6 IP-кодов) · ✅ KIREVO-EXIT NC §2.1 симметрия · ✅ CLAUDE.md Discrepancy Protocol · ✅ GTCP_UserGuide_v1.1 (.md+.docx). Тег sprint-7. Migrations 001–009 clean. Sprint 8 с 10.04.2026.*
 *26.03.2026 v5.1 — Sprint 5 отчёт сформирован (SPRINT_5_REPORT.md). Статус Sprint 5: ✅ ЗАВЕРШЕНО ДОСРОЧНО (~72 SP). P0 Gate Review пройден, все формулы NC верифицированы.*
 *06.04.2026 v10.1 — Sprint 15 отчёт сформирован (SPRINT_15_REPORT.md). ~16 SP, 9/9 задач. NC IP codes в demo data исправлены, документация синхронизирована до Sprint 14. NC coverage 79%.*
+*10.04.2026 v12.3 — Sprint 16 ЗАКРЫТ (rescoped, ~13/35 SP). Pivot на NC Art.12.3 binding rule (shippers always balanced) отменил US-1603 навсегда и заместил его US-1603b OBA Settlement (TSO-to-TSO read-only). Сделано: Migration 017 capacity_kwh_h, Migration 018 oba_daily_imbalances, 3 OBA endpoints, OBA UI section, LT Booking Rules, UI cleanup (billing/contracts/credit/gas-quality), data cleanup (7 invoices + 3 orphan contracts), BUG-04/05 fix. NC Art.15 sub-coverage 50→83%. Endpoints 96→99 (docs). Перенесено в Sprint 17: US-1601→1703, US-1602→1704, US-1604→1705, US-1605→1706 (CSV only), US-1607→1707. Отчёт: SPRINT_16_REPORT.md. План Sprint 17: SPRINT_17_PLAN.md (26 SP, P0 = NC Art.13 + Sprint 16 test debt).*

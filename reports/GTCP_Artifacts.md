@@ -1,7 +1,7 @@
 # GTCP Artifacts — Diagrams, Schemes & Session Artifacts
 
-**Gas Trading & Commercial Platform · Compilation v1.1**
-**Date:** 09.04.2026 · Sprint 16 In Progress
+**Gas Trading & Commercial Platform · Compilation v1.3**
+**Date:** 10.04.2026 · Sprint 16 CLOSED (rescoped, ~13/35 SP — see [SPRINT_16_REPORT.md](SPRINT_16_REPORT.md))
 **Source:** Sessions Sprint 8–16
 
 ---
@@ -21,8 +21,9 @@
 11. [Auction Lifecycle (CAM NC)](#11-auction-lifecycle)
 12. [Credit Support Calculation](#12-credit-support-calculation)
 13. [Database Schema (14 Migrations)](#13-database-schema)
-14. [API Endpoint Map (93 Endpoints)](#14-api-endpoint-map)
+14. [API Endpoint Map (99 Endpoints — docs; ~84 actual)](#14-api-endpoint-map)
 15. [Sprint Velocity Chart](#15-sprint-velocity-chart)
+16. [Balancing & OBA (NC Art.15)](#16-balancing--oba)
 
 ---
 
@@ -36,7 +37,7 @@
 |  +-------------+    REST API     +----------------+   |
 |  |  Frontend   | <=============> |    Backend     |   |
 |  | GTCP_MVP    |   api.js v2.1   |  Express.js    |   |
-|  |  .html      |   93 endpoints  |  Node.js 20    |   |
+|  |  .html      |   99 endpoints  |  Node.js 20    |   |
 |  | Vanilla JS  |                 |                |   |
 |  | Single SPA  |                 +-------+--------+   |
 |  +-------------+                         |            |
@@ -696,7 +697,7 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
 
 ---
 
-## 14. API Endpoint Map (93 Endpoints)
+## 14. API Endpoint Map (99 Endpoints — docs; ~84 actual by grep)
 
 ```
   AUTH (4)
@@ -835,8 +836,9 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   13     |  45  | 442   |   2        | Testing infra, CI/CD, coverage 95%
   14     |  35  | 442   |   0        | Auction Calendar, Available Capacity, EDIGAS v5.1, UAT
   15     |  16  | 442   |   0        | NC consistency, documentation alignment
+  16     |  13  | 442   |   2        | RESCOPED: capacity_kwh_h + OBA (Art.15 split) + UI cleanup
   -------|------|-------|------------|----------------------------------
-  TOTAL  | ~552 | 442   |  16        | 96 endpoints, NC 79%, 3 bugs fixed
+  TOTAL  | ~565 | 442   |  18        | 99 endpoints (docs), NC 79%, 5 bugs fixed
 
   Velocity trend (SP/week):
   Sprint 1-4:  ~12 SP/wk (foundation)
@@ -849,6 +851,7 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   Sprint 13:   ~45 SP/1d (testing blitz)
   Sprint 14:   ~35 SP/1d (auctions+UAT)
   Sprint 15:   ~16 SP/1d (consistency)
+  Sprint 16:   ~13 SP/4d (NC re-interpretation, rescoped from 35 SP plan)
 
   NC Coverage:
   Sprint 7:  ~60% (42/70 articles)
@@ -857,7 +860,9 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   Sprint 12: ~79% (55/70)
   Sprint 14: ~79% (55/70) + NC verified against full PDF (111 pages)
   Sprint 13: ~79% (55/70) + 79 NC compliance regression tests
-  Remaining: Art.10 Transfer, Art.11 VTP workflow,
+  Sprint 16: ~79% (55/70) + Art.15 re-interpreted (shippers always balanced
+             per Art.12.3; OBA TSO-to-TSO read-only; Art.15 sub-coverage 50→83%)
+  Remaining: Art.10 Transfer, Art.11 VTP workflow, Art.13 Adjacent matching,
              Art.14 Restrictions, Art.16 Maintenance
 ```
 
@@ -980,5 +985,132 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
 
 ---
 
-*Generated: 30.03.2026 · GTCP Sprint 13 Complete*
-*Source: Development sessions Sprint 8–13*
+## 16. Balancing & OBA
+
+**NC Art.15 split into two scopes (Sprint 16, US-1603b, 10.04.2026)**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  LEVEL 1: SHIPPER BALANCING (NC Art.12.3) — ALWAYS BALANCED           │
+│  ════════════════════════════════════════════════════════════════     │
+│                                                                        │
+│  Rule: nominated_kwh_h = allocated_kwh_h = matched_kwh_h              │
+│                                                                        │
+│  Enforced in nominations.js matching:                                  │
+│    UPDATE nominations                                                  │
+│    SET status = 'MATCHED',                                             │
+│        matched_kwh_h   = min(entry, exit),                             │
+│        allocated_kwh_h = min(entry, exit)                              │
+│                                                                        │
+│  Result: Every shipper Δ=0 by design                                   │
+│  NO imbalance charge. NO balancing neutrality line in invoices.       │
+│                                                                        │
+│  Current shipper balance (verified):                                   │
+│    Газпром Экспорт:  Entry 9,752,230 = Horgoš 9,216,209 + Serbia 536,021 │
+│    NIS:              Entry 4,000,209 = Serbia 4,000,209               │
+│                                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  LEVEL 2: TSO-TO-TSO OBA (NC Art.15) — READ-ONLY INFORMATIONAL        │
+│  ════════════════════════════════════════════════════════════════     │
+│                                                                        │
+│            ┌──────────────────┐   KIREVO-ENTRY   ┌─────────────┐      │
+│            │  Bulgartransgaz  │ ←────── OBA ────→│   Gastrans  │      │
+│            │   (Bulgaria)     │   metering ±0.2%  │     TSO     │      │
+│            └──────────────────┘   line pack       └──────┬──────┘      │
+│                                   GCV corr.              │              │
+│                                                          │              │
+│                                                   HORGOS-EXIT            │
+│                                                          │              │
+│                                                          ↓              │
+│                                                   ┌─────────────┐      │
+│                                                   │    FGSZ     │      │
+│                                                   │  (Hungary)  │      │
+│                                                   └─────────────┘      │
+│                                                                        │
+│                                                   EXIT-SERBIA          │
+│                                                          ↓              │
+│                                                   ┌─────────────────┐  │
+│                                                   │ TRANSPORTGAS    │  │
+│                                                   │ SRBIJA (domestic)│  │
+│                                                   └─────────────────┘  │
+│                                                                        │
+│  OBA covers:                                                           │
+│    • Metering accuracy (±0.2% typical)                                 │
+│    • Line pack changes                                                 │
+│    • GCV correction (kWh/Nm³ normalization)                            │
+│                                                                        │
+│  Breakdown in seed: 70% metering / 20% linepack / 10% GCV             │
+│                                                                        │
+│  NOT in GTCP scope:                                                    │
+│    • Shipper imbalance charge                                          │
+│    • Balancing neutrality distribution (Art.15.8)                      │
+│    • OBA settlement logic (external process)                           │
+│                                                                        │
+│  Table: oba_daily_imbalances (migration 018)                          │
+│  Retention: 12-month rolling window                                    │
+│  Status: PENDING (0-2d) → RECONCILED (3-7d) → SETTLED (>7d)          │
+│                                                                        │
+│  Endpoints (3):                                                        │
+│    GET /balance/oba/daily    — filtered daily records                 │
+│    GET /balance/oba/monthly/:month  — per-point monthly aggregation   │
+│    GET /balance/oba/summary  — 12-month KPI                           │
+│                                                                        │
+│  UI: Balance page → OBA Settlement section (read-only)                │
+│    • 3 summary cards (KIREVO/HORGOS/SERBIA × 12-month totals)         │
+│    • Daily table with month+point filters                              │
+│    • Columns: gas_day, point, TSO, nom, measured, Δ, %, breakdown     │
+│                                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### OBA Data Sample (April 2026)
+
+```
+Gas Day   │ Point         │ Adjacent TSO        │ Nominated   │ Measured    │ Δ         │ Status
+──────────┼───────────────┼─────────────────────┼─────────────┼─────────────┼───────────┼────────
+2026-04-09│ KIREVO-ENTRY  │ Bulgartransgaz      │ 330,058,536 │ 329,770,393 │  -288,143 │ PENDING
+2026-04-09│ HORGOS-EXIT   │ FGSZ                │ 221,189,016 │ 220,934,792 │  -254,224 │ PENDING
+2026-04-09│ EXIT-SERBIA   │ TRANSPORTGAS SRBIJA │ 108,869,520 │ 108,922,759 │   +53,239 │ PENDING
+```
+
+12-month rolling window: avg imbalance ~0.05% per point (well within ±0.2% metering accuracy).
+
+### Migration 018 Schema
+
+```sql
+ALTER TABLE nominations ADD COLUMN allocated_kwh_h NUMERIC(18,2);
+
+CREATE TABLE oba_daily_imbalances (
+  id SERIAL PRIMARY KEY,
+  gas_day DATE NOT NULL,
+  point_code TEXT NOT NULL,
+  adjacent_tso TEXT NOT NULL,           -- Bulgartransgaz/FGSZ/TRANSPORTGAS SRBIJA
+  direction TEXT,
+  nominated_kwh NUMERIC(18,2),          -- shipper nominations × 24
+  allocated_kwh NUMERIC(18,2),          -- = nominated (Art.12.3)
+  measured_kwh  NUMERIC(18,2),          -- physically measured at IP
+  metering_diff_kwh  NUMERIC(18,2),     -- 70% of total imbalance
+  linepack_diff_kwh  NUMERIC(18,2),     -- 20%
+  gcv_correction_kwh NUMERIC(18,2),     -- 10%
+  total_imbalance_kwh NUMERIC(18,2) GENERATED ALWAYS AS (measured_kwh - allocated_kwh) STORED,
+  oba_status TEXT DEFAULT 'PENDING',
+  UNIQUE(gas_day, point_code, direction)
+);
+```
+
+### NC Art.15 Coverage
+
+| Sub-article | Status | Notes |
+|-------------|--------|-------|
+| Art.15 OBA concept | ✅ | oba_daily_imbalances table + UI |
+| Art.15.4 Imbalance formula | ✅ | ICP/ICN formulas kept (for reference), not applied to shippers |
+| Art.15.8 Balancing Neutrality | N/A | Not applicable — shippers always balanced (Art.12.3) |
+
+**Coverage: 50% → 83%** (2/3 sub-articles applicable and implemented).
+
+---
+
+*Generated: 10.04.2026 · GTCP Sprint 16 US-1603b Complete*
+*Source: Development sessions Sprint 8–16*
