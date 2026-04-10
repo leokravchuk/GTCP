@@ -301,12 +301,13 @@ router.post('/match', authorize('nominations:match'), async (req, res, next) => 
         const entryStatus   = matchedVolume === Number(entry.volume_kwh_h) ? 'MATCHED' : 'PARTIALLY_MATCHED';
         const exitStatus    = matchedVolume === Number(exit.volume_kwh_h)  ? 'MATCHED' : 'PARTIALLY_MATCHED';
 
+        // NC Art.12.3: allocated_kwh_h = matched = nominated (shippers always balanced)
         await client.query(
-          `UPDATE nominations SET status = $1, matched_kwh_h = $2 WHERE id = $3`,
+          `UPDATE nominations SET status = $1, matched_kwh_h = $2, allocated_kwh_h = $2 WHERE id = $3`,
           [entryStatus, matchedVolume, entry.id]
         );
         await client.query(
-          `UPDATE nominations SET status = $1, matched_kwh_h = $2 WHERE id = $3`,
+          `UPDATE nominations SET status = $1, matched_kwh_h = $2, allocated_kwh_h = $2 WHERE id = $3`,
           [exitStatus, matchedVolume, exit.id]
         );
 

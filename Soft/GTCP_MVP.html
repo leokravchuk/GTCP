@@ -545,6 +545,41 @@ tr:hover td{background:rgba(255,255,255,.02);}
             </table>
           </div>
         </div>
+
+        <!-- OBA Settlement — NC Art.15 TSO-to-TSO (read-only) -->
+        <div class="section-wrap" style="margin-top:24px;">
+          <div class="section-head">
+            <span class="section-title">OBA SETTLEMENT · NC Art.15 · TSO-to-TSO Balancing</span>
+            <span style="font-size:11px;color:var(--text3);margin-left:12px;">Read-only · 12-month rolling window</span>
+          </div>
+          <div style="padding:10px 16px;font-size:11px;color:var(--text3);">
+            ℹ️ Шипперы всегда в балансе (NC Art.12.3: nominated = allocated). Расхождения между измеренными и номинированными объёмами на IP регулируются через OBA между соседними TSO (metering accuracy ±0.2%, line pack, GCV).
+          </div>
+          <!-- OBA Summary cards -->
+          <div id="oba-summary-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0 16px 12px;"></div>
+          <!-- OBA Daily table -->
+          <div style="padding:0 16px 12px;display:flex;gap:12px;align-items:center;">
+            <label style="font-size:11px;color:var(--text3);">ПЕРИОД:</label>
+            <select id="oba-filter-month" onchange="renderOba()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;font-family:var(--mono);font-size:12px;"></select>
+            <label style="font-size:11px;color:var(--text3);margin-left:12px;">ТОЧКА:</label>
+            <select id="oba-filter-point" onchange="renderOba()" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:6px 10px;font-family:var(--mono);font-size:12px;">
+              <option value="">Все</option>
+              <option value="KIREVO-ENTRY">KIREVO-ENTRY ↔ Bulgartransgaz</option>
+              <option value="HORGOS-EXIT">HORGOS-EXIT ↔ FGSZ</option>
+              <option value="EXIT-SERBIA">EXIT-SERBIA ↔ TRANSPORTGAS SRBIJA</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table id="t-oba-daily">
+              <thead><tr>
+                <th>ГАЗ-ДЕНЬ</th><th>ТОЧКА</th><th>СОСЕДНИЙ TSO</th>
+                <th>НОМИН. кВт·ч</th><th>ИЗМЕР. кВт·ч</th><th>Δ ИМБАЛАНС</th><th>Δ %</th>
+                <th>METERING</th><th>LINEPACK</th><th>GCV</th><th>СТАТУС</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- BILLING -->
@@ -2395,6 +2430,98 @@ async function renderBalance() {
     const sts = Math.abs(imb)<50 ? badge('БАЛАНС','ok') : imb>0 ? badge('ПЕРЕКОС +','warn') : badge('ПЕРЕКОС −','warn');
     return `<tr><td class="fw7">${s.code} ${s.name}</td><td class="mono">${fmt(entry)}</td><td class="mono">${fmt(exit)}</td><td class="mono ${Math.abs(imb)>=50?'text-yellow':''}">${imb>=0?'+':''}${fmt(imb)}</td><td>${sts}</td></tr>`;
   }).join('');
+
+  // ── OBA Settlement (NC Art.15, TSO-to-TSO, read-only) ──────────────
+  renderOba();
+}
+
+// ═══════════════════════════════════════════════════════
+// OBA Settlement · NC Art.15 (TSO-to-TSO, read-only)
+// ═══════════════════════════════════════════════════════
+async function renderOba() {
+  if (!STATE.backendMode || !window.API) {
+    const tbody = document.querySelector('#t-oba-daily tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:20px;">Требуется backend</td></tr>';
+    return;
+  }
+
+  try {
+    // Populate month filter (last 12 months)
+    const monthSel = document.getElementById('oba-filter-month');
+    if (monthSel && !monthSel.options.length) {
+      const now = new Date();
+      const months = [];
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const ym = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        months.push(ym);
+      }
+      monthSel.innerHTML = months.map((m, i) => `<option value="${m}"${i===0?' selected':''}>${m}</option>`).join('');
+    }
+
+    // Summary cards (12-month rolling window)
+    const sumRes = await fetch('http://localhost:3000/api/v1/balance/oba/summary', {
+      headers: { Authorization: 'Bearer ' + (sessionStorage.getItem('gtcp_access_token') || '') }
+    });
+    const sumData = await sumRes.json();
+    const cardsEl = document.getElementById('oba-summary-cards');
+    if (cardsEl && sumData.data) {
+      cardsEl.innerHTML = sumData.data.map(p => {
+        const imb = parseInt(p.total_imbalance_kwh || 0);
+        const pct = parseFloat(p.avg_imbalance_pct || 0);
+        const sign = imb >= 0 ? '+' : '';
+        const cls = Math.abs(pct) > 0.15 ? 'text-yellow' : 'text-green';
+        return `<div style="background:var(--bg2);border:1px solid var(--border2);padding:12px 16px;">
+          <div style="font-size:10px;color:var(--text3);letter-spacing:1px;">${p.point_code} ↔ ${p.adjacent_tso}</div>
+          <div style="font-family:var(--mono);font-size:18px;margin-top:4px;" class="${cls}">${sign}${fmt(imb)} кВт·ч</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px;">${pct}% · ${p.days_count}д</div>
+        </div>`;
+      }).join('');
+    }
+
+    // Daily detail table (filtered by month + point)
+    const month = document.getElementById('oba-filter-month').value;
+    const point = document.getElementById('oba-filter-point').value;
+    const from = month + '-01';
+    const toDate = new Date(parseInt(month.slice(0,4)), parseInt(month.slice(5,7)), 0);
+    const to = month + '-' + String(toDate.getDate()).padStart(2,'0');
+    let url = `http://localhost:3000/api/v1/balance/oba/daily?gas_day_from=${from}&gas_day_to=${to}&limit=200`;
+    if (point) url += '&point_code=' + point;
+
+    const dRes = await fetch(url, { headers: { Authorization: 'Bearer ' + (sessionStorage.getItem('gtcp_access_token') || '') } });
+    const dData = await dRes.json();
+    const tbody = document.querySelector('#t-oba-daily tbody');
+    if (tbody) {
+      if (dData.data && dData.data.length) {
+        tbody.innerHTML = dData.data.map(r => {
+          const imb = parseInt(r.total_imbalance_kwh);
+          const nom = parseInt(r.nominated_kwh);
+          const pct = nom > 0 ? (imb / nom * 100) : 0;
+          const cls = Math.abs(pct) > 0.15 ? 'text-yellow' : imb >= 0 ? 'text-green' : 'text-red';
+          const statusCls = r.oba_status === 'SETTLED' ? 'ok' : r.oba_status === 'RECONCILED' ? 'warn' : '';
+          return `<tr>
+            <td class="mono text-dim">${(r.gas_day||'').slice(0,10)}</td>
+            <td class="mono fw7">${r.point_code}</td>
+            <td style="font-size:11px;">${r.adjacent_tso}</td>
+            <td class="mono">${fmt(nom)}</td>
+            <td class="mono">${fmt(parseInt(r.measured_kwh))}</td>
+            <td class="mono ${cls}">${imb>=0?'+':''}${fmt(imb)}</td>
+            <td class="mono ${cls}">${pct.toFixed(3)}%</td>
+            <td class="mono text-dim">${fmt(parseInt(r.metering_diff_kwh))}</td>
+            <td class="mono text-dim">${fmt(parseInt(r.linepack_diff_kwh))}</td>
+            <td class="mono text-dim">${fmt(parseInt(r.gcv_correction_kwh))}</td>
+            <td>${badge(r.oba_status, statusCls)}</td>
+          </tr>`;
+        }).join('');
+      } else {
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text3);padding:20px;">Нет данных за период</td></tr>';
+      }
+    }
+  } catch (e) {
+    console.error('[OBA] error:', e);
+    const tbody = document.querySelector('#t-oba-daily tbody');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--red);padding:20px;">Ошибка: ${e.message}</td></tr>`;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
