@@ -1,7 +1,7 @@
 # GTCP — Action Plan
 **Текущие задачи, приоритеты и решения · Living Document**
 
-> Последнее обновление: 09.04.2026 · Sprint 16 в процессе · Версия 17.0
+> Последнее обновление: 10.04.2026 · Sprint 16 в процессе · Версия 17.1
 
 ---
 
@@ -18,6 +18,13 @@
 - [x] **US-1614** · 90/10 rule enforcement: LT=90% exact, ST=10% free for auctions, shipper balance Δ=0 (3 SP) ✅
 - [x] **US-1615** · Газпром HORGOS-EXIT=90% rule + CTR-2026-006 domestic contract + billing tariff lookup fix (price_eur) (2 SP) ✅
 - [x] **US-1616** · CLAUDE.md + Artifacts + memory: LT Booking Rules, capacity 90/10 updated (1 SP) ✅
+- [x] **US-1617** · Billing tariff SQL fix (tariff_eur→price_eur) + contract_type mapping FIRM→FIRM_YEARLY (1 SP) ✅ (10.04)
+- [x] **US-1618** · Frontend contracts mapping: capEntry/capExit + AERS tariff lookup by flow_direction (2 SP) ✅ (10.04)
+- [x] **US-1619** · Credit NC Art.5.1.6: Modal shows "ОСВОБОЖДЁН" for rated shippers (Газпром BBB-) (1 SP) ✅ (10.04)
+- [x] **US-1620** · Gas quality UI mapping: wobbe_kwh_nm3, methane_pct, density_kg_nm3 (1 SP) ✅ (10.04)
+- [x] **US-1621** · Billing table: totalAmount + lineCount + dueDate (instead of volume*tariff=0) (1 SP) ✅ (10.04)
+- [x] **US-1622** · Contracts table: cap_entry/cap_exit kWh/h + separate AERS tariffs (1 SP) ✅ (10.04)
+- [x] **US-1623** · Data cleanup: delete 7 stale invoices + 3 orphan ST contracts + generate 8 monthly Jan-Apr 2026 (3 SP) ✅ (10.04)
 
 ### 🔴 P0 — Критический путь
 

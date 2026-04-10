@@ -128,6 +128,15 @@ Total API endpoints: **96** (was 93 at Sprint 12)
 - Bug fixed: nominations.js over-nomination compared MWh/d with kWh/h (BUG-04/05)
 - Migrations: 000–017
 
+**Sprint 16 UI cleanup (10.04.2026):**
+- Billing tariff SQL: `tariff_eur` → `price_eur` (reserve_prices column), contract_type mapping FIRM→FIRM_YEARLY
+- Frontend contracts mapping uses `capEntryKwhH`/`capExitKwhH` + AERS lookup by `flow_direction`
+- Credit NC Art.5.1.6: rated shippers (Газпром BBB-) show "ОСВОБОЖДЁН" instead of minimum
+- Gas quality UI: correct columns `wobbe_kwh_nm3`, `methane_pct`, `density_kg_nm3`
+- Billing table uses `total_amount_eur`, `line_items_count`, `due_date` (not legacy volume*tariff)
+- Contracts table shows raw kWh/h + separate AERS tariffs (not bundled)
+- Data cleanup: 7 stale invoices + 3 orphan ST contracts deleted; 8 monthly Jan-Apr 2026 generated
+
 ---
 
 **Key rules:**

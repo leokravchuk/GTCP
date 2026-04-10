@@ -1,7 +1,7 @@
 # GTCP — Project Roadmap
 **Gas Trading & Commercial Platform · Full Delivery Plan**
 
-> Последнее обновление: 09.04.2026 · Версия 12.0 · Sprint 16 в процессе (8/43 SP)
+> Последнее обновление: 10.04.2026 · Версия 12.1 · Sprint 16 в процессе (18/43 SP)
 
 ---
 
@@ -536,9 +536,9 @@ C:\Users\leokr\ETRM\
 | Sprint 13 | 30.03.2026 | 45 | **~45** | ✅ Testing 442/442 |
 | Sprint 14 | 31.03.2026 | 35 | **~35** | ✅ Auction Calendar + UAT |
 | Sprint 15 | 03.04.2026 | 16 | **~16** | ✅ NC consistency + docs |
-| Sprint 16 | 06–19.04.2026 | 43 | **~8** (WIP) | 🔄 capacity_kwh_h ✅ + NC Art.13+15 + Analytics |
+| Sprint 16 | 06–19.04.2026 | 43 | **~18** (WIP) | 🔄 capacity_kwh_h ✅ + UI cleanup ✅ + NC Art.13+15 |
 ────────────────────────────────────────────────────────────────
-Total: ~560 SP delivered (552+8) + 35 SP remaining · Migrations: 17 (000-017) · Tests: 442/442 · NC: 79% → target 87%
+Total: ~570 SP delivered (552+18) + 25 SP remaining · Migrations: 17 (000-017) · Tests: 442/442 · NC: 79% → 84% → target 87%
 
 ---
 
