@@ -218,35 +218,69 @@ function calcCapacityFee({
 }
 
 /**
+ * Fuel Gas applicable directions (NC Art.18.3.3/4 + Art.19.1.4).
+ * Only physical-transit routes through compressor station generate FG fee.
+ * Domestic-only (KIREVO_EXIT_SERBIA via GMS-4 Gospođinci — no preheater per
+ * Art.19.1.4) and Commercial Reverse (virtual flow) → FG=0.
+ * See CLAUDE.md "Fuel Gas Allocation Rules".
+ */
+const FG_APPLICABLE_DIRECTIONS = ['KIREVO_HORGOS', 'KIREVO_HORGOS_AND_SERBIA'];
+const FG_ZERO = { fuelGasKwh: 0, fuelGasNm3: 0, fuelGasMwh: 0, fuelGasAmountEur: 0 };
+
+/**
  * Fuel Gas — NC Art. 18 formula
  *
  *   FG = X1 × Q_horgos + X2 × Q_serbia − KN
  *
+ * Allocation guard (NC Art.18.3 + Art.19.1.4, binding 14.04.2026):
+ *   FG > 0 ⟺ flowDirection ∈ FG_APPLICABLE_DIRECTIONS
+ *         AND fuelGasElection = 'CASH'  (Art.18.1.1(b))
+ * For KIREVO_HORGOS_AND_SERBIA: Q_serbia is forced to 0 — domestic exit is
+ * billed only for compressor (CS, Art.18.3.3), not for preheating.
+ *
  * @param {Object} opts
- * @param {number} opts.qHorgosKwh   — Horgoš nominations/allocations (kWh) for the period
- * @param {number} opts.qSerbiaKwh   — Serbia (domestic) nominations for the period
- * @param {number} opts.x1Pct        — X1 compressor rate (%)
- * @param {number} opts.x2Pct        — X2 preheating rate (%)
- * @param {number} [opts.knKwh]      — KN quality compensation (kWh), default 0
- * @param {number} opts.gcvKwhNm3    — GCV kWh/Nm³ for volume conversion
- * @param {number} opts.fuelGasPriceEurMwh — market price EUR/MWh
- * @returns {{ fuelGasKwh: number, fuelGasNm3: number, fuelGasAmountEur: number }}
+ * @param {string} [opts.flowDirection]      — contract flow direction
+ * @param {string} [opts.fuelGasElection]    — 'CASH' | 'IN_KIND' (Art.18.1.1)
+ * @param {number} opts.qHorgosKwh           — Horgoš allocations (kWh) for the period
+ * @param {number} opts.qSerbiaKwh           — Serbia domestic allocations (ignored for FG)
+ * @param {number} opts.x1Pct                — X1 compressor rate (%)
+ * @param {number} opts.x2Pct                — X2 preheating rate (%)
+ * @param {number} [opts.knKwh]              — KN quality compensation (kWh), default 0
+ * @param {number} opts.gcvKwhNm3            — GCV kWh/Nm³ for volume conversion
+ * @param {number} opts.fuelGasPriceEurMwh   — tender price EUR/MWh (Art.18.1.5)
+ * @returns {{ fuelGasKwh: number, fuelGasNm3: number, fuelGasMwh: number, fuelGasAmountEur: number }}
  */
 function calcFuelGas({
-  qHorgosKwh  = 0,
-  qSerbiaKwh  = 0,
-  x1Pct       = 0.42,
-  x2Pct       = 0.08,
-  knKwh       = 0,
-  gcvKwhNm3   = 11.523,
+  flowDirection      = null,
+  fuelGasElection    = 'CASH',
+  qHorgosKwh         = 0,
+  qSerbiaKwh         = 0,
+  x1Pct              = 0.42,
+  x2Pct              = 0.08,
+  knKwh              = 0,
+  gcvKwhNm3          = 11.523,
   fuelGasPriceEurMwh = 32.50,
 }) {
-  // FG in kWh
+  // Guard 1: route must traverse compressor station (Art.18.3.3)
+  if (flowDirection && !FG_APPLICABLE_DIRECTIONS.includes(flowDirection)) {
+    return { ...FG_ZERO };
+  }
+  // Guard 2: in-kind users already deliver FG via Nomination (Art.18.1.1(a))
+  if (fuelGasElection === 'IN_KIND') {
+    return { ...FG_ZERO };
+  }
+  // Guard 3: no allocated flow → no FG allocation (Art.18.3.3/4 requires AAQ)
+  if (!qHorgosKwh || qHorgosKwh <= 0) {
+    return { ...FG_ZERO };
+  }
+
+  // Domestic exit is excluded from FG even within mixed transit+domestic route
+  const qSerbiaForFg = 0;
+
   const fuelGasKwh = Math.max(
     0,
-    parseFloat(((x1Pct / 100) * qHorgosKwh + (x2Pct / 100) * qSerbiaKwh - knKwh).toFixed(2))
+    parseFloat(((x1Pct / 100) * qHorgosKwh + (x2Pct / 100) * qSerbiaForFg - knKwh).toFixed(2))
   );
-  // Convert to Nm³ and MWh
   const fuelGasNm3  = gcvKwhNm3 > 0 ? parseFloat((fuelGasKwh / gcvKwhNm3).toFixed(2)) : 0;
   const fuelGasMwh  = parseFloat((fuelGasKwh / 1000).toFixed(2));
   const fuelGasAmountEur = parseFloat((fuelGasMwh * fuelGasPriceEurMwh).toFixed(2));
@@ -300,6 +334,54 @@ function calcInterruptionPenalty(capacityFeeEur, productType) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Routes
 // ─────────────────────────────────────────────────────────────────────────────
+
+const { rowsToCsv, sendCsv } = require('../utils/csvExport');
+
+// GET /billing/export — CSV export (NC Art.20 invoices)
+// Placed BEFORE /:id to prevent route collision.
+router.get('/export', authorize('billing:read'), async (req, res, next) => {
+  const { status, shipper_id, from, to } = req.query;
+  const conds = []; const params = []; let i = 1;
+  if (status)     { conds.push(`i.status = $${i++}`);          params.push(status); }
+  if (shipper_id) { conds.push(`i.shipper_id = $${i++}`);      params.push(shipper_id); }
+  if (from)       { conds.push(`i.period_from >= $${i++}`);    params.push(from); }
+  if (to)         { conds.push(`i.period_to   <= $${i++}`);    params.push(to); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
+  try {
+    const { rows } = await db.query(
+      `SELECT i.invoice_no, s.code AS shipper_code, s.name AS shipper_name,
+              i.period_from, i.period_to, i.billing_days, i.flow_direction,
+              i.cap_entry_kwh_h, i.cap_exit_kwh_h,
+              i.cap_entry_fee_eur, i.cap_exit_fee_eur,
+              i.fuel_gas_kwh, i.fuel_gas_amount_eur,
+              i.total_amount_eur, i.status, i.due_date, i.created_at
+         FROM invoices i JOIN shippers s ON s.id = i.shipper_id
+         ${where} ORDER BY i.created_at DESC`,
+      params
+    );
+    const csv = rowsToCsv(rows, [
+      { key: 'invoice_no',         header: 'Invoice No' },
+      { key: 'shipper_code',       header: 'Shipper' },
+      { key: 'shipper_name',       header: 'Shipper Name' },
+      { key: 'period_from',        header: 'Period From' },
+      { key: 'period_to',          header: 'Period To' },
+      { key: 'billing_days',       header: 'Days' },
+      { key: 'flow_direction',     header: 'Flow Direction' },
+      { key: 'cap_entry_kwh_h',    header: 'Cap Entry kWh/h' },
+      { key: 'cap_exit_kwh_h',     header: 'Cap Exit kWh/h' },
+      { key: 'cap_entry_fee_eur',  header: 'Entry Fee EUR' },
+      { key: 'cap_exit_fee_eur',   header: 'Exit Fee EUR' },
+      { key: 'fuel_gas_kwh',       header: 'Fuel Gas kWh' },
+      { key: 'fuel_gas_amount_eur',header: 'Fuel Gas EUR' },
+      { key: 'total_amount_eur',   header: 'Total EUR' },
+      { key: 'status',             header: 'Status' },
+      { key: 'due_date',           header: 'Due Date' },
+      { key: 'created_at',         header: 'Created' },
+    ]);
+    return sendCsv(res, 'billing-invoices', csv);
+  } catch (err) { next(err); }
+});
 
 // GET /billing
 router.get('/', authorize('billing:read'), async (req, res, next) => {
@@ -441,7 +523,12 @@ router.post(
     body('periodFrom').isDate(),
     body('periodTo').isDate(),
     body('flowDirection').optional().isIn([
-      'GOSPODJINCI_HORGOS', 'HORGOS_GOSPODJINCI', 'KIREVO_EXIT_SERBIA',
+      // NC §2.1 physical routes
+      'KIREVO_HORGOS', 'KIREVO_EXIT_SERBIA', 'KIREVO_HORGOS_AND_SERBIA',
+      // NC Art.6.1.2 commercial reverse
+      'HORGOS_KIREVO', 'EXIT_SERBIA_KIREVO', 'HORGOS_EXIT_SERBIA', 'EXIT_SERBIA_HORGOS',
+      // Legacy (backward compat, not for new contracts)
+      'GOSPODJINCI_HORGOS', 'HORGOS_GOSPODJINCI',
     ]),
     // Capacity-based (preferred, NC model)
     body('capEntryKwhH').optional().isFloat({ min: 0 }),
@@ -532,40 +619,73 @@ router.post(
         transitAmount = parseFloat((Number(volumeMwh) * Number(tariffEurMwh)).toFixed(2));
       }
 
-      // ── Line 2: Fuel gas — NC Art.18 ─────────────────────────────────────
-      // If actual nominations provided → use NC formula
-      // Otherwise estimate from capacity × utilisation × days (billing fallback)
+      // ── Line 2: Fuel gas — NC Art.18 + Art.19.1.4 ───────────────────────
+      // Allocation is restricted by calcFuelGas() guards:
+      //   - only transit routes (KIREVO_HORGOS, KIREVO_HORGOS_AND_SERBIA)
+      //   - only shippers with election=CASH (Art.18.1.1(b))
+      //   - only when qHorgosKwh > 0 (Art.18.3 AAQ-based)
+      // See CLAUDE.md "Fuel Gas Allocation Rules" (binding 14.04.2026).
       let fuelGasResult;
-      const hasActualFlow = qHorgosKwh > 0 || qSerbiaKwh > 0;
 
-      if (hasActualFlow) {
-        fuelGasResult = calcFuelGas({
-          qHorgosKwh:         Number(qHorgosKwh),
-          qSerbiaKwh:         Number(qSerbiaKwh),
-          x1Pct:              sp.x1CompressorPct,
-          x2Pct:              sp.x2PreheatingPct,
-          knKwh:              sp.knQualityKwh,
-          gcvKwhNm3:          sp.gcvHorgosKwhNm3,
-          fuelGasPriceEurMwh: sp.fuelGasPriceEurMwh,
-        });
-      } else {
-        // Fallback: legacy flat-rate estimate from effective capacity
-        const capForFuel = resolvedCapEntry || resolvedCapLegacy || 0;
-        // Estimate: cap × 24h × days × 85% utilisation = estimated kWh flow
-        const estFlowKwh = capForFuel * 24 * billingDays * 0.85;
-        const estFlowQ = resolvedDirection === 'HORGOS_GOSPODJINCI'
-          ? { qHorgosKwh: 0, qSerbiaKwh: estFlowKwh }
-          : { qHorgosKwh: estFlowKwh, qSerbiaKwh: 0 };
-
-        fuelGasResult = calcFuelGas({
-          ...estFlowQ,
-          x1Pct:              sp.x1CompressorPct,
-          x2Pct:              sp.x2PreheatingPct,
-          knKwh:              sp.knQualityKwh,
-          gcvKwhNm3:          sp.gcvHorgosKwhNm3,
-          fuelGasPriceEurMwh: sp.fuelGasPriceEurMwh,
-        });
+      // Resolve election — column may not yet exist (migration 019 pending).
+      // Default to CASH; overridden when US-1709 lands.
+      let fuelGasElection = 'CASH';
+      try {
+        const { rows: elRows } = await db.query(
+          `SELECT fuel_gas_election FROM shippers WHERE id = $1`, [shipperId]
+        );
+        if (elRows.length && elRows[0].fuel_gas_election) {
+          fuelGasElection = elRows[0].fuel_gas_election;
+        }
+      } catch {
+        // Column not yet present — fall through with default.
       }
+
+      // Resolve qHorgosKwh: prefer caller-provided value, otherwise pull from
+      // allocated nominations for the billing period (Art.18.3 AAQ-based).
+      // Capacity × utilisation fallback is retained only as a last-resort
+      // estimation for transit routes without any nomination data (e.g. seed).
+      let resolvedQHorgos = Number(qHorgosKwh) || 0;
+      let fuelGasEstimated = false;
+
+      if (!resolvedQHorgos && FG_APPLICABLE_DIRECTIONS.includes(resolvedDirection)) {
+        try {
+          // Nominations store kWh/h per gas_day. Each gas_day covers 24h, so
+          // AAQ for the period = Σ(allocated_kwh_h × 24) across gas_days.
+          const { rows: aaq } = await db.query(
+            `SELECT COALESCE(SUM(COALESCE(allocated_kwh_h, volume_kwh_h, 0) * 24), 0) AS total_kwh
+               FROM nominations
+              WHERE shipper_id = $1
+                AND point      = 'HORGOS-EXIT'
+                AND gas_day BETWEEN $2 AND $3
+                AND status IN ('CONFIRMED', 'MATCHED', 'MATCHED_ADJACENT', 'ALLOCATED')`,
+            [shipperId, periodFrom, periodTo || periodFrom]
+          );
+          resolvedQHorgos = aaq.length ? Number(aaq[0].total_kwh) || 0 : 0;
+        } catch {
+          resolvedQHorgos = 0;
+        }
+
+        if (!resolvedQHorgos) {
+          // Final fallback: capacity × 85% utilisation (marked estimated).
+          const capForFuel = resolvedCapEntry || resolvedCapLegacy || 0;
+          resolvedQHorgos = capForFuel * 24 * billingDays * 0.85;
+          fuelGasEstimated = resolvedQHorgos > 0;
+        }
+      }
+
+      fuelGasResult = calcFuelGas({
+        flowDirection:      resolvedDirection,
+        fuelGasElection,
+        qHorgosKwh:         resolvedQHorgos,
+        qSerbiaKwh:         Number(qSerbiaKwh) || 0,
+        x1Pct:              sp.x1CompressorPct,
+        x2Pct:              sp.x2PreheatingPct,
+        knKwh:              sp.knQualityKwh,
+        gcvKwhNm3:          sp.gcvHorgosKwhNm3,
+        fuelGasPriceEurMwh: sp.fuelGasPriceEurMwh,
+      });
+      fuelGasResult.estimated = fuelGasEstimated;
 
       // ── Line 3: Balancing gas ─────────────────────────────────────────────
       const balancingGasEur = parseFloat(
@@ -676,9 +796,11 @@ router.post(
             amountEur:     fuelGasResult.fuelGasAmountEur,
             x1Pct:         sp.x1CompressorPct,
             x2Pct:         sp.x2PreheatingPct,
-            qHorgosKwh:    Number(qHorgosKwh),
-            qSerbiaKwh:    Number(qSerbiaKwh),
-            estimated:     !hasActualFlow,
+            qHorgosKwh:    resolvedQHorgos,
+            qSerbiaKwh:    Number(qSerbiaKwh) || 0,
+            estimated:     fuelGasEstimated,
+            election:      fuelGasElection,
+            flowDirection: resolvedDirection,
           },
           balancing:  { mwh: Number(balancingGasMwh), amountEur: balancingGasEur },
           total:      totalAmountEur,
@@ -1270,4 +1392,5 @@ module.exports._test = {
   calcInterruptionPenalty,
   getSystemParams,
   REVERSE_ROUTES,
+  FG_APPLICABLE_DIRECTIONS,
 };

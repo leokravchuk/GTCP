@@ -21,9 +21,10 @@
 11. [Auction Lifecycle (CAM NC)](#11-auction-lifecycle)
 12. [Credit Support Calculation](#12-credit-support-calculation)
 13. [Database Schema (14 Migrations)](#13-database-schema)
-14. [API Endpoint Map (99 Endpoints — docs; ~84 actual)](#14-api-endpoint-map)
+14. [API Endpoint Map (82 Endpoints — authoritative)](#14-api-endpoint-map)
 15. [Sprint Velocity Chart](#15-sprint-velocity-chart)
 16. [Balancing & OBA (NC Art.15)](#16-balancing--oba)
+17. [Fuel Gas Allocation Rules (NC Art.18 + Art.19.1.4)](#17-fuel-gas-allocation-rules-nc-art18--art1914--binding)
 
 ---
 
@@ -37,7 +38,7 @@
 |  +-------------+    REST API     +----------------+   |
 |  |  Frontend   | <=============> |    Backend     |   |
 |  | GTCP_MVP    |   api.js v2.1   |  Express.js    |   |
-|  |  .html      |   99 endpoints  |  Node.js 20    |   |
+|  |  .html      |   82 endpoints  |  Node.js 20    |   |
 |  | Vanilla JS  |                 |                |   |
 |  | Single SPA  |                 +-------+--------+   |
 |  +-------------+                         |            |
@@ -697,7 +698,7 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
 
 ---
 
-## 14. API Endpoint Map (99 Endpoints — docs; ~84 actual by grep)
+## 14. API Endpoint Map (82 Endpoints — authoritative, Sprint 17 DEBT-02 audit)
 
 ```
   AUTH (4)
@@ -838,7 +839,7 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   15     |  16  | 442   |   0        | NC consistency, documentation alignment
   16     |  13  | 442   |   2        | RESCOPED: capacity_kwh_h + OBA (Art.15 split) + UI cleanup
   -------|------|-------|------------|----------------------------------
-  TOTAL  | ~565 | 442   |  18        | 99 endpoints (docs), NC 79%, 5 bugs fixed
+  TOTAL  | ~572 | 458   |  19        | 82 endpoints (audited), NC 79%, 5 bugs fixed + FG hotfix
 
   Velocity trend (SP/week):
   Sprint 1-4:  ~12 SP/wk (foundation)
@@ -1112,5 +1113,92 @@ CREATE TABLE oba_daily_imbalances (
 
 ---
 
+---
+
+## 17. Fuel Gas Allocation Rules (NC Art.18 + Art.19.1.4) — BINDING
+
+**Адопт: 14.04.2026.** На основании анализа INV-2026-0008 и совместного чтения Art.18.3 + физики Art.19.1.4.
+
+### 17.1 Правило
+
+```
+FG_fee > 0   ⟺   flow_direction ∈ {KIREVO_HORGOS, KIREVO_HORGOS_AND_SERBIA}
+            AND  shipper.fuel_gas_election = 'CASH'  (Art.18.1.1(b))
+            AND  AAQ_horgos > 0
+```
+
+Все остальные маршруты (`KIREVO_EXIT_SERBIA`, 4× Commercial Reverse) → **FG_fee = 0**.
+
+### 17.2 Обоснование
+
+| Установка FG | Локация (Art.19.1.4) | Обслуживает |
+|---|---|---|
+| Compressor station | магистраль к HORGOS-EXIT | **только транзит до Horgoš** |
+| Preheating GMS-2 Paraćin | Exit Serbia (магистральная ветка) | транзитный поток |
+| Preheating GMS-3 Pančevo | Exit Serbia (магистральная ветка) | транзитный поток |
+| **GMS-4 Gospođinci** | Exit Serbia | **НЕТ preheater** (не упомянут в Art.19.1.4) |
+
+Domestic shipper (NIS через KIREVO_EXIT_SERBIA): поток идёт до компрессора, выходит через GMS-4 без preheater → нет ни CS, ни PHG → FG = 0.
+
+### 17.3 Кто платит / кто не платит
+
+| Shipper | Route | FG fee | Основание |
+|---|---|---|---|
+| Газпром Экспорт (SHP-001) | `KIREVO_HORGOS_AND_SERBIA` | **ДА** (только на транзитной доле Q_horgos) | Art.18.3.3 |
+| NIS (SHP-002) | `KIREVO_EXIT_SERBIA` | **НЕТ** | Art.19.1.4 (GMS-4 без preheater) |
+| CR shipper (любой) | `HORGOS_KIREVO` / `EXIT_SERBIA_KIREVO` / `HORGOS_EXIT_SERBIA` / `EXIT_SERBIA_HORGOS` | **НЕТ** | Art.18.3.3/4 (Physical Flow Direction only; CR = виртуальный поток) |
+
+### 17.4 Election (Art.18.1.1)
+
+- **IN_KIND**: shipper поставляет FG в натуре через Nomination. FG_fee = 0 (кроме Art.18.4.2 edge-case).
+- **CASH**: shipper возмещает TSO по тендерной цене Art.18.1.5. Fee по Art.18.2.1.
+- Выбор на весь Gas Year (Art.18.1.2).
+
+Требуемое поле schema: `shippers.fuel_gas_election` ∈ {`IN_KIND`, `CASH`}.
+
+### 17.5 Billing Invoice requirements (Art.20.3)
+
+- Art.20.3.2.2: FG — позиция Monthly Invoice.
+- Art.20.3.5: при >1 Capacity Product → **отдельный FG-invoice** (не line item внутри общего счёта).
+- Art.20.3.6: для LT GTA FG — на основании LT GTA.
+- Art.18.5.1.4: цена FG публикуется на сайте TSO ежедневно.
+
+### 17.6 Открытые баги (Debt для Sprint 17+)
+
+| ID | Файл / Строка | Проблема | Severity |
+|---|---|---|---|
+| FG-01 | [backend/src/routes/billing.js:553-558](../backend/src/routes/billing.js#L553-L558) | Fallback `estFlowKwh = cap × 24 × days × 0.85` начисляет FG **любому** shipper'у независимо от маршрута | P0 |
+| FG-02 | [backend/src/routes/billing.js:556-558](../backend/src/routes/billing.js#L556-L558) | Для `KIREVO_EXIT_SERBIA` fallback направляет весь поток в `qHorgosKwh` → применяет X1 (компрессор) — двойная ошибка | P0 |
+| FG-03 | schema | Нет поля `shippers.fuel_gas_election` | P1 |
+| FG-04 | billing logic | Нет проверки `AAQ > 0` перед начислением FG | P1 |
+| FG-05 | invoice generation | FG как line item вместо отдельного invoice (Art.20.3.5) | P2 |
+| FG-06 | seed data | INV-2026-0008 (NIS): FG=74 883,91 EUR → должно быть 0, total пересчитать 3 350 312,03 EUR | P0 |
+| FG-07 | seed data | Проверить/зачистить исторические FG-строки для NIS и всех CR-shipper'ов | P1 |
+
+### 17.7 Fix snippet (для Sprint 17)
+
+```js
+// backend/src/routes/billing.js
+const FG_APPLICABLE_DIRECTIONS = ['KIREVO_HORGOS', 'KIREVO_HORGOS_AND_SERBIA'];
+
+if (!FG_APPLICABLE_DIRECTIONS.includes(resolvedDirection)
+    || shipper.fuel_gas_election === 'IN_KIND') {
+  fuelGasResult = { fuelGasKwh: 0, fuelGasNm3: 0, fuelGasMwh: 0, fuelGasAmountEur: 0 };
+} else {
+  // существующая логика, но Q_serbia = 0 даже для KIREVO_HORGOS_AND_SERBIA
+  fuelGasResult = calcFuelGas({
+    qHorgosKwh: Q_horgos_allocated,
+    qSerbiaKwh: 0,                   // domestic exit освобождён
+    x1Pct: sp.x1CompressorPct,
+    x2Pct: 0,                         // не применяется в текущей модели
+    knKwh: sp.knQualityKwh,
+    ...
+  });
+}
+```
+
+---
+
 *Generated: 10.04.2026 · GTCP Sprint 16 US-1603b Complete*
+*Updated: 14.04.2026 · Fuel Gas Allocation Rules (section 17)*
 *Source: Development sessions Sprint 8–16*

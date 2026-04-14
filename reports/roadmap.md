@@ -1,7 +1,7 @@
 # GTCP — Project Roadmap
 **Gas Trading & Commercial Platform · Full Delivery Plan**
 
-> Последнее обновление: 10.04.2026 · Версия 12.3 · Sprint 16 ЗАКРЫТ (rescoped, ~13/35 SP) · Sprint 17 запланирован (26 SP)
+> Последнее обновление: 14.04.2026 · Версия 12.6 · Sprint 17 🔄 В РАБОТЕ (26 + 7 FG hotfix = 33 SP) · Sprint 18 📋 ЗАПЛАНИРОВАН (24 SP + FG-05 отдельный invoice)
 
 ---
 
@@ -426,8 +426,9 @@ Jan–Feb 2026  Mar 2026              Mar 2026                   Mar 2026       
 | Phase 7 · Auction Calendar | Sprint 14 | 31.03.2026 | ~35 SP | ✅ ЗАВЕРШЕНО (Auction Calendar + UAT) |
 | Phase 8 · NC Consistency | Sprint 15 | 03.04.2026 | ~16 SP | ✅ ЗАВЕРШЕНО (NC consistency + docs alignment) |
 | Phase 9 · NC Art.15 + capacity_kwh_h | Sprint 16 | 06–10.04.2026 | ~13 / 35 SP | ✅ ЗАКРЫТО (rescoped): Art.15 re-interpreted, migration 017/018, OBA, UI cleanup |
-| **Phase 10 · NC Art.13 + Analytics + Diploma** | **Sprint 17** | **13–24.04.2026** | **26 SP** | **📋 ЗАПЛАНИРОВАН (Matching + Analytics + Export + Sprint 16 debt + UserGuide v3.4)** |
-| **ИТОГО** | **17 спринтов** | **Янв–Июн 2026** | **~591 SP** (Sprint 16 делiver ~13) | |
+| **Phase 10 · NC Art.13 + Analytics + FG Hotfix + Diploma** | **Sprint 17** | **13–24.04.2026** | **33 SP** | **🔄 В РАБОТЕ (Matching + Analytics + Export + Sprint 16 debt + FG Art.18 hotfix + UserGuide v3.4)** |
+| **Phase 11 · Diploma Assembly + VTP + Performance + FG-invoice split** | **Sprint 18** | **27.04–08.05.2026** | **27 SP** | **📋 ЗАПЛАНИРОВАН (Diploma + VTP Art.11 + Excel + k6 + FG отдельный invoice Art.20.3.5)** |
+| **ИТОГО** | **18 спринтов** | **Янв–Июн 2026** | **~625 SP** (Sprint 16 deliver ~13, Sprint 17 plan 33 incl. FG hotfix, Sprint 18 plan 27 incl. FG-05) | |
 
 ---
 
@@ -469,6 +470,8 @@ Jan–Feb 2026  Mar 2026              Mar 2026                   Mar 2026       
 | ADR-013 | KIREVO-EXIT — симметричная EXIT-точка NC §2.1 | ✅ РЕАЛИЗОВАНО (Sprint 7) |
 | ADR-014 | WebSocket (socket.io) для real-time кредитных алертов | 📋 Sprint 8 |
 | ADR-015 | VPS деплой: nginx + PM2 + Let's Encrypt SSL (Hetzner CX21) | 📋 Sprint 8 |
+| **ADR-018** | **Fuel Gas начисляется только транзитным маршрутам** (`KIREVO_HORGOS`, `KIREVO_HORGOS_AND_SERBIA`) на долю `Q_horgos`. KIREVO_EXIT_SERBIA и все Commercial Reverse → FG=0. Основание: Art.18.3.3/4 (Physical Flow) + Art.19.1.4 (GMS-4 без preheater). Бинд в CLAUDE.md "Fuel Gas Allocation Rules", Artifacts §17. | ✅ ПРИНЯТО 14.04.2026 · реализация Sprint 17 (US-1708..1713) |
+| **ADR-019** | **Fuel Gas Election A/B** (Art.18.1.1): `shippers.fuel_gas_election ∈ {IN_KIND, CASH}`, дефолт `CASH`. Газпром=CASH, NIS=IN_KIND. | ✅ ПРИНЯТО 14.04.2026 · миграция 019 Sprint 17 |
 
 ---
 
@@ -538,9 +541,10 @@ C:\Users\leokr\ETRM\
 | Sprint 14 | 31.03.2026 | 35 | **~35** | ✅ Auction Calendar + UAT |
 | Sprint 15 | 03.04.2026 | 16 | **~16** | ✅ NC consistency + docs |
 | Sprint 16 | 06–10.04.2026 | 35 | **~13** | ✅ ЗАКРЫТО (rescoped): capacity_kwh_h + OBA Art.15 + UI cleanup. Pivot на NC Art.12.3 binding rule. US-1601/1602/1604/1605/1607 → Sprint 17. US-1603 отменено навсегда. |
-| Sprint 17 | 13–24.04.2026 | 26 | **0** (plan) | 📋 PLANNED: NC Art.13 (Matching), Analytics, Export CSV, Sprint 16 test debt, UserGuide v3.4 |
+| Sprint 17 | 13–24.04.2026 | 33 | **29** (Day 3 · 15.04.2026) | ✅ ЗАКРЫТО ДОСРОЧНО: FG Art.18 hotfix (7 SP) + NC Art.13 100% (8 SP) + Analytics (5) + CSV Export (3) + Sprint 16 test debt (6) + UserGuide v3.4 (4). 4 SP дипломный buffer → Sprint 18 |
+| Sprint 18 | 27.04–08.05.2026 | 27 | **0** (plan) | 📋 PLANNED: Diploma Assembly, VTP Art.11, Excel Export, k6 Load Testing, OpenAPI sync, **FG отдельный invoice Art.20.3.5 (US-1712)** |
 ────────────────────────────────────────────────────────────────
-Total: ~565 SP delivered (552+13) + 26 SP planned Sprint 17 · Migrations: 18 (000–018), +1 в Sprint 17 (019) · Tests: 442/442 (Sprint 16 debt: +18 в Sprint 17) · NC: 79% (Art.15 sub-coverage 50→83%; Art.13 → 100% в Sprint 17) · Endpoints: 99 docs / ~84 actual (DEBT-02 в Sprint 17)
+Total: ~594 SP delivered (Sprint 1–17) + 27 SP planned Sprint 18 · Migrations: **21** (000–020 incl. FG election + adjacent_tso_matches) · Tests: **527/535 passed** (target ≥466 Sprint 17 exceeded by 61 tests) · NC: **82%** (Art.13 → 100%; Art.15 OBA → 83%; Art.18 correctness + Art.19 metering ✅; Art.11 baseline Sprint 18) · Endpoints: **82 audited** (`npm run count-endpoints`) · Sprint 17 **13/13 US closed** (29/33 SP; 4 SP дипломный buffer → Sprint 18)
 
 ---
 
@@ -551,3 +555,5 @@ Total: ~565 SP delivered (552+13) + 26 SP planned Sprint 17 · Migrations: 18 (0
 *26.03.2026 v5.1 — Sprint 5 отчёт сформирован (SPRINT_5_REPORT.md). Статус Sprint 5: ✅ ЗАВЕРШЕНО ДОСРОЧНО (~72 SP). P0 Gate Review пройден, все формулы NC верифицированы.*
 *06.04.2026 v10.1 — Sprint 15 отчёт сформирован (SPRINT_15_REPORT.md). ~16 SP, 9/9 задач. NC IP codes в demo data исправлены, документация синхронизирована до Sprint 14. NC coverage 79%.*
 *10.04.2026 v12.3 — Sprint 16 ЗАКРЫТ (rescoped, ~13/35 SP). Pivot на NC Art.12.3 binding rule (shippers always balanced) отменил US-1603 навсегда и заместил его US-1603b OBA Settlement (TSO-to-TSO read-only). Сделано: Migration 017 capacity_kwh_h, Migration 018 oba_daily_imbalances, 3 OBA endpoints, OBA UI section, LT Booking Rules, UI cleanup (billing/contracts/credit/gas-quality), data cleanup (7 invoices + 3 orphan contracts), BUG-04/05 fix. NC Art.15 sub-coverage 50→83%. Endpoints 96→99 (docs). Перенесено в Sprint 17: US-1601→1703, US-1602→1704, US-1604→1705, US-1605→1706 (CSV only), US-1607→1707. Отчёт: SPRINT_16_REPORT.md. План Sprint 17: SPRINT_17_PLAN.md (26 SP, P0 = NC Art.13 + Sprint 16 test debt).*
+*13.04.2026 v12.5 — Sprint 18 plan сформирован автоматически (SPRINT_18_PLAN.md). 7 US, 24 SP. P0: Diploma Final Assembly + OpenAPI Final Sync. P1: VTP Basic NC Art.11 (миграция 020) + Excel Export (exceljs) + k6 Load Testing. P2: LOCAL_RUN.md + Sprint 17 carryover buffer. Phase 11 добавлена в roadmap. Период: 27.04–08.05.2026.*
+*14.04.2026 v12.6 — Fuel Gas hotfix. Аудит INV-2026-0008 выявил, что `calcFuelGas()` начисляет FG любому shipper'у независимо от маршрута (fallback estFlowKwh). По Art.18.3.3/4 + Art.19.1.4 (GMS-4 Gospođinci БЕЗ preheating) FG должен идти только транзитным: `KIREVO_HORGOS`, `KIREVO_HORGOS_AND_SERBIA`. KIREVO_EXIT_SERBIA и 4× Commercial Reverse → FG=0. Правило записано в CLAUDE.md "Fuel Gas Allocation Rules" + GTCP_Artifacts.md §17 + UserGuide §6.4/§14.3. Sprint 17: +7 SP (US-1708..1713 = billing fix + migration 019 election + AAQ check + data fix INV-2026-0008 + tests). Sprint 18: +3 SP (US-1712 отдельный FG-invoice Art.20.3.5). ADR-018, ADR-019 приняты.*

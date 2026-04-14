@@ -67,13 +67,13 @@ describe('Billing Coverage — POST /billing (invoice creation)', () => {
         periodTo: '2026-03-31',
         capEntryKwhH: 13752230,
         capExitKwhH: 9216209,
-        flowDirection: 'GOSPODJINCI_HORGOS',
+        flowDirection: 'KIREVO_HORGOS',  // transit route → FG estimation applies
       });
     expect(res.status).toBe(201);
     expect(res.body._breakdown).toBeDefined();
     expect(res.body._breakdown.capacity.entryFeeEur).toBeGreaterThan(0);
     expect(res.body._breakdown.capacity.exitFeeEur).toBeGreaterThan(0);
-    expect(res.body._breakdown.fuelGas.estimated).toBe(true);
+    expect(res.body._breakdown.fuelGas.estimated).toBe(true);  // no nominations seeded → cap × 0.85 fallback
     expect(res.body._breakdown.billingDays).toBe(31);
   });
 
@@ -92,6 +92,7 @@ describe('Billing Coverage — POST /billing (invoice creation)', () => {
         shipperId: UUID_1,
         periodFrom: '2026-03-01',
         periodTo: '2026-03-31',
+        flowDirection: 'KIREVO_HORGOS',  // transit route → FG applies (Art.18)
         capEntryKwhH: 13752230,
         capExitKwhH: 9216209,
         qHorgosKwh: 10000000,

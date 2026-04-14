@@ -165,17 +165,18 @@ describe('calcCapacityFee', () => {
 
 describe('calcFuelGas', () => {
 
-  test('standard: X1=0.42%, Horgos=10M, X2=0.08%, Serbia=5M, KN=1000', () => {
+  test('standard: X1=0.42%, Horgos=10M, Serbia excluded (Art.18.3 + Art.19.1.4), KN=1000', () => {
     const r = calcFuelGas({
       qHorgosKwh: 10000000, qSerbiaKwh: 5000000,
       x1Pct: 0.42, x2Pct: 0.08, knKwh: 1000,
       gcvKwhNm3: 11.523, fuelGasPriceEurMwh: 32.50,
     });
-    // FG = 0.0042 × 10M + 0.0008 × 5M − 1000 = 42000 + 4000 − 1000 = 45000 kWh
-    expect(r.fuelGasKwh).toBe(45000);
-    expect(r.fuelGasMwh).toBe(45);
-    expect(r.fuelGasAmountEur).toBe(1462.50);
-    expect(r.fuelGasNm3).toBeCloseTo(45000 / 11.523, 1);
+    // Q_serbia is zeroed in billing (domestic exit excluded per binding rule 14.04.2026):
+    // FG = 0.0042 × 10M − 1000 = 42000 − 1000 = 41000 kWh
+    expect(r.fuelGasKwh).toBe(41000);
+    expect(r.fuelGasMwh).toBe(41);
+    expect(r.fuelGasAmountEur).toBe(1332.50);
+    expect(r.fuelGasNm3).toBeCloseTo(41000 / 11.523, 1);
   });
 
   test('FG cannot be negative (KN exceeds flow)', () => {

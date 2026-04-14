@@ -1,5 +1,7 @@
 # GTCP — Sprint 17 Plan
-**Gas Trading & Commercial Platform · NC Art.13 + Analytics + Sprint 16 Debt + Diploma Prep**
+**Gas Trading & Commercial Platform · NC Art.13 + Analytics + Sprint 16 Debt + Diploma Prep + FG Art.18 Hotfix**
+
+> **Обновлено 14.04.2026 v2:** добавлен Epic 5 — Fuel Gas Hotfix (NC Art.18 + Art.19.1.4), +7 SP. Обнаружено при аудите INV-2026-0008.
 
 ---
 
@@ -10,10 +12,10 @@
 | **Sprint** | Sprint 17 |
 | **Период** | 13.04.2026 — 24.04.2026 |
 | **Команда** | Backend Dev, Frontend Dev, QA, Tech Lead |
-| **Velocity (цель)** | 28 SP (реалистичная корректировка после Sprint 16: план 35 → факт 13) |
-| **Sprint Goal** | Закрыть NC Art.13 Matching (67% → 100%), добавить Analytics dashboard + Export, погасить Sprint 16 test debt, выпустить UserGuide v3.4 к диплому |
-| **Приоритет** | P0 — NC Art.13 + Sprint 16 test debt; P1 — Analytics, Export, UserGuide v3.4 |
-| **Статус** | 🟡 PLANNED |
+| **Velocity (цель)** | **33 SP** (26 базовый план + 7 FG hotfix; US-1712 FG-invoice split → Sprint 18) |
+| **Sprint Goal** | Закрыть NC Art.13 Matching (67% → 100%), Analytics + Export, Sprint 16 test debt, UserGuide v3.4, **исправить FG начисление (правильно только транзит KIREVO_HORGOS)** |
+| **Приоритет** | P0 — NC Art.13 + Sprint 16 debt + **FG hotfix (US-1708/1711)**; P1 — Analytics, Export, UserGuide, FG election/tests |
+| **Статус** | 🔄 IN PROGRESS (Day 2) |
 
 ---
 
@@ -29,7 +31,8 @@
 - [ ] Sprint 16 test debt погашен: ≥15 новых тестов (OBA endpoints + capacity_kwh_h invariants)
 - [ ] Endpoint count audit завершён — docs = actual
 - [ ] UserGuide v3.4 (.md + .docx) готов к защите
-- [ ] Jest total ≥ 460 (было 442; +18)
+- [ ] **FG Art.18 hotfix: KIREVO_EXIT_SERBIA + 4× CR → FG=0; INV-2026-0008 исправлен; migration 019 election; ≥6 FG-тестов**
+- [ ] Jest total ≥ 466 (было 442; +18 Sprint 16 debt, +6 FG matrix)
 
 ---
 
@@ -295,21 +298,135 @@ package.json                        ← +"count-endpoints" script
 | R-3 | Повторный scope drift — обнаружится ещё одна NC inconsistency | Средняя | Высокое | **Fresh NC review перед Sprint Planning** (обязательное действие из Sprint 16 retro) |
 | R-4 | DEBT-02 endpoint audit откроет крупные расхождения с OpenAPI | Средняя | Среднее | Если расхождение >20 endpoints — отдельный эпик в Sprint 18, в Sprint 17 только baseline |
 | R-5 | UserGuide v3.4 не успевает к защите | Низкая | Высокое | P0 приоритет; черновик на Mid-Sprint Review; docx к 23.04 |
+| R-6 | FG sweep-скрипт затронет корректные транзитные invoice | Низкая | Среднее | Dry-run mode обязателен; проверка `flow_direction NOT IN (...)` filter в SQL перед apply; бэкап таблицы invoices |
+| R-7 | FG hotfix +7 SP перегружает Sprint 17 (33 vs 28 базовая velocity) | Средняя | Среднее | FG-05 (отдельный invoice Art.20.3.5) вынесен в Sprint 18 (US-1712, 3 SP); US-1706 Export CSV при перегрузке → Sprint 18 |
 
 ---
 
 ## Definition of Done (Sprint 17)
 
-- [ ] Все P0 US завершены (US-1701, 1702, 1703, 1704)
+- [ ] Все P0 US завершены (US-1701, 1702, 1703, 1704, **US-1708, US-1711**)
 - [ ] NC Art.13 = 100% coverage
 - [ ] Sprint 16 test debt погашен (≥18 новых тестов)
 - [ ] Endpoint count audited, единое число в CLAUDE.md / Artifacts / UserGuide
 - [ ] Analytics dashboard работает с real-data
 - [ ] Export CSV работает для 3 модулей
 - [ ] UserGuide v3.4 (.md + .docx) готов
-- [ ] Jest tests: ≥460 зелёные в CI
+- [ ] **FG hotfix: billing.js ограничен транзитом; migration 019 election; INV-2026-0008 fixed (FG=0, total=3 350 312,03); ≥6 FG-тестов; FG_DATA_FIX_REPORT.md**
+- [ ] Jest tests: ≥466 зелёные в CI (442 baseline + 18 Sprint 16 debt + 6 FG matrix)
 - [ ] Git: коммит `feat(sprint-17)` + тег `sprint-17`
-- [ ] SPRINT_17_REPORT.md написан
+- [ ] SPRINT_17_REPORT.md написан (включая FG retrospective)
+
+---
+
+## Epic 5: Fuel Gas Hotfix (NC Art.18 + Art.19.1.4) — P0 · добавлено 14.04.2026
+
+**Источник обнаружения:** аудит INV-2026-0008 (NIS, `KIREVO_EXIT_SERBIA`) показал line FUEL_GAS = 74 883,91 EUR при корректном значении 0,00 EUR.
+
+**Binding rule** (записан в [CLAUDE.md "Fuel Gas Allocation Rules"](../CLAUDE.md) + [GTCP_Artifacts.md §17](./GTCP_Artifacts.md)):
+
+```
+FG_fee > 0  ⟺  flow_direction ∈ {KIREVO_HORGOS, KIREVO_HORGOS_AND_SERBIA}
+           AND  shipper.fuel_gas_election = 'CASH'
+           AND  AAQ_horgos > 0
+```
+
+Обоснование: Art.18.3.3 (CS только через компрессор → только транзит к Horgoš); Art.19.1.4 (preheating только GMS-2 и GMS-3, GMS-4 Gospođinci БЕЗ preheater → domestic NIS и CR-shippers не получают аллокацию).
+
+---
+
+#### US-1708 · Billing Fix: FG applicable directions only (FG-01/FG-02) 🔴 P0
+
+**Как** Billing Engineer, **я хочу** чтобы `calcFuelGas()` применялся только к транзитным маршрутам, **чтобы** domestic и CR-shippers не получали ошибочных FG-начислений.
+
+| | |
+|---|---|
+| **Story Points** | 2 |
+| **Assignee** | Backend Dev |
+| **Priority** | 🔴 P0 |
+
+**Задачи:**
+- [ ] `FG-01.1` В [billing.js:535-568](../backend/src/routes/billing.js#L535-L568) добавить константу `FG_APPLICABLE_DIRECTIONS = ['KIREVO_HORGOS', 'KIREVO_HORGOS_AND_SERBIA']`.
+- [ ] `FG-01.2` Early return `{fuelGasKwh: 0, ...}` если `!FG_APPLICABLE_DIRECTIONS.includes(resolvedDirection)`.
+- [ ] `FG-02.1` Удалить fallback-ветку `estFlowKwh = cap × 24 × days × 0.85` или ограничить её только транзитными маршрутами.
+- [ ] `FG-02.2` Для `KIREVO_HORGOS_AND_SERBIA`: `qSerbiaKwh = 0` всегда (domestic exit освобождён от FG).
+
+**DoD:** Unit-тест показывает FG=0 для всех non-transit маршрутов; FG>0 для транзита при election=CASH.
+
+---
+
+#### US-1709 · Migration 019: shippers.fuel_gas_election (FG-03) 🟡 P1
+
+| | |
+|---|---|
+| **Story Points** | 1 |
+| **Assignee** | Backend Dev |
+| **Priority** | 🟡 P1 |
+
+**Задачи:**
+- [ ] `FG-03.1` `ALTER TABLE shippers ADD COLUMN fuel_gas_election TEXT CHECK (fuel_gas_election IN ('IN_KIND','CASH')) DEFAULT 'CASH'`.
+- [ ] `FG-03.2` Seed: Газпром (SHP-001)='CASH', NIS (SHP-002)='IN_KIND' (domestic supplier с собственным газом).
+- [ ] `FG-03.3` В `calcFuelGas()` добавить проверку `shipper.fuel_gas_election === 'IN_KIND' → FG=0` (edge-case Art.18.4.2 → P3 later).
+- [ ] `FG-03.4` OpenAPI: обновить schema `Shipper` + `POST /shippers` validation.
+
+**DoD:** Миграция чистая, backfill 2 shipper'а корректный, billing использует поле.
+
+---
+
+#### US-1710 · AAQ-based FG (no capacity fallback) (FG-04) 🟡 P1
+
+| | |
+|---|---|
+| **Story Points** | 1 |
+| **Assignee** | Backend Dev |
+| **Priority** | 🟡 P1 |
+
+**Задачи:**
+- [ ] `FG-04.1` `calcFuelGas()`: брать `qHorgosKwh` из `SELECT SUM(allocated_kwh_h) FROM nominations WHERE shipper_id=$1 AND period=$2 AND exit_point='HORGOS-EXIT'`.
+- [ ] `FG-04.2` Early return `0` если AAQ=0 (Art.18.3 требует Allocated Quantities, не estimation).
+- [ ] `FG-04.3` Удалить `cap × 0.85` fallback (или оставить только для dry-run mode за флагом).
+
+**DoD:** Integration test: создать invoice без nominations → FG=0; с nominations → FG>0 пропорционально.
+
+---
+
+#### US-1711 · Data Fix INV-2026-0008 + historical sweep (FG-06/FG-07) 🔴 P0
+
+| | |
+|---|---|
+| **Story Points** | 2 |
+| **Assignee** | Data Engineer |
+| **Priority** | 🔴 P0 |
+
+**Задачи:**
+- [ ] `FG-06.1` Обновить INV-2026-0008: `UPDATE invoice_line_items SET amount_eur=0 WHERE invoice_id=... AND line_type='FUEL_GAS'`; пересчитать `total_amount_eur = 3 350 312,03 EUR`.
+- [ ] `FG-07.1` Скрипт `scripts/fix-fuel-gas-invoices.js`: идентифицировать все invoice где shipper.flow_direction ∉ {KIREVO_HORGOS, KIREVO_HORGOS_AND_SERBIA} И line_type='FUEL_GAS' И amount>0 → обнулить + пересчитать total.
+- [ ] `FG-07.2` Dry-run вывод в консоль; apply после ревью.
+- [ ] `FG-07.3` Отчёт в `reports/FG_DATA_FIX_REPORT.md` — сколько invoice затронуто, суммарная коррекция EUR.
+
+**DoD:** INV-2026-0008 корректен (FG=0, total=3 350 312,03); нет исторических invoice для NIS/CR с ненулевым FG.
+
+---
+
+#### US-1713 · FG Test Matrix 🟡 P1
+
+| | |
+|---|---|
+| **Story Points** | 1 |
+| **Assignee** | QA |
+| **Priority** | 🟡 P1 |
+
+**Задачи:**
+- [ ] `FG-T.1` `tests/fuel-gas.spec.test.js` — matrix:
+  - KIREVO_HORGOS + CASH + AAQ>0 → FG>0 ✅
+  - KIREVO_HORGOS_AND_SERBIA + CASH + AAQ_horgos>0 → FG на Q_horgos, Q_serbia zeroed ✅
+  - KIREVO_EXIT_SERBIA + CASH + any AAQ → FG=0 ✅
+  - HORGOS_KIREVO / EXIT_SERBIA_KIREVO / HORGOS_EXIT_SERBIA / EXIT_SERBIA_HORGOS → FG=0 ✅
+  - KIREVO_HORGOS + IN_KIND → FG=0 ✅
+  - KIREVO_HORGOS + CASH + AAQ=0 → FG=0 ✅
+- [ ] `FG-T.2` Regression: INV-2026-0008 reproduction через POST /billing → assert FG=0.
+
+**DoD:** ≥6 новых тестов зелёные; Jest total ≥ 466.
 
 ---
 

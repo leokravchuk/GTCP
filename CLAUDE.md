@@ -58,7 +58,7 @@ Before writing or changing any code in the following areas, verify against the N
 | Gas Day | NC §2.1 ("Gas Day") | 06:00 CET → 06:00 CET next day |
 | Credit Support | NC Art. 5 | Margin call: 2 Business Days (Art. 5.5) |
 | Credit calculation | NC Art. 5.3.1 | Available Credit = Credit Limit − current exposure |
-| Fuel Gas billing | NC Art. 18 | Monthly: (Production − Consumption) × tariff |
+| Fuel Gas billing | NC Art. 18 + Art. 19.1.4 | **Только транзитные маршруты** (`KIREVO_HORGOS`, `KIREVO_HORGOS_AND_SERBIA`). `KIREVO_EXIT_SERBIA` и все Commercial Reverse **НЕ платят FG**. См. раздел "Fuel Gas Allocation Rules" ниже. |
 | Capacity fee tariff | AERS Decision 05-145 (17.07.2025) | EUR/kWh/h/period; see full tariff table below |
 | Capacity fee formula | Gastrans analysis | **Separate entry/exit**: fee = cap_entry×t_entry + cap_exit×t_exit (cap_entry ≠ cap_exit!) |
 | Within-Day fee | NC Art. 6.3.1.4 | fee = capacity_kWh_h × price_per_hour × hours (NOT / 365) |
@@ -119,8 +119,9 @@ Implementation: Option A (real-time SQL on every request).
 - `GET /auctions/calendar/grid` — Product × Month grid for Gas Year (Yearly/Quarterly/Monthly status per month)
 - `GET /auctions/calendar/days?year=YYYY&month=M` — Day-centric calendar: DB auctions (Y/Q/M) + on-the-fly Daily/WD per day
 
-Total API endpoints: **99** (Sprint 16: +3 OBA endpoints; was 96 at Sprint 14, 93 at Sprint 12)
-> ⚠️ Docs count (99) differs from actual grep count (~84). Endpoint audit deferred to Sprint 17 (DEBT-02).
+Total API endpoints: **82** (authoritative, from `node scripts/count-endpoints.js` · Sprint 17 DEBT-02 completed 15.04.2026).
+> OpenAPI coverage: 58/82 (71%). Gap: 42 endpoints in code without openapi spec + 18 in openapi without code (obsolete names). Full OpenAPI sync → Sprint 18 US-1802.
+> Previous docs counts (99 / 96 / 93) were stale estimates. The new single source of truth is `npm run count-endpoints` (see backend/scripts/count-endpoints.js).
 
 **Sprint 16 capacity_kwh_h (09.04.2026):**
 - Migration 017: `capacity_bookings.capacity_kwh_h` — native kWh/h column (АЕРС-exact)
@@ -372,3 +373,78 @@ fee = cap × (t_entry + t_exit)     ← assumes cap_entry == cap_exit, FALSE for
 
 **Example (March 2026, 31 days, Entry Kirevo 13,752,230 kWh/h):**
 ```
+
+---
+
+## Fuel Gas Allocation Rules (NC Art.18 + Art.19.1.4) — BINDING
+
+**Адопт: 14.04.2026 (на основании анализа Art.18.3.3 / 18.3.4 + физики оборудования Art.19.1.4).**
+
+### Физика — размещение оборудования (Art.19.1.4)
+
+| Установка | Расположение | Для кого нужна |
+|---|---|---|
+| Компрессорная станция (CS) | магистраль до HORGOS-EXIT | **только транзит до Horgoš** (венгерская back-pressure) |
+| Preheating unit — GMS-2 Paraćin | Exit Serbia | транзитный поток на магистрали |
+| Preheating unit — GMS-3 Pančevo | Exit Serbia | транзитный поток на магистрали |
+| **GMS-4 Gospođinci** | Exit Serbia | **preheating ОТСУТСТВУЕТ** (Art.19.1.4 не упоминает GMS-4) |
+
+### Правило начисления Fuel Gas fee
+
+```
+FG_fee > 0   ⟺   flow_direction ∈ {KIREVO_HORGOS, KIREVO_HORGOS_AND_SERBIA}
+            AND  shipper.fuel_gas_election = 'CASH'   (Art.18.1.1(b))
+            AND  AAQ_horgos > 0                       (реальный allocated поток)
+
+Все остальные маршруты → FG_fee = 0.
+```
+
+### Кто платит / кто не платит
+
+| Маршрут | Тип | CS (Art.18.3.3) | PHG (Art.18.3.4) | Платит FG? |
+|---|---|---|---|---|
+| `KIREVO_HORGOS` | PHYSICAL transit | ✅ X1·Q_horgos | ✅ (минорно, пропорционально AAQE) | **ДА** |
+| `KIREVO_HORGOS_AND_SERBIA` | PHYSICAL mixed | ✅ только на `Q_horgos` | ✅ только на транзитной доле | **ДА** (только транзитная часть) |
+| `KIREVO_EXIT_SERBIA` | PHYSICAL domestic | ❌ 0 (не проходит компрессор) | ❌ 0 (GMS-4 без preheater) | **НЕТ** |
+| `HORGOS_KIREVO`, `EXIT_SERBIA_KIREVO`, `HORGOS_EXIT_SERBIA`, `EXIT_SERBIA_HORGOS` | Commercial Reverse | ❌ 0 (виртуальный поток) | ❌ 0 | **НЕТ** |
+
+### Формула (Art.18.2.1 — только для применимых маршрутов)
+
+```
+FG_kwh = X1 × Q_horgos + X2 × Q_serbia − KN
+FG_eur = (FG_kwh / 1000) × price_eur_mwh   (тендерная цена Art.18.1.5)
+```
+
+Для `KIREVO_HORGOS_AND_SERBIA`: `Q_serbia` в формуле **обнуляется** на уровне billing (domestic exit освобождён), остаётся только `X1 × Q_horgos`.
+
+### Выбор способа оплаты (Art.18.1.1)
+
+- **Election A — in-kind**: User поставляет FG в натуре через Nomination (титул на VTP; для нерезидента — на Kirevo). В Monthly Invoice FG = 0, кроме Art.18.4.2 (30 дней простоя + KN<0).
+- **Election B — cash**: User возмещает TSO стоимость закупки по Art.18.1.5. Fee рассчитывается по формуле выше.
+- Выбор валиден на весь Gas Year (Art.18.1.2).
+
+### Обязательные поля для schema
+
+- `shippers.fuel_gas_election` ∈ {`IN_KIND`, `CASH`} — по умолчанию `CASH` для нерезидентов.
+
+### Требования к billing invoice (Art.20.3)
+
+- Art.20.3.2.2: FG — отдельная позиция Monthly Invoice.
+- Art.20.3.5: при >1 Capacity Product → **отдельный FG-invoice** (не line item в общем счёте).
+- Art.20.3.6: для LT GTA FG выставляется по LT GTA, не по NC.
+- Art.18.5.1.4: цена FG публикуется на сайте TSO ежедневно.
+
+### Текущие баги backend/src/routes/billing.js (зафиксировано 14.04.2026)
+
+1. [billing.js:553-558](../backend/src/routes/billing.js#L553-L558) — fallback `estFlowKwh = cap × 24 × days × 0.85` начисляет FG **любому** shipper'у с capacity, независимо от маршрута и election. **Исправить**: early return `0` для маршрутов вне `{KIREVO_HORGOS, KIREVO_HORGOS_AND_SERBIA}`.
+2. [billing.js:556-558](../backend/src/routes/billing.js#L556-L558) — для `KIREVO_EXIT_SERBIA` fallback кладёт поток в `qHorgosKwh` → начисляет X1 (компрессор) вместо X2 (подогрев). Критично.
+3. Отсутствует поле `shippers.fuel_gas_election` → нельзя различить in-kind/cash.
+4. Отсутствует проверка `AAQ > 0` — счёт генерируется даже при нулевых фактических аллокациях.
+5. Нарушение Art.20.3.5 — FG как line item вместо отдельного invoice для мультипродуктовых shippers.
+
+### Последствия для seed / существующих счетов
+
+- **INV-2026-0008 (NIS, `KIREVO_EXIT_SERBIA`)**: line item FUEL_GAS = 74 883,91 EUR **должен быть 0**. Total пересчитать: 3 350 312,03 EUR (не 3 425 195,94).
+- Проверить все исторические invoice для NIS и Commercial Reverse shipper'ов — удалить/занулить FG-строки.
+- Summary-блок Fuel Gas 0,00 EUR в INV-2026-0008 — правильный.
+

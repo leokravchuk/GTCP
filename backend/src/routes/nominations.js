@@ -18,6 +18,12 @@ const authorize     = require('../middleware/authorize');
 const { addAudit }  = require('../services/auditService');
 
 const edigas = require('../services/edigasService');
+const {
+  matchWithAdjacentTso,
+  fetchAdjacentNomination,
+  applyLesserRule,
+  ADJACENT_TSO_BY_POINT,
+} = require('../services/adjacentTsoService');
 
 const router = express.Router();
 router.use(authenticate);
@@ -34,6 +40,50 @@ async function nextReference(gasDay) {
   const seq = String(Number(rows[0].cnt) + 1).padStart(5, '0');
   return `NOM-${year}-${seq}`;
 }
+
+// ── GET /export — CSV export (NC Art.12 nominations register) ─────────────────
+const { rowsToCsv, sendCsv } = require('../utils/csvExport');
+router.get('/export', authorize('nominations:read'), async (req, res, next) => {
+  const { gas_day, shipper_id, status, direction, from, to } = req.query;
+  const conds = []; const params = []; let i = 1;
+  if (gas_day)    { conds.push(`n.gas_day = $${i++}`);    params.push(gas_day); }
+  if (shipper_id) { conds.push(`n.shipper_id = $${i++}`); params.push(shipper_id); }
+  if (status)     { conds.push(`n.status = $${i++}`);     params.push(status); }
+  if (direction)  { conds.push(`n.direction = $${i++}`);  params.push(direction); }
+  if (from)       { conds.push(`n.gas_day >= $${i++}`);   params.push(from); }
+  if (to)         { conds.push(`n.gas_day <= $${i++}`);   params.push(to); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
+  try {
+    const { rows } = await db.query(
+      `SELECT n.reference, s.code AS shipper_code, s.name AS shipper_name,
+              n.gas_day, n.direction, n.point,
+              n.volume_kwh_h, n.contracted_kwh_h,
+              n.matched_kwh_h, n.allocated_kwh_h,
+              n.is_over_nomination, n.status, n.gas_day_cycle, n.submitted_at
+         FROM nominations n JOIN shippers s ON s.id = n.shipper_id
+         ${where} ORDER BY n.gas_day DESC, n.submitted_at DESC`,
+      params
+    );
+    const csv = rowsToCsv(rows, [
+      { key: 'reference',          header: 'Reference' },
+      { key: 'shipper_code',       header: 'Shipper' },
+      { key: 'shipper_name',       header: 'Shipper Name' },
+      { key: 'gas_day',            header: 'Gas Day' },
+      { key: 'direction',          header: 'Direction' },
+      { key: 'point',              header: 'Point' },
+      { key: 'volume_kwh_h',       header: 'Nominated kWh/h' },
+      { key: 'contracted_kwh_h',   header: 'Contracted kWh/h' },
+      { key: 'matched_kwh_h',      header: 'Matched kWh/h' },
+      { key: 'allocated_kwh_h',    header: 'Allocated kWh/h' },
+      { key: 'is_over_nomination', header: 'Over-Nom' },
+      { key: 'status',             header: 'Status' },
+      { key: 'gas_day_cycle',      header: 'Cycle' },
+      { key: 'submitted_at',       header: 'Submitted' },
+    ]);
+    return sendCsv(res, 'nominations', csv);
+  } catch (err) { next(err); }
+});
 
 // ── GET / ──────────────────────────────────────────────────────────────────────
 router.get('/', authorize('nominations:read'), async (req, res, next) => {
@@ -322,6 +372,88 @@ router.post('/match', authorize('nominations:match'), async (req, res, next) => 
       description: `Matching run for gas_day ${gasDay}: ${results.length} pairs matched` });
 
     res.json({ gasDay, matchedPairs: results.length, details: results });
+  } catch (err) { next(err); }
+});
+
+// ── POST /:id/match-adjacent — NC Art.13 Lesser Rule with adjacent TSO ────────
+router.post('/:id/match-adjacent', authorize('nominations:match'), async (req, res, next) => {
+  const { id } = req.params;
+  const { scenario, factor, notes } = req.body || {};
+
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM nominations WHERE id = $1`, [id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Nomination not found' });
+    const nom = rows[0];
+
+    if (!ADJACENT_TSO_BY_POINT[nom.point]) {
+      return res.status(400).json({
+        error: `No adjacent TSO configured for point ${nom.point}`,
+      });
+    }
+
+    const result = await matchWithAdjacentTso({ db }, nom, { scenario, factor, notes });
+
+    await addAudit({
+      actionType: 'NOMINATION_MATCH_ADJACENT',
+      entityType: 'nomination',
+      userId:   req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      description: `Adjacent TSO match for ${nom.reference} at ${nom.point}: ` +
+                   `our=${result.match.our_side_kwh_h} their=${result.match.their_side_kwh_h} ` +
+                   `matched=${result.match.matched_kwh_h} (${result.match.lesser_side})`,
+    });
+
+    res.status(201).json({
+      match: result.match,
+      nominationStatus: result.newNominationStatus,
+      ncRef: 'NC Art.13 Lesser Rule',
+    });
+  } catch (err) { next(err); }
+});
+
+// ── GET /:id/matching-result — US-1704 Double-Sided Matching Result ───────────
+router.get('/:id/matching-result', authorize('nominations:read'), async (req, res, next) => {
+  const { id } = req.params;
+  try {
+    const { rows: nomRows } = await db.query(
+      `SELECT n.*, s.code AS shipper_code, s.name AS shipper_name
+         FROM nominations n JOIN shippers s ON s.id = n.shipper_id
+        WHERE n.id = $1`, [id]
+    );
+    if (!nomRows.length) return res.status(404).json({ error: 'Nomination not found' });
+    const nom = nomRows[0];
+
+    const { rows: adjMatches } = await db.query(
+      `SELECT * FROM adjacent_tso_matches
+        WHERE nomination_id = $1
+        ORDER BY matched_at DESC`, [id]
+    );
+
+    res.json({
+      nomination: {
+        id: nom.id,
+        reference: nom.reference,
+        shipperCode: nom.shipper_code,
+        shipperName: nom.shipper_name,
+        gasDay: nom.gas_day,
+        point: nom.point,
+        direction: nom.direction,
+        nominatedKwhH: Number(nom.volume_kwh_h),
+        matchedKwhH:   Number(nom.matched_kwh_h || 0),
+        allocatedKwhH: Number(nom.allocated_kwh_h || 0),
+        status: nom.status,
+      },
+      adjacentMatches: adjMatches,
+      summary: {
+        hasAdjacentMatch: adjMatches.length > 0,
+        lastLesserSide:   adjMatches[0]?.lesser_side || null,
+        adjacentTso:      adjMatches[0]?.adjacent_tso || null,
+      },
+      ncRef: 'NC Art.13 Double-Sided Matching',
+    });
   } catch (err) { next(err); }
 });
 

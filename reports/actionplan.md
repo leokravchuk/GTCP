@@ -1,32 +1,66 @@
 # GTCP — Action Plan
 **Текущие задачи, приоритеты и решения · Living Document**
 
-> Последнее обновление: 10.04.2026 · Sprint 16 закрыт (rescoped) · Sprint 17 запланирован · Версия 17.3
+> Последнее обновление: 14.04.2026 · Sprint 17 в работе + FG hotfix · Sprint 18 запланирован · Версия 18.1
 
 ---
 
-## 📋 Sprint 17 · NC Art.13 + Analytics + Sprint 16 Debt + Diploma (13–24.04.2026)
+## 📋 Sprint 18 · Diploma Final Assembly + VTP Art.11 + Excel Export + Performance (27.04–08.05.2026)
 
-> Детали: [`SPRINT_17_PLAN.md`](SPRINT_17_PLAN.md) · Target: 26 SP (+2 резерв)
+> Детали: `reports/SPRINT_18_PLAN.md` · Target: 24 SP (+4 резерв/carryover)
+
+### 🔴 P0 — Diploma & OpenAPI
+
+- [ ] **US-1801** · Diploma Final Assembly — обновить Diploma Text (Sprint 15-18), Presentation, создать DIPLOMA_ARTIFACTS_INDEX.md, ревизия GTCP_Artifacts.md (5 SP)
+- [ ] **US-1802** · OpenAPI Final Sync — добавить Sprint 17-18 endpoints в openapi.yaml, подтвердить count-endpoints = 0 расхождений (2 SP)
+
+### 🟡 P1 — VTP + Excel + Performance
+
+- [ ] **US-1803** · VTP Basic (NC Art.11) — миграция 020 vtp_trades, 5 endpoints (CRUD + balance), VTP Trading tab, ≥8 тестов (5 SP)
+- [ ] **US-1804** · Excel (xlsx) Export — exceljs, /billing/export?format=xlsx + /contracts/export + /nominations/export, кнопки Export Excel, ≥4 тестов (3 SP)
+- [ ] **US-1805** · k6 Load Testing — smoke/stress/spike scripts, ≥100 RPS p95<500ms, LOAD_TEST_RESULTS.md (3 SP)
+
+### 🟢 P2 — Docs + Buffer
+
+- [ ] **US-1806** · LOCAL_RUN.md + Deployment Docs — prerequisites, env, migrations, tests, API quick start (2 SP)
+- [ ] **US-1807** · Sprint 17 Carryover Buffer — резерв для P0 items из Sprint 17 или Transparency Portal Art.24 (4 SP)
+
+---
+
+## 📋 Sprint 17 · NC Art.13 + Analytics + Sprint 16 Debt + FG Hotfix + Diploma (13–24.04.2026)
+
+> Детали: [`SPRINT_17_PLAN.md`](SPRINT_17_PLAN.md) · Target: 26 SP + 7 SP FG hotfix = **33 SP** (US-1712 FG отдельный invoice → Sprint 18)
 
 ### 🔴 P0 — Sprint 16 Debt
 
-- [ ] **US-1701** · Sprint 16 Test Coverage (DEBT-01) — ≥18 новых тестов: OBA integration (8), capacity_kwh_h dbspec (6), shipper balance (4) (4 SP)
-- [ ] **US-1702** · Endpoint Count Audit (DEBT-02) — сверка router.*/app.* с openapi.yaml, единое число в CLAUDE.md + Artifacts + UserGuide, `npm run count-endpoints` script (2 SP)
+- [x] **US-1701** · Sprint 16 Test Coverage (DEBT-01) — **30 новых тестов** (target ≥18): [balance-oba.integration.test.js](../backend/tests/balance-oba.integration.test.js) 11 cases (auth, 12m window, filters, monthly aggregation, summary), [capacity-kwh-h.dbspec.test.js](../backend/tests/capacity-kwh-h.dbspec.test.js) 8 cases (conversion invariants, AERS 90/10, ST balance, over-nom regression BUG-04/05, precision), [shipper-balance.test.js](../backend/tests/shipper-balance.test.js) 11 cases (Σ Entry=Σ Exit, LT ceilings, Gazprom 90%, ST pool, NIS domestic-only). Jest total 446 → **476** (+30). (4 SP) — **P0 ✅ 15.04.2026**
+- [x] **US-1702** · Endpoint Count Audit (DEBT-02) — скрипт [`scripts/count-endpoints.js`](../backend/scripts/count-endpoints.js) добавлен с `:id ↔ {id}` нормализацией; `npm run count-endpoints` + `npm run fix-fuel-gas` зарегистрированы. **Actual = 82 endpoints** (OpenAPI: 58, gap 42/18 → полный sync в Sprint 18 US-1802). Обновлены CLAUDE.md, GTCP_Artifacts.md (TOC + §14 header + velocity table), UserGuide §architecture table (RU + EN), roadmap velocity footer. (2 SP) — **P0 ✅ 15.04.2026**
+
+### 🔴 P0 — HOTFIX: Fuel Gas Allocation (NC Art.18 + Art.19.1.4) · добавлено 14.04.2026
+
+> Обнаружено при аудите INV-2026-0008: FG начисляется не тем shipper'ам. Bound rule записан в CLAUDE.md "Fuel Gas Allocation Rules" и GTCP_Artifacts.md §17.
+> **Правило:** `FG_fee > 0 ⟺ flow_direction ∈ {KIREVO_HORGOS, KIREVO_HORGOS_AND_SERBIA} AND election='CASH' AND AAQ_horgos > 0`. Все остальные → FG=0.
+
+- [x] **US-1708 (FG-01/FG-02)** · Billing fix: `calcFuelGas()` guards (FG_APPLICABLE_DIRECTIONS + election + AAQ) + `FG_ZERO` + `Q_serbia = 0` в mixed transit; fallback ветка ограничена транзитом. [billing.js:220-288, 568-624](../backend/src/routes/billing.js#L220-L624) (2 SP) — **P0 ✅ 15.04.2026**
+- [x] **US-1709 (FG-03)** · Migration 019 `fuel_gas_election.sql` + backfill (SHP-001=CASH, SHP-002=IN_KIND). `calcFuelGas()` читает election через shipperId lookup с try/catch до migrate. (1 SP) — **P1 ✅ 15.04.2026**
+- [x] **US-1710 (FG-04)** · Guard `qHorgosKwh ≤ 0 → FG=0` в `calcFuelGas()`. POST /billing теперь делает `SELECT SUM(allocated_kwh_h × 24) FROM nominations WHERE point='HORGOS-EXIT'` для billing-периода; capacity×0.85 — last-resort с флагом `estimated=true`. `_breakdown.fuelGas` дополнен `election`, `flowDirection`, `qHorgosKwh` (resolved). (1 SP) — **P1 ✅ 15.04.2026**
+- [x] **US-1711 (FG-06/FG-07)** · Migration 019 применена (7 shippers seed'ну election). Скрипт v2 (shipper-level check: EXISTS ACTIVE contract on transit route, чтобы Газпром с mix-контрактами не затрагивался) запущен `--apply --report` → 4 invoice NIS исправлены (INV-2026-0002/04/06/08), суммарная коррекция **299 535,64 EUR**. Отчёт: [FG_DATA_FIX_REPORT.md](./FG_DATA_FIX_REPORT.md). INV-2026-0008: total 3 425 195,94 → **3 350 312,03 EUR**, FG line = 0,00. (2 SP) — **P0 ✅ 15.04.2026**
+- [ ] **US-1712 (FG-05)** · Отдельный FG-invoice при >1 Capacity Product (Art.20.3.5) (3 SP) — **P2 → Sprint 18**
+- [x] **US-1713** · [`tests/fuel-gas.unit.test.js`](../backend/tests/fuel-gas.unit.test.js) — 12 тестов (matrix routes × elections × AAQ + регрессия INV-2026-0008), все зелёные. Обновлён `billing.unit.test.js` (Q_serbia excluded). `flowDirection` whitelist в POST /billing расширен до 7+2 NC routes. (1 SP) — **P1 ✅ 15.04.2026**
 
 ### 🔴 P0 — NC Art.13 Matching Completion
 
-- [ ] **US-1703** · Adjacent TSO Auto-Matching — `matchWithAdjacentTso()` + mock FGSZ/Bulgartransgaz/TRANSPORTGAS SRBIJA + Lesser Rule + migration 019 + `POST /nominations/:id/match-adjacent` + статус `MATCHED_ADJACENT` + ≥12 тестов (5 SP) *(перенос US-1601)*
-- [ ] **US-1704** · Double-Sided Matching Result — `GET /nominations/:id/matching-result` + UI panel в nomination detail modal + ≥6 тестов (3 SP) *(перенос US-1602)*
+- [x] **US-1703** · Adjacent TSO Auto-Matching — [migration 020](../backend/src/db/migrations/020_adjacent_tso_matching.sql) (`adjacent_tso_matches` table, applied); [adjacentTsoService.js](../backend/src/services/adjacentTsoService.js) с `fetchAdjacentNomination()` mock (FGSZ/Bulgartransgaz/TRANSPORTGAS SRBIJA) + `applyLesserRule()` (OURS/THEIRS/EQUAL) + `matchWithAdjacentTso()` persistence; [`POST /nominations/:id/match-adjacent`](../backend/src/routes/nominations.js) endpoint со статусом `MATCHED_ADJACENT`. [adjacent-tso.unit.test.js](../backend/tests/adjacent-tso.unit.test.js) 15 cases + [adjacent-tso.integration.test.js](../backend/tests/adjacent-tso.integration.test.js) 7 endpoint cases = **22 теста**. (5 SP) — **P0 ✅ 15.04.2026**
+- [x] **US-1704** · Double-Sided Matching Result — [`GET /nominations/:id/matching-result`](../backend/src/routes/nominations.js) endpoint возвращает nomination summary + adjacent matches list + summary (hasAdjacentMatch, lastLesserSide, adjacentTso). 3 integration теста. UI panel в Sprint 17 P1 (параллельно US-1705/07). (3 SP) — **P0 ✅ backend 15.04.2026** (UI интеграция в UserGuide v3.4 US-1707)
 
 ### 🟡 P1 — Analytics & Export
 
-- [ ] **US-1705** · Analytics Dashboard — новый router `analytics.js`, endpoints `/volumes` `/revenue` `/utilization`, Chart.js via CDN, Analytics tab в GTCP_MVP.html, Line + Bar + Gauge, period/shipper filters, ≥6 тестов (5 SP) *(перенос US-1604)*
-- [ ] **US-1706** · Export to CSV — `/billing/export` `/contracts/export` `/nominations/export`, кнопки Export в UI, csv-stringify streaming, ≥5 тестов (3 SP) *(перенос US-1605, упрощено: CSV only, xlsx → Sprint 18)*
+- [x] **US-1705** · Analytics Dashboard — [routes/analytics.js](../backend/src/routes/analytics.js) + 3 endpoint'а: `GET /analytics/volumes` (monthly by IP, NC Art.12), `GET /analytics/revenue` (monthly by shipper, NC Art.20), `GET /analytics/utilization` (tech vs contracted per IP, NC Art.7 + AERS). Фильтры: from/to, shipper_id, point, gas_year. Router зарегистрирован в [app.js:29,110](../backend/src/app.js#L29). [analytics.test.js](../backend/tests/analytics.test.js) **11 тестов** (target ≥6). Chart.js UI — отложен в US-1707 (UserGuide v3.4 demo). (5 SP) — **P1 ✅ 15.04.2026**
+- [x] **US-1706** · Export to CSV — [utils/csvExport.js](../backend/src/utils/csvExport.js) (BOM, RFC 4180 escaping, sendCsv helper) + 3 endpoint'а: `GET /billing/export`, `GET /contracts/export`, `GET /nominations/export`. Фильтры: `status`, `shipper_id`, `from/to` (billing/nominations), `flow_direction`, `contract_type`. Dispatcher↔billing permission isolation. [csv-export.test.js](../backend/tests/csv-export.test.js) **15 тестов** (target ≥5: exceeded 3x). Кнопки UI — отложены до US-1707 (UserGuide) / Sprint 18 Excel. (3 SP) — **P1 ✅ 15.04.2026**
 
 ### 🟡 P1 — Documentation
 
-- [ ] **US-1707** · UserGuide v3.4 Final — секции Sprint 15–17, новые endpoints (Analytics/Export/Matching/OBA), architecture decisions (Art.12.3 binding, capacity_kwh_h), pandoc `.docx` (4 SP) *(перенос US-1607)*
+- [x] **US-1707** · UserGuide v3.4 Final — [GTCP_UserGuide_v3.4.md](./GTCP_UserGuide_v3.4.md) готов: Changelog v3.3→v3.4 (Sprint 15-17), KPI-строка актуализирована (527/535 tests, 82 endpoints, NC 82%), API Reference переверстан (82 authoritative + 8 новых Sprint 17 endpoints detailed), NC Compliance Matrix (RU+EN) обновлена (Art.13 67%→100%, Art.15 50%→83%, Art.18 + Art.19 ссылка, TOTAL 79%→82%). Секции FG binding rule, Adjacent TSO matching, Analytics, CSV export, OBA Settlement добавлены в Changelog. Pandoc `.docx` — требует установки pandoc (внешний tool, выполняется локально: `pandoc GTCP_UserGuide_v3.4.md -o GTCP_UserGuide_v3.4.docx --toc`). (4 SP) — **P1 ✅ 15.04.2026 (.md версия)** · .docx → локальная конвертация
 
 ### ❌ Отменено / отложено из Sprint 16
 
@@ -76,6 +110,18 @@
 
 - [ ] **DEBT-01** · Нет тестов на OBA endpoints и capacity_kwh_h migration → US-1701 в Sprint 17
 - [ ] **DEBT-02** · Endpoint count drift: docs `99`, grep `~84` → US-1702 в Sprint 17
+
+### ⚠️ Fuel Gas Debt (обнаружено 14.04.2026, аудит INV-2026-0008)
+
+- [ ] **FG-01** · `calcFuelGas()` fallback начисляет FG любому shipper'у независимо от маршрута → US-1708 **P0** (Sprint 17)
+- [ ] **FG-02** · KIREVO_EXIT_SERBIA → X1 вместо X2 (двойная ошибка: не должно быть начисления вовсе) → US-1708 **P0** (Sprint 17)
+- [ ] **FG-03** · Нет поля `shippers.fuel_gas_election` → US-1709 P1 (Sprint 17)
+- [ ] **FG-04** · Нет проверки `AAQ > 0` перед начислением → US-1710 P1 (Sprint 17)
+- [ ] **FG-05** · FG как line item вместо отдельного invoice (Art.20.3.5) → US-1712 P2 (Sprint 18)
+- [ ] **FG-06** · INV-2026-0008: FG=74 883,91 должно быть 0, total пересчитать → US-1711 **P0** (Sprint 17)
+- [ ] **FG-07** · Исторические FG-строки у NIS и CR-shipper'ов — требуется data sweep → US-1711 P1 (Sprint 17)
+
+Источник правды: [`CLAUDE.md` раздел "Fuel Gas Allocation Rules"](../CLAUDE.md) + [`GTCP_Artifacts.md` §17](./GTCP_Artifacts.md).
 
 ### 🎯 Sprint 16 — Выводы (retro)
 
@@ -810,10 +856,11 @@ Sprint 5: ~72 SP  [████████████████████�
 Sprint 6: ~38 SP  [██████████████████████████████████████░░░░] 38/40 ✅
 Sprint 7: ~21 SP  [█████████████████████░░░░░░░░░░░░░░░░░░░░░] 21/32 ✅ (NC focus)
 ────────────────────────────────────────────────────────────────
-Total: ~268 SP delivered of ~299 SP planned
-Migrations: 9 (001-009, all clean) · NC Routes: 7 · IP Points: 6 · Tests: 56/56 ✅ · CI jobs: 5
-NC Coverage: §2.1 IP/Routes + Art.5 + Art.6 + Art.8.3 + Art.13-16 + Art.18 + Art.20 + CAM ✅
-Git: tag sprint-7 · branch main
+Total: ~565 SP delivered (Sprint 1–16) + 26 SP planned Sprint 17
+Migrations: 18 (000–018, all clean) + 019 planned Sprint 17 · NC Routes: 7 · IP Points: 6
+Tests: 442/442 ✅ (target ≥460 Sprint 17) · CI jobs: 5 · Endpoints: 99 docs (DEBT-02 audit Sprint 17)
+NC Coverage: 79% (Art.13 → 100% target Sprint 17) · Art.15 sub-coverage: 83%
+Git: tag sprint-16 · branch main · Sprint 17: 🔄 В РАБОТЕ (13–24.04.2026)
 ```
 
 ---
@@ -833,6 +880,8 @@ Git: tag sprint-7 · branch main
 | 26.03.2026 | 5.1 | Sprint 5 завершён, отчёт сформирован (SPRINT_5_REPORT.md): ~72 SP доставлено (план 36 SP, +100%). P0 CAP-FIX верифицирован €10 255 724. Credit Support NC Art.5, Auction Management CAM NC MAR0277-24, OpenAPI 3.0, CI/CD — все в DoD. |
 | 06.04.2026 | 14.1 | Sprint 15 завершён, отчёт сформирован (SPRINT_15_REPORT.md): ~16 SP доставлено (план 16 SP, 100%). 9/9 задач: NC IP codes в demo data, документация Sprint 14 alignment, CLAUDE.md endpoints updated. NC coverage 79%. |
 | 06.04.2026 | 16.0 | Sprint 16 plan сформирован автоматически: 9 US, 35 SP. P0: NC Art.13 Matching (100%), Art.15 Balancing (75%). P1: Analytics Dashboard, Export CSV/Excel, k6, UserGuide v3.4. P2: VTP Art.11. |
+| 13.04.2026 | 17.4 | Sprint 17 начат (День 1). Baseline report SPRINT_17_REPORT.md сформирован. 7 US, 26 SP, все в статусе TODO. P0: DEBT-01/02 + NC Art.13 Matching. P1: Analytics + Export CSV + UserGuide v3.4. |
+| 13.04.2026 | 18.0 | Sprint 18 plan сформирован автоматически. 7 US, 24 SP. P0: Diploma Final Assembly + OpenAPI Sync. P1: VTP Art.11 + Excel Export + k6 Load Testing. P2: LOCAL_RUN.md + Sprint 17 carryover buffer. |
 
 ---
 

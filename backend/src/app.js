@@ -26,6 +26,7 @@ const auditRouter        = require('./routes/audit');
 const systemParamsRouter  = require('./routes/systemParams');
 const reservePricesRouter = require('./routes/reservePrices');
 const rbpRouter          = require('./routes/rbp');
+const analyticsRouter    = require('./routes/analytics');
 
 const app = express();
 const API = process.env.API_PREFIX || '/api/v1';
@@ -106,6 +107,7 @@ app.use(`${API}/audit`,         auditRouter);
 app.use(`${API}/system-params`,  systemParamsRouter);
 app.use(`${API}/reserve-prices`, reservePricesRouter);
 app.use(`${API}/rbp`,            rbpRouter);
+app.use(`${API}/analytics`,      analyticsRouter);
 
 // ── 404 & Error handlers ───────────────────────────────────────────────────────
 app.use(notFound);
