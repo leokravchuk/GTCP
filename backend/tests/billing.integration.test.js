@@ -48,8 +48,8 @@ describe('Billing API — /api/v1/billing', () => {
         .get(`${API}/billing`)
         .set('Authorization', `Bearer ${billingToken()}`);
       expect(res.status).toBe(200);
-      expect(res.body.data[0].invoice_no).toBe('INV-2026-0001');
-      expect(res.body.total).toBe(1);
+      expect(res.body[0].invoice_no).toBe('INV-2026-0001');
+      expect(res.headers['x-total-count']).toBe('1');
     });
 
     test('returns 403 for dispatcher (no billing:read)', async () => {

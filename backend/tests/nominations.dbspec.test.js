@@ -40,7 +40,7 @@ describe('Nominations DB-specific', () => {
     test('gets contracted from capacity_bookings (lines 127-135)', async () => {
       db.query.mockImplementation((sql) => {
         if (sql.includes('capacity_bookings') && sql.includes('SUM')) return Promise.resolve({ rows: [{ contracted_kwh_h: '10000000' }] });
-        if (sql.includes('COUNT')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+        if (sql.includes('MAX')) return Promise.resolve({ rows: [{ max_seq: 0 }] });
         if (sql.includes('INSERT INTO nominations')) return Promise.resolve({ rows: [{ id: 1, reference: 'NOM-2026-00001', status: 'SUBMITTED' }] });
         return Promise.resolve({ rows: [] });
       });
@@ -55,7 +55,7 @@ describe('Nominations DB-specific', () => {
       db.query.mockImplementation((sql) => {
         if (sql.includes('capacity_bookings') && sql.includes('SUM')) return Promise.resolve({ rows: [{ contracted_kwh_h: '0' }] });
         if (sql.includes('contracts') && sql.includes('cap_entry')) return Promise.resolve({ rows: [{ cap: '13752230' }] });
-        if (sql.includes('COUNT')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+        if (sql.includes('MAX')) return Promise.resolve({ rows: [{ max_seq: 0 }] });
         if (sql.includes('INSERT INTO nominations')) return Promise.resolve({ rows: [{ id: 2, reference: 'NOM-2026-00002', status: 'SUBMITTED' }] });
         return Promise.resolve({ rows: [] });
       });
@@ -71,7 +71,7 @@ describe('Nominations DB-specific', () => {
         if (sql.includes('capacity_bookings') && sql.includes('shipper_id') && sql.includes('SUM')) return Promise.resolve({ rows: [{ contracted_kwh_h: '5000000' }] });
         if (sql.includes('capacity_bookings') && sql.includes('point') && !sql.includes('shipper_id')) return Promise.resolve({ rows: [{ total: '15000000' }] });
         if (sql.includes('nominations') && sql.includes('SUM')) return Promise.resolve({ rows: [{ total: '10000000' }] });
-        if (sql.includes('COUNT')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+        if (sql.includes('MAX')) return Promise.resolve({ rows: [{ max_seq: 0 }] });
         if (sql.includes('INSERT INTO nominations')) return Promise.resolve({ rows: [{ id: 3, reference: 'NOM-2026-00003', status: 'SUBMITTED', is_over_nomination: true }] });
         return Promise.resolve({ rows: [] });
       });
@@ -107,7 +107,7 @@ describe('Nominations DB-specific', () => {
         if (sql.includes('capacity_bookings') && sql.includes('SUM') && sql.includes('point')) return Promise.resolve({ rows: [{ total_contracted: '15000000' }] });
         if (sql.includes('capacity_bookings') && sql.includes('shipper_id')) return Promise.resolve({ rows: [{ contracted: '5000000' }] });
         if (sql.includes('nominations') && sql.includes('SUM')) return Promise.resolve({ rows: [{ total_nominated: '12000000' }] });
-        if (sql.includes('COUNT')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+        if (sql.includes('MAX')) return Promise.resolve({ rows: [{ max_seq: 0 }] });
         if (sql.includes('INSERT')) return Promise.resolve({ rows: [{ id: 50, reference: 'ONOM-2026-00001', status: 'SUBMITTED' }] });
         return Promise.resolve({ rows: [] });
       });

@@ -34,7 +34,7 @@ describe('Nominations Deep Coverage', () => {
       db.query.mockImplementation((sql) => {
         if (sql.includes('capacity_bookings')) return Promise.resolve({ rows: [{ contracted_kwh_h: 3000000 }] });
         if (sql.includes('contracts')) return Promise.resolve({ rows: [] });
-        if (sql.includes('COUNT')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+        if (sql.includes('MAX')) return Promise.resolve({ rows: [{ max_seq: 0 }] });
         if (sql.includes('INSERT')) return Promise.resolve({ rows: [{ id: 1, reference: 'NOM-2026-00001', status: 'SUBMITTED' }] });
         return Promise.resolve({ rows: [] });
       });
@@ -49,7 +49,7 @@ describe('Nominations Deep Coverage', () => {
       db.query.mockImplementation((sql) => {
         if (sql.includes('capacity_bookings')) return Promise.resolve({ rows: [{ contracted_kwh_h: 0 }] });
         if (sql.includes('contracts') && sql.includes('cap_entry')) return Promise.resolve({ rows: [{ cap_entry_kwh_h: 10000000 }] });
-        if (sql.includes('COUNT')) return Promise.resolve({ rows: [{ cnt: '0' }] });
+        if (sql.includes('MAX')) return Promise.resolve({ rows: [{ max_seq: 0 }] });
         if (sql.includes('INSERT')) return Promise.resolve({ rows: [{ id: 2, reference: 'NOM-2026-00002', status: 'SUBMITTED' }] });
         return Promise.resolve({ rows: [] });
       });

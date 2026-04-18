@@ -1,0 +1,2366 @@
+openapi: 3.0.3
+info:
+  title: GTCP — Gas Trading & Commercial Platform API
+  description: |
+    **Gastrans Serbia · Backend REST API**
+
+    Система управления газовыми транзитными потоками, договорами мощности, биллингом и аукционами.
+
+    ### Нормативная база
+    - **CAM NC EU 2017/459** — механизмы распределения мощности
+    - **АЕРС 05-145** — официальные тарифы Gastrans
+    - **Gastrans Network Code** — NC Art. 5 (Credit Support), Art. 6.3.1 (EXIT-SERBIA),
+      Art. 8.3 (Surrender), Art. 18 (Fuel Gas), Art. 20 (Billing & Late Payment)
+    - **MAR0277-24** — расписание аукционов CAM NC 2025-2026 (ENTSOG)
+
+    ### Аутентификация
+    Все endpoints (кроме `/auth/login`) требуют JWT Bearer token.
+
+    ### Lifecycle аукциона
+    ```
+    Free Capacity → POST /auctions/bids (DRAFT)
+                  → POST /auctions/bids/{id}/submit (SUBMITTED)
+                  → POST /auctions/bids/{id}/result (WON/LOST)
+                  → POST /auctions/bids/{id}/create-contract (CONTRACT_CREATED)
+                  → POST /billing (Invoice)
+    ```
+  version: 6.0.0
+  contact:
+    name: GTCP Backend
+    email: krav4ukleo@gmail.com
+  license:
+    name: Proprietary — Gastrans Serbia
+    url: https://gastrans.rs
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local Development
+  - url: https://gtcp.gastrans.rs/api/v1
+    description: Production
+
+tags:
+  - name: health
+    description: Health check
+  - name: auth
+    description: Аутентификация — JWT + Argon2id (NC Art. 3 — регистрация шипперов)
+  - name: shippers
+    description: Шипперы (грузоотправители) — участники транзита
+  - name: contracts
+    description: Договоры CAM NC (7 типов, GTA-YYYY-NNN, 3 направления потока)
+  - name: nominations
+    description: Номинации — суточные заявки на транзит (ENTRY/EXIT матчинг)
+  - name: capacity
+    description: Мощности — Tracker, доступная мощность, бронирования
+  - name: auctions
+    description: Аукционы CAM NC — полный lifecycle (MAR0277-24, 2025-2026)
+  - name: billing
+    description: Биллинг — capacity fee (АЕРС 05-145), Fuel Gas (NC Art.18), Late Payment
+  - name: credits
+    description: Кредитная поддержка — NC Art.5 (URDG 758, рейтинг, Margin Call)
+  - name: balance
+    description: Баланс газа — суточный, месячный, OBA Settlement (NC Art.15)
+  - name: audit
+    description: Журнал аудита — все действия пользователей
+  - name: system
+    description: Системные параметры — тарифы, правила NC, резервные цены
+  - name: rbp
+    description: RBP.EU Bridge — синхронизация мощностей, кредитов, аукционов, вторичный рынок
+  - name: analytics
+    description: Аналитика — KPI дашборд, объёмы, выручка, утилизация
+  - name: vtp
+    description: VTP (Virtual Trading Point) — NC Art.11, виртуальная торговля
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT access token, срок действия 24 часа.
+        Получить: `POST /auth/login` → `{ token }`.
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Shipper not found"
+
+    ValidationError:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              msg:   { type: string }
+              param: { type: string }
+              value: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, example: admin }
+        password: { type: string, example: secret123 }
+
+    LoginResponse:
+      type: object
+      properties:
+        token:        { type: string }
+        accessToken:  { type: string }
+        user:
+          type: object
+          properties:
+            id:       { type: integer }
+            username: { type: string }
+            role:     { type: string, enum: [admin, dispatcher, credit, billing, contracts] }
+            fullName: { type: string }
+
+    Shipper:
+      type: object
+      properties:
+        id:               { type: integer }
+        code:             { type: string, example: GAZPROM-EXP }
+        name:             { type: string, example: Gazprom Export LLC }
+        credit_limit:     { type: number }
+        current_exposure: { type: number }
+        is_active:        { type: boolean }
+        status:           { type: string, enum: [APPLICANT, APPROVED, ACTIVE, SUSPENDED, REMOVED] }
+        gta_type:         { type: string }
+        sp_rating:        { type: string }
+        moodys_rating:    { type: string }
+        creditreform_score: { type: integer }
+        rating_exempt:    { type: boolean }
+
+    Contract:
+      type: object
+      properties:
+        id:                     { type: integer }
+        contract_no:            { type: string, example: GTA-2026-001 }
+        shipper_id:             { type: integer }
+        contract_type:          { type: string }
+        capacity_type:          { type: string }
+        flow_direction:         { type: string }
+        cap_entry_kwh_h:        { type: number }
+        cap_exit_kwh_h:         { type: number }
+        tariff_entry_eur_kwh_h: { type: number }
+        tariff_exit_eur_kwh_h:  { type: number }
+        start_date:             { type: string, format: date }
+        end_date:               { type: string, format: date }
+        status:                 { type: string, enum: [ACTIVE, EXPIRED, PENDING, CANCELLED] }
+
+    Nomination:
+      type: object
+      properties:
+        id:             { type: string, format: uuid }
+        reference:      { type: string, example: NOM-2026-00001 }
+        shipper_id:     { type: string, format: uuid }
+        gas_day:        { type: string, format: date }
+        direction:      { type: string, enum: [ENTRY, EXIT] }
+        point:          { type: string }
+        volume_kwh_h:   { type: number }
+        matched_kwh_h:  { type: number }
+        status:         { type: string, enum: [PENDING, MATCHED, PARTIALLY_MATCHED, CONFIRMED, RENOMINATED, REJECTED, CANCELLED] }
+
+    Invoice:
+      type: object
+      properties:
+        id:               { type: string, format: uuid }
+        invoice_no:       { type: string, example: INV-2026-0001 }
+        shipper_id:       { type: string, format: uuid }
+        period_from:      { type: string, format: date }
+        period_to:        { type: string, format: date }
+        total_amount_eur: { type: number }
+        due_date:         { type: string, format: date }
+        status:           { type: string, enum: [DRAFT, ISSUED, PAID, OVERDUE, CANCELLED] }
+
+    AuctionCalendar:
+      type: object
+      properties:
+        id:               { type: integer }
+        product_type:     { type: string }
+        capacity_type:    { type: string }
+        auction_round:    { type: string }
+        gas_year:         { type: integer }
+        auction_start_date: { type: string, format: date }
+        delivery_start:   { type: string, format: date }
+        delivery_end:     { type: string, format: date }
+        status:           { type: string, enum: [UPCOMING, OPEN, CLOSED, RESULTS_PUBLISHED, CANCELLED] }
+
+    AuctionBid:
+      type: object
+      properties:
+        id:                   { type: integer }
+        auction_calendar_id:  { type: integer }
+        shipper_id:           { type: integer }
+        bid_capacity_kwh_h:   { type: number }
+        offered_price_eur:    { type: number }
+        credit_blocked_eur:   { type: number }
+        status:               { type: string, enum: [DRAFT, SUBMITTED, UNDER_REVIEW, WON, PARTIALLY_WON, LOST, CANCELLED, CONTRACT_CREATED] }
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ════════════════════════════════════════════════════════════
+  # HEALTH
+  # ════════════════════════════════════════════════════════════
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  time:   { type: string, format: date-time }
+                  version: { type: string }
+
+  # ════════════════════════════════════════════════════════════
+  # AUTH
+  # ════════════════════════════════════════════════════════════
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Получить JWT токен
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401':
+          description: Неверные учётные данные
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Текущий пользователь
+      responses:
+        '200':
+          description: Данные текущего пользователя
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:       { type: integer }
+                  username: { type: string }
+                  role:     { type: string }
+
+  /auth/change-password:
+    post:
+      tags: [auth]
+      summary: Сменить пароль
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword:     { type: string, minLength: 6 }
+      responses:
+        '200':
+          description: Пароль изменён
+        '401':
+          description: Текущий пароль неверен
+
+  # ════════════════════════════════════════════════════════════
+  # SHIPPERS
+  # ════════════════════════════════════════════════════════════
+  /shippers:
+    get:
+      tags: [shippers]
+      summary: Список шипперов
+      responses:
+        '200':
+          description: Массив шипперов
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Shipper' }
+
+    post:
+      tags: [shippers]
+      summary: Создать шиппера
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, name, creditLimit]
+              properties:
+                code:        { type: string }
+                name:        { type: string }
+                country:     { type: string }
+                eicCode:     { type: string }
+                creditLimit: { type: number }
+      responses:
+        '201':
+          description: Шиппер создан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shipper' }
+
+  /shippers/{id}:
+    get:
+      tags: [shippers]
+      summary: Детали шиппера
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shipper' }
+        '404':
+          description: Шиппер не найден
+
+    patch:
+      tags: [shippers]
+      summary: Обновить шиппера
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:         { type: string }
+                country:      { type: string }
+                eic_code:     { type: string }
+                credit_limit: { type: number }
+                is_active:    { type: boolean }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shipper' }
+
+  /shippers/apply:
+    post:
+      tags: [shippers]
+      summary: Заявка на регистрацию шиппера (NC Art.3.3)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:                     { type: string }
+                country_of_incorporation: { type: string }
+                company_id:               { type: string }
+                tax_id:                   { type: string }
+                address:                  { type: string }
+                representative_name:      { type: string }
+                representative_email:     { type: string, format: email }
+                credit_limit:             { type: number }
+      responses:
+        '201':
+          description: Заявка принята (статус APPLICANT)
+        '400':
+          description: Ошибка валидации
+
+  /shippers/{id}/status:
+    patch:
+      tags: [shippers]
+      summary: Изменить статус шиппера (NC Art.3 lifecycle)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [APPLICANT, APPROVED, ACTIVE, SUSPENDED, REMOVED] }
+                reason: { type: string }
+      responses:
+        '200':
+          description: Статус обновлён
+        '422':
+          description: Недопустимый переход статуса
+
+  /shippers/{id}/history:
+    get:
+      tags: [shippers]
+      summary: История изменений шиппера (audit trail)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Журнал изменений
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    field_name: { type: string }
+                    old_value:  { type: string }
+                    new_value:  { type: string }
+                    changed_at: { type: string, format: date-time }
+                    changed_by_name: { type: string }
+
+  # ════════════════════════════════════════════════════════════
+  # CONTRACTS
+  # ════════════════════════════════════════════════════════════
+  /contracts:
+    get:
+      tags: [contracts]
+      summary: Список договоров
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+        - in: query
+          name: flow_direction
+          schema: { type: string }
+        - in: query
+          name: contract_type
+          schema: { type: string }
+      responses:
+        '200':
+          description: Список договоров
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Contract' }
+
+    post:
+      tags: [contracts]
+      summary: Создать договор (GTA)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, contractType, flowDirection, startDate, endDate]
+              properties:
+                shipperId:      { type: string, format: uuid }
+                contractType:   { type: string }
+                flowDirection:  { type: string }
+                startDate:      { type: string, format: date }
+                endDate:        { type: string, format: date }
+                capEntryKwhH:   { type: number }
+                capExitKwhH:    { type: number }
+      responses:
+        '201':
+          description: Договор создан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+
+  /contracts/meta:
+    get:
+      tags: [contracts]
+      summary: Метаданные — типы контрактов и направления потока
+      responses:
+        '200':
+          description: Enums для UI
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contractTypes:  { type: object }
+                  flowDirections: { type: object }
+
+  /contracts/export:
+    get:
+      tags: [contracts]
+      summary: Экспорт договоров (CSV/XLSX)
+      parameters:
+        - in: query
+          name: format
+          schema: { type: string, enum: [csv, xlsx] }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+      responses:
+        '200':
+          description: CSV или XLSX файл
+
+  /contracts/{id}:
+    get:
+      tags: [contracts]
+      summary: Детальная карточка договора
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+        '404':
+          description: Договор не найден
+
+    patch:
+      tags: [contracts]
+      summary: Обновить договор
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:                { type: string }
+                cap_entry_kwh_h:       { type: number }
+                cap_exit_kwh_h:        { type: number }
+                notes:                 { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Contract' }
+
+  # ════════════════════════════════════════════════════════════
+  # NOMINATIONS
+  # ════════════════════════════════════════════════════════════
+  /nominations:
+    get:
+      tags: [nominations]
+      summary: Список номинаций
+      parameters:
+        - in: query
+          name: gas_day
+          schema: { type: string, format: date }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: direction
+          schema: { type: string, enum: [ENTRY, EXIT] }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Список номинаций
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Nomination' }
+
+    post:
+      tags: [nominations]
+      summary: Создать номинацию (NC Art.12.6)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, gasDay, direction, point, volumeKwhH]
+              properties:
+                shipperId:  { type: string }
+                gasDay:     { type: string, format: date }
+                direction:  { type: string, enum: [ENTRY, EXIT] }
+                point:      { type: string }
+                volumeKwhH: { type: number, minimum: 0 }
+                notes:      { type: string }
+      responses:
+        '201':
+          description: Номинация создана
+        '422':
+          description: Превышена contracted capacity или пропущен дедлайн
+
+  /nominations/export:
+    get:
+      tags: [nominations]
+      summary: Экспорт номинаций (CSV/XLSX)
+      parameters:
+        - in: query
+          name: format
+          schema: { type: string, enum: [csv, xlsx] }
+        - in: query
+          name: gas_day
+          schema: { type: string, format: date }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: CSV или XLSX файл
+
+  /nominations/{id}:
+    get:
+      tags: [nominations]
+      summary: Детали номинации
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: UUID или reference (NOM-2026-00001)
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Nomination' }
+        '404':
+          description: Номинация не найдена
+
+  /nominations/match:
+    post:
+      tags: [nominations]
+      summary: Запустить матчинг ENTRY/EXIT (NC Art.13)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [gasDay]
+              properties:
+                gasDay: { type: string, format: date }
+      responses:
+        '200':
+          description: Результат матчинга
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gasDay:       { type: string }
+                  matchedPairs: { type: integer }
+                  details:      { type: array }
+
+  /nominations/{id}/match-adjacent:
+    post:
+      tags: [nominations]
+      summary: Матчинг с соседним TSO (NC Art.13 Lesser Rule)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scenario: { type: string }
+                factor:   { type: number }
+                notes:    { type: string }
+      responses:
+        '201':
+          description: Результат матчинга с adjacent TSO
+        '400':
+          description: No adjacent TSO configured for this point
+
+  /nominations/{id}/matching-result:
+    get:
+      tags: [nominations]
+      summary: Результат Double-Sided Matching (NC Art.13)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Nomination + adjacent matches + summary
+        '404':
+          description: Номинация не найдена
+
+  /nominations/{id}/renom:
+    post:
+      tags: [nominations]
+      summary: Реноминация (NC Art.12.7.5)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newVolumeKwhH]
+              properties:
+                newVolumeKwhH: { type: number, minimum: 0 }
+                notes:         { type: string }
+      responses:
+        '201':
+          description: Реноминация создана
+        '422':
+          description: Превышен лимит upward/downward реноминации
+
+  /nominations/over-nominate:
+    post:
+      tags: [nominations]
+      summary: Over-Nomination — Within-Day Interruptible (NC Art.12.8)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, point, direction, volumeKwhH, gasDay]
+              properties:
+                shipperId:  { type: string }
+                point:      { type: string }
+                direction:  { type: string, enum: [ENTRY, EXIT] }
+                volumeKwhH: { type: number, minimum: 1 }
+                gasDay:     { type: string, format: date }
+      responses:
+        '201':
+          description: Over-Nomination зарегистрирована
+        '422':
+          description: Условия NC Art.12.8 не выполнены
+
+  /nominations/{id}/edigas-nomint:
+    get:
+      tags: [nominations]
+      summary: Preview EDIG@S NOMINT XML
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: NOMINT XML document
+          content:
+            application/xml:
+              schema: { type: string }
+        '404':
+          description: Номинация не найдена
+
+  /nominations/{id}/edigas-submit:
+    post:
+      tags: [nominations]
+      summary: Отправить NOMINT на RBP.EU (TSO)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Результат отправки (tsoStatus + rbpResponse)
+        '404':
+          description: Номинация не найдена
+
+  /nominations/{id}/status:
+    patch:
+      tags: [nominations]
+      summary: Обновить статус номинации
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PENDING, CONFIRMED, REJECTED, CANCELLED, MATCHED, PARTIALLY_MATCHED, RENOMINATED]
+      responses:
+        '200':
+          description: Статус обновлён
+
+  # ════════════════════════════════════════════════════════════
+  # CAPACITY
+  # ════════════════════════════════════════════════════════════
+  /capacity:
+    get:
+      tags: [capacity]
+      summary: Список бронирований мощности
+      parameters:
+        - in: query
+          name: point
+          schema: { type: string }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+        - in: query
+          name: product_type
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Список capacity_bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:             { type: integer }
+                    shipper_id:     { type: integer }
+                    point:          { type: string }
+                    capacity_kwh_h: { type: number }
+                    status:         { type: string }
+
+    post:
+      tags: [capacity]
+      summary: Создать бронирование мощности
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, contractId, point, capacityKwhH, startDate, endDate]
+              properties:
+                shipperId:     { type: integer }
+                contractId:    { type: integer }
+                point:         { type: string }
+                capacityKwhH:  { type: number }
+                startDate:     { type: string, format: date-time }
+                endDate:       { type: string, format: date-time }
+                productType:   { type: string }
+      responses:
+        '201':
+          description: Бронирование создано
+
+  /capacity/available:
+    get:
+      tags: [capacity]
+      summary: Доступная мощность в реальном времени (NC Art.7.1.1 + Art.7.3)
+      responses:
+        '200':
+          description: Physical IPs + Commercial Reverse available capacity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timestamp: { type: string, format: date-time }
+                  method:    { type: string, example: REAL_TIME_SQL }
+                  physical:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ip:                  { type: string }
+                        tech:                { type: integer }
+                        contracted:          { type: integer }
+                        availableQuarterly:  { type: integer }
+                        availableDaily:      { type: integer }
+                        utilizationPct:      { type: number }
+                  commercialReverse:
+                    type: array
+
+  # ════════════════════════════════════════════════════════════
+  # AUCTIONS
+  # ════════════════════════════════════════════════════════════
+  /auctions:
+    get:
+      tags: [auctions]
+      summary: Список аукционов (root, совместимость с тестами)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: product_type
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Список аукционов с X-Total-Count header
+          headers:
+            X-Total-Count:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuctionCalendar' }
+
+  /auctions/calendar:
+    get:
+      tags: [auctions]
+      summary: Расписание аукционов CAM NC (MAR0277-24)
+      parameters:
+        - in: query
+          name: product_type
+          schema: { type: string, enum: [ANNUAL, QUARTERLY, MONTHLY, DAILY, WITHIN_DAY] }
+        - in: query
+          name: capacity_type
+          schema: { type: string, enum: [FIRM, INTERRUPTIBLE] }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: gas_year
+          schema: { type: integer }
+        - in: query
+          name: upcoming_only
+          schema: { type: boolean }
+        - in: query
+          name: limit
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Список аукционов
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  auctions:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuctionCalendar' }
+
+  /auctions/calendar/grid:
+    get:
+      tags: [auctions]
+      summary: Календарная сетка Product x Month для Gas Year
+      parameters:
+        - in: query
+          name: gas_year
+          schema: { type: integer, default: 2025 }
+      responses:
+        '200':
+          description: Grid with 5 products x 12 months
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gasYear:        { type: integer }
+                  gasYearLabel:   { type: string }
+                  grid:           { type: array }
+                  totalAuctions:  { type: integer }
+
+  /auctions/calendar/days:
+    get:
+      tags: [auctions]
+      summary: Day-centric calendar for a month (Daily/WD on-the-fly)
+      parameters:
+        - in: query
+          name: year
+          schema: { type: integer, default: 2026 }
+        - in: query
+          name: month
+          schema: { type: integer, default: 3 }
+      responses:
+        '200':
+          description: Day-by-day calendar with auction tags
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  year:         { type: integer }
+                  month:        { type: integer }
+                  monthName:    { type: string }
+                  daysInMonth:  { type: integer }
+                  days:         { type: array }
+
+  /auctions/calendar/upcoming:
+    get:
+      tags: [auctions]
+      summary: Ближайший аукцион по каждому типу продукта
+      responses:
+        '200':
+          description: Grouped by product_type
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  next_auction:    { $ref: '#/components/schemas/AuctionCalendar' }
+                  by_product_type: { type: object }
+
+  /auctions/calendar/next:
+    get:
+      tags: [auctions]
+      summary: Следующий аукцион по типу (quick lookup)
+      parameters:
+        - in: query
+          name: product_type
+          schema: { type: string, default: MONTHLY }
+        - in: query
+          name: capacity_type
+          schema: { type: string, default: FIRM }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuctionCalendar' }
+        '404':
+          description: No upcoming auction found
+
+  /auctions/calendar/{id}:
+    get:
+      tags: [auctions]
+      summary: Карточка аукциона с заявками и доступной мощностью
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Аукцион + bids + capacity_available
+        '404':
+          description: Аукцион не найден
+
+  /auctions/calendar/{id}/status:
+    patch:
+      tags: [auctions]
+      summary: Обновить статус аукциона
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [UPCOMING, OPEN, CLOSED, RESULTS_PUBLISHED, CANCELLED]
+                rbp_auction_id:           { type: string }
+                reserve_price_eur_kwh_h:  { type: number }
+                notes:                    { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuctionCalendar' }
+
+  /auctions/bids:
+    get:
+      tags: [auctions]
+      summary: Список заявок (с фильтрами)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: shipper_id
+          schema: { type: integer }
+        - in: query
+          name: product_type
+          schema: { type: string }
+        - in: query
+          name: point_code
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/AuctionBid' }
+
+    post:
+      tags: [auctions]
+      summary: Создать заявку (DRAFT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [auction_calendar_id, shipper_id, bid_capacity_kwh_h]
+              properties:
+                auction_calendar_id: { type: integer }
+                shipper_id:          { type: integer }
+                bid_capacity_kwh_h:  { type: number, minimum: 1 }
+                offered_price_eur:   { type: number }
+                point_code:          { type: string }
+                flow_direction:      { type: string }
+                notes:               { type: string }
+      responses:
+        '201':
+          description: Заявка создана (DRAFT)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuctionBid' }
+        '422':
+          description: Bid exceeds available ST capacity
+
+  /auctions/bids/{id}:
+    get:
+      tags: [auctions]
+      summary: Полный lifecycle заявки + кредитная позиция
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuctionBid' }
+        '404':
+          description: Заявка не найдена
+
+    patch:
+      tags: [auctions]
+      summary: Обновить параметры заявки (только DRAFT)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bid_capacity_kwh_h:     { type: number }
+                bid_price_eur_kwh_h_yr: { type: number }
+                flow_direction:         { type: string }
+                notes:                  { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuctionBid' }
+        '422':
+          description: Bid is not DRAFT
+
+    delete:
+      tags: [auctions]
+      summary: Отозвать заявку (DRAFT/SUBMITTED → CANCELLED)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Заявка отменена
+
+  /auctions/bids/{id}/submit:
+    post:
+      tags: [auctions]
+      summary: "DRAFT → SUBMITTED (отправка на RBP.EU)"
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rbp_bid_ref: { type: string }
+                notes:       { type: string }
+      responses:
+        '200':
+          description: Заявка отправлена
+        '422':
+          description: Недостаточно кредитной поддержки или аукцион закрыт
+
+  /auctions/bids/{id}/result:
+    post:
+      tags: [auctions]
+      summary: Записать результат (WON / PARTIALLY_WON / LOST)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [result]
+              properties:
+                result:              { type: string, enum: [WON, PARTIALLY_WON, LOST] }
+                won_capacity_kwh_h:  { type: number }
+                final_price_eur:     { type: number }
+                auction_premium_eur: { type: number }
+                result_notes:        { type: string }
+      responses:
+        '200':
+          description: Результат зафиксирован
+
+  /auctions/bids/{id}/create-contract:
+    post:
+      tags: [auctions]
+      summary: Создать контракт из победы (fn_create_contract_from_bid)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '201':
+          description: Контракт создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contract_id: { type: integer }
+                  contract_no: { type: string }
+                  bid_id:      { type: integer }
+                  contract:    { $ref: '#/components/schemas/Contract' }
+        '409':
+          description: Контракт уже создан для этой заявки
+        '422':
+          description: Bid must be WON or PARTIALLY_WON
+
+  /auctions/summary:
+    get:
+      tags: [auctions]
+      summary: Дашборд — статистика по всем аукционам и заявкам
+      responses:
+        '200':
+          description: Аукционный дашборд
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  auction_calendar: { type: object }
+                  bids:             { type: object }
+                  recent_wins:      { type: array }
+
+  /auctions/timeline:
+    get:
+      tags: [auctions]
+      summary: Timeline предстоящих событий (аукционы + deliveries)
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, default: 90, minimum: 7, maximum: 365 }
+      responses:
+        '200':
+          description: Хронология событий по неделям
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  horizon_days:  { type: integer }
+                  total_events:  { type: integer }
+                  timeline:      { type: array }
+                  by_week:       { type: object }
+
+  # ════════════════════════════════════════════════════════════
+  # BILLING
+  # ════════════════════════════════════════════════════════════
+  /billing:
+    get:
+      tags: [billing]
+      summary: Список счетов
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [DRAFT, ISSUED, PAID, OVERDUE, CANCELLED] }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Массив счетов с X-Total-Count header
+          headers:
+            X-Total-Count:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Invoice' }
+
+    post:
+      tags: [billing]
+      summary: Создать счёт (auto-calculate capacity fee + fuel gas)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, periodFrom, periodTo]
+              properties:
+                shipperId:      { type: string, format: uuid }
+                periodFrom:     { type: string, format: date }
+                periodTo:       { type: string, format: date }
+                flowDirection:  { type: string }
+                capEntryKwhH:   { type: number }
+                capExitKwhH:    { type: number }
+                contractId:     { type: integer }
+                qHorgosKwh:     { type: number }
+                qSerbiaKwh:     { type: number }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invoice' }
+
+  /billing/export:
+    get:
+      tags: [billing]
+      summary: Экспорт счетов (CSV/XLSX)
+      parameters:
+        - in: query
+          name: format
+          schema: { type: string, enum: [csv, xlsx] }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: CSV или XLSX файл
+
+  /billing/gas-quality:
+    get:
+      tags: [billing]
+      summary: Качество газа (NC Art.17, Annex 3A)
+      parameters:
+        - in: query
+          name: point_code
+          schema: { type: string }
+        - in: query
+          name: month
+          schema: { type: string, example: "2025-04" }
+      responses:
+        '200':
+          description: Ежесуточные параметры качества газа
+
+  /billing/with-lines:
+    post:
+      tags: [billing]
+      summary: Создать счёт с детализированными строками (NC Art.20.3)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, periodFrom, periodTo, lines]
+              properties:
+                shipperId:    { type: string, format: uuid }
+                periodFrom:   { type: string, format: date }
+                periodTo:     { type: string, format: date }
+                dueDate:      { type: string, format: date }
+                lines:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [lineType]
+                    properties:
+                      lineType:
+                        type: string
+                        enum: [CAPACITY, CAPACITY_WITHIN_DAY, FUEL_GAS, TRANSFER, SURRENDER_PREMIUM, LATE_PAYMENT, IMBALANCE, INTERRUPTION_PENALTY, AUCTION_PREMIUM]
+                      capacityKwhH:  { type: number }
+                      tariffEur:     { type: number }
+                      periodDays:    { type: integer }
+                      hours:         { type: integer }
+                      productType:   { type: string }
+                      pointCode:     { type: string }
+                      direction:     { type: string }
+      responses:
+        '201':
+          description: Счёт с line items создан
+
+  /billing/generate:
+    post:
+      tags: [billing]
+      summary: Авто-генерация строк счёта из контрактов шиппера
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, periodFrom, periodTo]
+              properties:
+                shipperId:  { type: string, format: uuid }
+                periodFrom: { type: string, format: date }
+                periodTo:   { type: string, format: date }
+      responses:
+        '200':
+          description: Preview строк (dry_run)
+        '404':
+          description: Нет активных контрактов для шиппера
+
+  /billing/{id}:
+    get:
+      tags: [billing]
+      summary: Детали счёта с line items и subtotals
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Invoice + line_items + subtotals
+        '404':
+          description: Счёт не найден
+
+  /billing/{id}/statement:
+    get:
+      tags: [billing]
+      summary: Monthly Statement (NC Art.20.1)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: UUID или invoice_no (INV-2026-0001)
+      responses:
+        '200':
+          description: Полная расшифровка счёта
+        '404':
+          description: Счёт не найден
+
+  /billing/{id}/status:
+    patch:
+      tags: [billing]
+      summary: Изменить статус счёта (DRAFT→ISSUED→PAID/OVERDUE)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [DRAFT, ISSUED, PAID, OVERDUE, CANCELLED]
+      responses:
+        '200':
+          description: Статус обновлён (+ late payment interest при OVERDUE)
+        '400':
+          description: Недопустимый переход статуса
+
+  /billing/{id}/erp-sync:
+    post:
+      tags: [billing]
+      summary: Синхронизация с 1С ERP (mock)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: ERP sync successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  erpRef:  { type: string }
+        '404':
+          description: Счёт не найден
+
+  # ════════════════════════════════════════════════════════════
+  # CREDITS
+  # ════════════════════════════════════════════════════════════
+  /credits:
+    get:
+      tags: [credits]
+      summary: Dashboard — кредитные позиции всех шипперов (NC Art.5)
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:               { type: integer }
+                    code:             { type: string }
+                    name:             { type: string }
+                    credit_limit:     { type: number }
+                    current_exposure: { type: number }
+                    available_credit: { type: number }
+
+  /credits/margin-calls:
+    get:
+      tags: [credits]
+      summary: Список открытых margin calls (NC Art.5.5)
+      responses:
+        '200':
+          description: Margin calls + auto-detected violations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:            { type: integer }
+                    shipper_id:    { type: integer }
+                    shipper_code:  { type: string }
+                    exposure_eur:  { type: number }
+                    limit_eur:     { type: number }
+                    shortfall_eur: { type: number }
+                    status:        { type: string }
+
+  /credits/{shipperId}:
+    get:
+      tags: [credits]
+      summary: Детальная кредитная позиция шиппера
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Credit detail
+        '404':
+          description: Шиппер не найден
+
+    patch:
+      tags: [credits]
+      summary: Обновить кредитный лимит (NC Art.5.5)
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [creditLimit]
+              properties:
+                creditLimit: { type: number }
+      responses:
+        '200':
+          description: Лимит обновлён
+
+  /credits/{shipperId}/instruments:
+    get:
+      tags: [credits]
+      summary: Инструменты кредитной поддержки шиппера (NC Art.5.2)
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:           { type: integer }
+                    support_type: { type: string }
+                    amount_eur:   { type: number }
+                    valid_from:   { type: string, format: date }
+                    valid_to:     { type: string, format: date }
+                    status:       { type: string }
+
+    post:
+      tags: [credits]
+      summary: Добавить инструмент кредитной поддержки
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:      { type: string, enum: [BANK_GUARANTEE, ESCROW, PARENT_GUARANTEE] }
+                bank:      { type: string }
+                amount:    { type: number }
+                validFrom: { type: string, format: date }
+                validTo:   { type: string, format: date }
+                product:   { type: string }
+      responses:
+        '201':
+          description: Инструмент добавлен
+
+  /credits/{shipperId}/rating:
+    get:
+      tags: [credits]
+      summary: Кредитный рейтинг шиппера (NC Art.5.1.6)
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Rating + exempt status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sp_rating:        { type: string }
+                  moodys_rating:    { type: string }
+                  creditreform_score: { type: integer }
+                  rating_exempt:    { type: boolean }
+                  exempt:           { type: boolean }
+        '404':
+          description: Шиппер не найден
+
+  # ════════════════════════════════════════════════════════════
+  # BALANCE
+  # ════════════════════════════════════════════════════════════
+  /balance:
+    get:
+      tags: [balance]
+      summary: Imbalance charges by gas day (NC Art.15)
+      parameters:
+        - in: query
+          name: gas_day
+          schema: { type: string, format: date }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Balance charges
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /balance/oba/daily:
+    get:
+      tags: [balance]
+      summary: OBA Daily imbalances — TSO-to-TSO (NC Art.15, read-only)
+      parameters:
+        - in: query
+          name: gas_day_from
+          schema: { type: string, format: date }
+        - in: query
+          name: gas_day_to
+          schema: { type: string, format: date }
+        - in: query
+          name: point_code
+          schema: { type: string }
+        - in: query
+          name: adjacent_tso
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Daily OBA imbalances (12-month rolling window)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:  { type: array }
+                  ncRef: { type: string }
+
+  /balance/oba/monthly/{month}:
+    get:
+      tags: [balance]
+      summary: OBA Monthly aggregation per point/TSO
+      parameters:
+        - in: path
+          name: month
+          required: true
+          schema: { type: string, example: "2026-03" }
+          description: YYYY-MM format
+      responses:
+        '200':
+          description: Monthly OBA settlement data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  month: { type: string }
+                  data:  { type: array }
+
+  /balance/oba/summary:
+    get:
+      tags: [balance]
+      summary: OBA 12-month KPI summary
+      responses:
+        '200':
+          description: Rolling 12-month OBA summary per point/TSO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array }
+                  generated_at: { type: string, format: date-time }
+
+  # ════════════════════════════════════════════════════════════
+  # AUDIT
+  # ════════════════════════════════════════════════════════════
+  /audit:
+    get:
+      tags: [audit]
+      summary: Журнал аудита
+      parameters:
+        - in: query
+          name: entity_type
+          schema: { type: string }
+        - in: query
+          name: action_type
+          schema: { type: string }
+        - in: query
+          name: user_id
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:          { type: integer }
+                    action_type: { type: string }
+                    entity_type: { type: string }
+                    entity_id:   { type: string }
+                    username:    { type: string }
+                    description: { type: string }
+                    occurred_at: { type: string, format: date-time }
+
+  # ════════════════════════════════════════════════════════════
+  # SYSTEM
+  # ════════════════════════════════════════════════════════════
+  /system-params:
+    get:
+      tags: [system]
+      summary: Системные параметры (тарифы, NC параметры)
+      responses:
+        '200':
+          description: Все системные параметры
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key:   { type: string }
+                    value: { type: string }
+
+  /system-params/{key}:
+    patch:
+      tags: [system]
+      summary: Обновить системный параметр
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: { type: string }
+      responses:
+        '200':
+          description: Параметр обновлён
+        '404':
+          description: Параметр не найден
+
+  /reserve-prices:
+    get:
+      tags: [system]
+      summary: Тарифы АЕРС (резервные цены) — Decision 05-145
+      parameters:
+        - in: query
+          name: gas_year
+          schema: { type: string, example: "2025/2026" }
+        - in: query
+          name: product_type
+          schema: { type: string }
+        - in: query
+          name: point_code
+          schema: { type: string }
+        - in: query
+          name: capacity_type
+          schema: { type: string }
+        - in: query
+          name: period_unit
+          schema: { type: string }
+      responses:
+        '200':
+          description: Список тарифных записей
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:           { type: array }
+                  total:          { type: integer }
+                  aers_decision:  { type: string, example: "05-145" }
+
+  # ════════════════════════════════════════════════════════════
+  # RBP
+  # ════════════════════════════════════════════════════════════
+  /rbp/status:
+    get:
+      tags: [rbp]
+      summary: RBP.EU connection status
+      responses:
+        '200':
+          description: Current RBP connection status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected: { type: boolean }
+                  mode:      { type: string }
+                  baseUrl:   { type: string }
+
+  /rbp/sync-capacity:
+    post:
+      tags: [rbp]
+      summary: Upload capacity to RBP.EU
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Sync result
+        '502':
+          description: RBP sync failed
+
+  /rbp/sync-credit:
+    post:
+      tags: [rbp]
+      summary: Sync shipper credit to RBP.EU (NC Art.5)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Sync result
+        '502':
+          description: RBP credit sync failed
+
+  /rbp/auctions:
+    get:
+      tags: [rbp]
+      summary: Fetch auctions from RBP.EU
+      responses:
+        '200':
+          description: RBP auctions
+        '502':
+          description: RBP fetch failed
+
+  /rbp/trades:
+    get:
+      tags: [rbp]
+      summary: Fetch trade results from RBP.EU
+      responses:
+        '200':
+          description: RBP trade results
+        '502':
+          description: RBP fetch failed
+
+  /rbp/credit/{shipperId}:
+    get:
+      tags: [rbp]
+      summary: Query shipper credit on RBP.EU
+      parameters:
+        - in: path
+          name: shipperId
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: RBP credit limits
+        '502':
+          description: RBP query failed
+
+  /rbp/sync-log:
+    get:
+      tags: [rbp]
+      summary: RBP sync audit log
+      responses:
+        '200':
+          description: Last 50 sync log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /rbp/surrender/approve:
+    post:
+      tags: [rbp]
+      summary: Approve Surrender on RBP.EU (NC Art.8)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Surrender approved
+        '502':
+          description: RBP operation failed
+
+  /rbp/bilateral:
+    post:
+      tags: [rbp]
+      summary: Create bilateral deal on RBP.EU (NC Art.10)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Bilateral deal created
+        '502':
+          description: RBP operation failed
+
+  /rbp/bilateral/approve:
+    post:
+      tags: [rbp]
+      summary: Approve bilateral deal on RBP.EU
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Bilateral deal approved
+        '502':
+          description: RBP operation failed
+
+  /rbp/network-users:
+    get:
+      tags: [rbp]
+      summary: Sync registered shippers from RBP.EU (NC Art.3)
+      responses:
+        '200':
+          description: Active network users
+        '502':
+          description: RBP operation failed
+
+  /rbp/remit:
+    post:
+      tags: [rbp]
+      summary: Submit REMIT report via RBP.EU (NC Art.24)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: REMIT report submitted
+        '502':
+          description: RBP operation failed
+
+  # ════════════════════════════════════════════════════════════
+  # ANALYTICS
+  # ════════════════════════════════════════════════════════════
+  /analytics/volumes:
+    get:
+      tags: [analytics]
+      summary: Monthly gas volumes per IP (kWh)
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+        - in: query
+          name: point
+          schema: { type: string }
+      responses:
+        '200':
+          description: Monthly volume aggregation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        month:            { type: string }
+                        point:            { type: string }
+                        nominated_kwh:    { type: integer }
+                        matched_kwh:      { type: integer }
+                        allocated_kwh:    { type: integer }
+                        nominations_count: { type: integer }
+
+  /analytics/revenue:
+    get:
+      tags: [analytics]
+      summary: Monthly billing revenue per shipper
+      parameters:
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+      responses:
+        '200':
+          description: Monthly revenue aggregation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        month:          { type: string }
+                        shipper_code:   { type: string }
+                        entry_fee_eur:  { type: number }
+                        exit_fee_eur:   { type: number }
+                        fuel_gas_eur:   { type: number }
+                        total_eur:      { type: number }
+                        invoices_count: { type: integer }
+
+  /analytics/utilization:
+    get:
+      tags: [analytics]
+      summary: Contracted vs Technical capacity per IP
+      parameters:
+        - in: query
+          name: gas_year
+          schema: { type: string, default: "2025/2026" }
+      responses:
+        '200':
+          description: Utilization per IP
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        point_code:        { type: string }
+                        direction:         { type: string }
+                        tech_kwh_h:        { type: number }
+                        lt_reserved_kwh_h: { type: number }
+                        contracted_kwh_h:  { type: number }
+                        utilization_pct:   { type: number }
+
+  # ════════════════════════════════════════════════════════════
+  # VTP
+  # ════════════════════════════════════════════════════════════
+  /vtp/trades:
+    get:
+      tags: [vtp]
+      summary: Список VTP-сделок (NC Art.11)
+      parameters:
+        - in: query
+          name: gas_day
+          schema: { type: string, format: date }
+        - in: query
+          name: shipper_id
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+        - in: query
+          name: trade_type
+          schema: { type: string, enum: [TITLE_TRANSFER, BALANCING] }
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 100 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+      responses:
+        '200':
+          description: VTP trades with X-Total-Count header
+          headers:
+            X-Total-Count:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:           { type: string, format: uuid }
+                    trade_ref:    { type: string }
+                    shipper_id:   { type: string, format: uuid }
+                    gas_day:      { type: string, format: date }
+                    volume_kwh_h: { type: number }
+                    direction:    { type: string, enum: [BUY, SELL] }
+                    trade_type:   { type: string }
+                    status:       { type: string }
+
+    post:
+      tags: [vtp]
+      summary: Создать VTP-сделку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, gasDay, volumeKwhH, direction]
+              properties:
+                shipperId:      { type: string, format: uuid }
+                gasDay:         { type: string, format: date }
+                volumeKwhH:     { type: number, minimum: 0.01 }
+                direction:      { type: string, enum: [BUY, SELL] }
+                tradeType:      { type: string, enum: [TITLE_TRANSFER, BALANCING] }
+                counterpartyId: { type: string, format: uuid }
+                priceEurMwh:    { type: number }
+                notes:          { type: string }
+      responses:
+        '201':
+          description: VTP trade создана
+        '422':
+          description: Shipper not ACTIVE or gas day in past
+
+  /vtp/trades/{id}:
+    get:
+      tags: [vtp]
+      summary: Детали VTP-сделки
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: VTP trade detail
+        '404':
+          description: VTP trade not found
+
+  /vtp/trades/{id}/confirm:
+    patch:
+      tags: [vtp]
+      summary: Подтвердить VTP-сделку (PENDING → CONFIRMED)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Trade confirmed
+        '404':
+          description: Trade not found
+        '422':
+          description: Trade is not PENDING
+
+  /vtp/balance:
+    get:
+      tags: [vtp]
+      summary: Net VTP balance per shipper (BUY=entry, SELL=exit)
+      parameters:
+        - in: query
+          name: gas_day
+          schema: { type: string, format: date }
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: VTP net balance per shipper
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ncRef: { type: string }
+                  balances:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        shipper_id:   { type: string }
+                        shipper_code: { type: string }
+                        buy_kwh_h:    { type: number }
+                        sell_kwh_h:   { type: number }
+                        net_kwh_h:    { type: number }
+                        trade_count:  { type: integer }

@@ -336,11 +336,12 @@ function calcInterruptionPenalty(capacityFeeEur, productType) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { rowsToCsv, sendCsv } = require('../utils/csvExport');
+const { rowsToXlsx, sendXlsx } = require('../utils/xlsxExport');
 
 // GET /billing/export — CSV export (NC Art.20 invoices)
 // Placed BEFORE /:id to prevent route collision.
 router.get('/export', authorize('billing:read'), async (req, res, next) => {
-  const { status, shipper_id, from, to } = req.query;
+  const { status, shipper_id, from, to, format } = req.query;
   const conds = []; const params = []; let i = 1;
   if (status)     { conds.push(`i.status = $${i++}`);          params.push(status); }
   if (shipper_id) { conds.push(`i.shipper_id = $${i++}`);      params.push(shipper_id); }
@@ -360,25 +361,30 @@ router.get('/export', authorize('billing:read'), async (req, res, next) => {
          ${where} ORDER BY i.created_at DESC`,
       params
     );
-    const csv = rowsToCsv(rows, [
+    const columns = [
       { key: 'invoice_no',         header: 'Invoice No' },
       { key: 'shipper_code',       header: 'Shipper' },
       { key: 'shipper_name',       header: 'Shipper Name' },
-      { key: 'period_from',        header: 'Period From' },
-      { key: 'period_to',          header: 'Period To' },
-      { key: 'billing_days',       header: 'Days' },
+      { key: 'period_from',        header: 'Period From', type: 'date' },
+      { key: 'period_to',          header: 'Period To', type: 'date' },
+      { key: 'billing_days',       header: 'Days', type: 'integer' },
       { key: 'flow_direction',     header: 'Flow Direction' },
-      { key: 'cap_entry_kwh_h',    header: 'Cap Entry kWh/h' },
-      { key: 'cap_exit_kwh_h',     header: 'Cap Exit kWh/h' },
-      { key: 'cap_entry_fee_eur',  header: 'Entry Fee EUR' },
-      { key: 'cap_exit_fee_eur',   header: 'Exit Fee EUR' },
-      { key: 'fuel_gas_kwh',       header: 'Fuel Gas kWh' },
-      { key: 'fuel_gas_amount_eur',header: 'Fuel Gas EUR' },
-      { key: 'total_amount_eur',   header: 'Total EUR' },
+      { key: 'cap_entry_kwh_h',    header: 'Cap Entry kWh/h', type: 'number' },
+      { key: 'cap_exit_kwh_h',     header: 'Cap Exit kWh/h', type: 'number' },
+      { key: 'cap_entry_fee_eur',  header: 'Entry Fee EUR', type: 'eur' },
+      { key: 'cap_exit_fee_eur',   header: 'Exit Fee EUR', type: 'eur' },
+      { key: 'fuel_gas_kwh',       header: 'Fuel Gas kWh', type: 'number' },
+      { key: 'fuel_gas_amount_eur',header: 'Fuel Gas EUR', type: 'eur' },
+      { key: 'total_amount_eur',   header: 'Total EUR', type: 'eur' },
       { key: 'status',             header: 'Status' },
-      { key: 'due_date',           header: 'Due Date' },
+      { key: 'due_date',           header: 'Due Date', type: 'date' },
       { key: 'created_at',         header: 'Created' },
-    ]);
+    ];
+    if (format === 'xlsx') {
+      const buffer = await rowsToXlsx(rows, columns, 'Billing Invoices');
+      return sendXlsx(res, 'billing-invoices', buffer);
+    }
+    const csv = rowsToCsv(rows, columns);
     return sendCsv(res, 'billing-invoices', csv);
   } catch (err) { next(err); }
 });
@@ -1273,17 +1279,33 @@ router.post(
         });
       }
 
-      // 5. Return preview (not saved yet) — caller can POST /billing/with-lines to save
-      res.json({
+      // 5. NC Art.20.3.5: if shipper has >1 Capacity Product, FG must be a separate invoice
+      const fgLines = lines.filter(l => l.lineType === 'FUEL_GAS');
+      const capacityLines = lines.filter(l => l.lineType !== 'FUEL_GAS');
+      const needsSeparateFgInvoice = contracts.length > 1 && fgLines.length > 0;
+
+      // 6. Return preview (not saved yet)
+      const result = {
         preview: true,
         shipperId,
         periodFrom,
         periodTo,
         contractsFound: contracts.length,
         overdueInvoices: overdue.length,
-        lines,
         instruction: 'Review lines and POST to /billing/with-lines to create invoice',
-      });
+      };
+
+      if (needsSeparateFgInvoice) {
+        // Art.20.3.5: separate invoices for capacity and fuel gas
+        result.invoices = [
+          { invoiceType: 'CAPACITY', lines: capacityLines },
+          { invoiceType: 'FUEL_GAS', lines: fgLines, ncRef: 'NC Art.20.3.5 — separate FG invoice for multi-product shippers' },
+        ];
+      } else {
+        result.lines = lines;
+      }
+
+      res.json(result);
     } catch (err) { next(err); }
   }
 );

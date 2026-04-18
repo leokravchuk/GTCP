@@ -166,8 +166,9 @@ router.get('/meta', authorize('contracts:read'), (_req, res) => {
 
 // ── GET /export — CSV (NC Art.6 contracts register) ───────────────────────────
 const { rowsToCsv, sendCsv } = require('../utils/csvExport');
+const { rowsToXlsx, sendXlsx } = require('../utils/xlsxExport');
 router.get('/export', authorize('contracts:read'), async (req, res, next) => {
-  const { status, shipper_id, flow_direction, contract_type } = req.query;
+  const { status, shipper_id, flow_direction, contract_type, format } = req.query;
   const conds = []; const params = []; let i = 1;
   if (status)         { conds.push(`c.status = $${i++}`);          params.push(status); }
   if (shipper_id)     { conds.push(`c.shipper_id = $${i++}`);      params.push(shipper_id); }
@@ -186,22 +187,27 @@ router.get('/export', authorize('contracts:read'), async (req, res, next) => {
          ${where} ORDER BY c.created_at DESC`,
       params
     );
-    const csv = rowsToCsv(rows, [
+    const columns = [
       { key: 'contract_no',             header: 'Contract No' },
       { key: 'shipper_code',            header: 'Shipper' },
       { key: 'shipper_name',            header: 'Shipper Name' },
       { key: 'contract_type',           header: 'Type' },
       { key: 'flow_direction',          header: 'Flow Direction' },
       { key: 'status',                  header: 'Status' },
-      { key: 'cap_entry_kwh_h',         header: 'Cap Entry kWh/h' },
-      { key: 'cap_exit_kwh_h',          header: 'Cap Exit kWh/h' },
-      { key: 'capacity_kwh_h',          header: 'Capacity kWh/h (legacy)' },
-      { key: 'tariff_entry_eur_kwh_h',  header: 'Tariff Entry' },
-      { key: 'tariff_exit_eur_kwh_h',   header: 'Tariff Exit' },
-      { key: 'period_from',             header: 'Period From' },
-      { key: 'period_to',               header: 'Period To' },
+      { key: 'cap_entry_kwh_h',         header: 'Cap Entry kWh/h', type: 'number' },
+      { key: 'cap_exit_kwh_h',          header: 'Cap Exit kWh/h', type: 'number' },
+      { key: 'capacity_kwh_h',          header: 'Capacity kWh/h (legacy)', type: 'number' },
+      { key: 'tariff_entry_eur_kwh_h',  header: 'Tariff Entry', type: 'number' },
+      { key: 'tariff_exit_eur_kwh_h',   header: 'Tariff Exit', type: 'number' },
+      { key: 'period_from',             header: 'Period From', type: 'date' },
+      { key: 'period_to',               header: 'Period To', type: 'date' },
       { key: 'created_at',              header: 'Created' },
-    ]);
+    ];
+    if (format === 'xlsx') {
+      const buffer = await rowsToXlsx(rows, columns, 'Contracts');
+      return sendXlsx(res, 'contracts', buffer);
+    }
+    const csv = rowsToCsv(rows, columns);
     return sendCsv(res, 'contracts', csv);
   } catch (err) { next(err); }
 });

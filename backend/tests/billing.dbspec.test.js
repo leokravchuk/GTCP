@@ -163,8 +163,8 @@ describe('Billing DB-specific — POST /billing/generate branches', () => {
         flow_direction: 'KIREVO_HORGOS', start_date: '2025-10-01', end_date: '2026-09-30',
       }] });
       if (sql.includes('capacity_bookings') && sql.includes('shipper_id')) return Promise.resolve({ rows: [
-        { point: 'KIREVO-ENTRY', direction: 'ENTRY', capacity_mwh_d: 450000 },
-        { point: 'HORGOS-EXIT', direction: 'EXIT', capacity_mwh_d: 380000 },
+        { point: 'KIREVO-ENTRY', direction: 'ENTRY', capacity_kwh_h: 13752230 },
+        { point: 'HORGOS-EXIT', direction: 'EXIT', capacity_kwh_h: 9216209 },
       ] });
       if (sql.includes('OVERDUE')) return Promise.resolve({ rows: [] });
       return Promise.resolve({ rows: [] });

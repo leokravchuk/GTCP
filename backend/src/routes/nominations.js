@@ -33,18 +33,22 @@ router.use(authenticate);
 /** Auto-increment reference counter: NOM-YYYY-NNNNN */
 async function nextReference(gasDay) {
   const year = new Date(gasDay).getFullYear();
+  const prefix = `NOM-${year}-`;
   const { rows } = await db.query(
-    `SELECT COUNT(*) AS cnt FROM nominations
-     WHERE EXTRACT(YEAR FROM gas_day) = $1`, [year]
+    `SELECT COALESCE(MAX(CAST(REPLACE(reference, $1, '') AS INTEGER)), 0) AS max_seq
+     FROM nominations
+     WHERE reference LIKE $2`,
+    [prefix, `${prefix}%`]
   );
-  const seq = String(Number(rows[0].cnt) + 1).padStart(5, '0');
-  return `NOM-${year}-${seq}`;
+  const seq = String(Number(rows[0].max_seq) + 1).padStart(5, '0');
+  return `${prefix}${seq}`;
 }
 
-// ── GET /export — CSV export (NC Art.12 nominations register) ─────────────────
+// ── GET /export — CSV/XLSX export (NC Art.12 nominations register) ────────────
 const { rowsToCsv, sendCsv } = require('../utils/csvExport');
+const { rowsToXlsx, sendXlsx } = require('../utils/xlsxExport');
 router.get('/export', authorize('nominations:read'), async (req, res, next) => {
-  const { gas_day, shipper_id, status, direction, from, to } = req.query;
+  const { gas_day, shipper_id, status, direction, from, to, format } = req.query;
   const conds = []; const params = []; let i = 1;
   if (gas_day)    { conds.push(`n.gas_day = $${i++}`);    params.push(gas_day); }
   if (shipper_id) { conds.push(`n.shipper_id = $${i++}`); params.push(shipper_id); }
@@ -59,28 +63,33 @@ router.get('/export', authorize('nominations:read'), async (req, res, next) => {
       `SELECT n.reference, s.code AS shipper_code, s.name AS shipper_name,
               n.gas_day, n.direction, n.point,
               n.volume_kwh_h, n.contracted_kwh_h,
-              n.matched_kwh_h, n.allocated_kwh_h,
+              n.matched_kwh_h, n.matched_kwh_h AS allocated_kwh_h,
               n.is_over_nomination, n.status, n.gas_day_cycle, n.submitted_at
          FROM nominations n JOIN shippers s ON s.id = n.shipper_id
          ${where} ORDER BY n.gas_day DESC, n.submitted_at DESC`,
       params
     );
-    const csv = rowsToCsv(rows, [
+    const columns = [
       { key: 'reference',          header: 'Reference' },
       { key: 'shipper_code',       header: 'Shipper' },
       { key: 'shipper_name',       header: 'Shipper Name' },
-      { key: 'gas_day',            header: 'Gas Day' },
+      { key: 'gas_day',            header: 'Gas Day', type: 'date' },
       { key: 'direction',          header: 'Direction' },
       { key: 'point',              header: 'Point' },
-      { key: 'volume_kwh_h',       header: 'Nominated kWh/h' },
-      { key: 'contracted_kwh_h',   header: 'Contracted kWh/h' },
-      { key: 'matched_kwh_h',      header: 'Matched kWh/h' },
-      { key: 'allocated_kwh_h',    header: 'Allocated kWh/h' },
+      { key: 'volume_kwh_h',       header: 'Nominated kWh/h', type: 'number' },
+      { key: 'contracted_kwh_h',   header: 'Contracted kWh/h', type: 'number' },
+      { key: 'matched_kwh_h',      header: 'Matched kWh/h', type: 'number' },
+      { key: 'allocated_kwh_h',    header: 'Allocated kWh/h', type: 'number' },
       { key: 'is_over_nomination', header: 'Over-Nom' },
       { key: 'status',             header: 'Status' },
       { key: 'gas_day_cycle',      header: 'Cycle' },
       { key: 'submitted_at',       header: 'Submitted' },
-    ]);
+    ];
+    if (format === 'xlsx') {
+      const buffer = await rowsToXlsx(rows, columns, 'Nominations');
+      return sendXlsx(res, 'nominations', buffer);
+    }
+    const csv = rowsToCsv(rows, columns);
     return sendCsv(res, 'nominations', csv);
   } catch (err) { next(err); }
 });
@@ -351,13 +360,13 @@ router.post('/match', authorize('nominations:match'), async (req, res, next) => 
         const entryStatus   = matchedVolume === Number(entry.volume_kwh_h) ? 'MATCHED' : 'PARTIALLY_MATCHED';
         const exitStatus    = matchedVolume === Number(exit.volume_kwh_h)  ? 'MATCHED' : 'PARTIALLY_MATCHED';
 
-        // NC Art.12.3: allocated_kwh_h = matched = nominated (shippers always balanced)
+        // NC Art.12.3: matched = nominated (shippers always balanced)
         await client.query(
-          `UPDATE nominations SET status = $1, matched_kwh_h = $2, allocated_kwh_h = $2 WHERE id = $3`,
+          `UPDATE nominations SET status = $1, matched_kwh_h = $2 WHERE id = $3`,
           [entryStatus, matchedVolume, entry.id]
         );
         await client.query(
-          `UPDATE nominations SET status = $1, matched_kwh_h = $2, allocated_kwh_h = $2 WHERE id = $3`,
+          `UPDATE nominations SET status = $1, matched_kwh_h = $2 WHERE id = $3`,
           [exitStatus, matchedVolume, exit.id]
         );
 

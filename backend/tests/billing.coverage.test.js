@@ -183,14 +183,16 @@ describe('Billing Coverage — GET /billing/gas-quality', () => {
     expect(res.status).toBe(200);
   });
 
-  test('defaults to HORGOS-EXIT without point_code', async () => {
+  test('returns all IPs without point_code filter', async () => {
     db.query.mockResolvedValue({ rows: [] });
     const token = makeToken({ ...SEED.BILLING_USER });
     const res = await request(app)
       .get(`${API}/billing/gas-quality`)
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(db.query.mock.calls[0][1]).toContain('HORGOS-EXIT');
+    // No point_code → no filter params, returns all IPs (NC Art.17)
+    const sql = db.query.mock.calls[0][0];
+    expect(sql).not.toContain('point_code =');
   });
 });
 

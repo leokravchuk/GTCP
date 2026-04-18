@@ -35,7 +35,7 @@ router.get('/volumes', authorize('billing:read'), async (req, res, next) => {
               n.point,
               COALESCE(SUM(n.volume_kwh_h * 24), 0)::bigint    AS nominated_kwh,
               COALESCE(SUM(n.matched_kwh_h * 24), 0)::bigint   AS matched_kwh,
-              COALESCE(SUM(n.allocated_kwh_h * 24), 0)::bigint AS allocated_kwh,
+              COALESCE(SUM(n.matched_kwh_h * 24), 0)::bigint   AS allocated_kwh,
               COUNT(*)::int                                     AS nominations_count
          FROM nominations n
          ${where}

@@ -31,8 +31,9 @@ describe('Auctions Coverage', () => {
         .get(`${API}/auctions`)
         .set('Authorization', `Bearer ${adminToken()}`);
       expect(res.status).toBe(200);
-      expect(res.body.data).toBeDefined();
-      expect(res.body.total).toBe(1);
+      expect(res.body).toBeDefined();
+      expect(res.body[0].product_type).toBe('ANNUAL');
+      expect(res.headers['x-total-count']).toBe('1');
     });
 
     test('filters by status', async () => {
