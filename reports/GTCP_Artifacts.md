@@ -1,8 +1,8 @@
 # GTCP Artifacts — Diagrams, Schemes & Session Artifacts
 
-**Gas Trading & Commercial Platform · Compilation v1.3**
-**Date:** 10.04.2026 · Sprint 16 CLOSED (rescoped, ~13/35 SP — see [SPRINT_16_REPORT.md](SPRINT_16_REPORT.md))
-**Source:** Sessions Sprint 8–16
+**Gas Trading & Commercial Platform · Compilation v1.4**
+**Date:** 18.04.2026 · Sprint 18 IN PROGRESS (see [SPRINT_18_PLAN.md](SPRINT_18_PLAN.md))
+**Source:** Sessions Sprint 8–18
 
 ---
 
@@ -21,7 +21,7 @@
 11. [Auction Lifecycle (CAM NC)](#11-auction-lifecycle)
 12. [Credit Support Calculation](#12-credit-support-calculation)
 13. [Database Schema (14 Migrations)](#13-database-schema)
-14. [API Endpoint Map (82 Endpoints — authoritative)](#14-api-endpoint-map)
+14. [API Endpoint Map (95 Endpoints — authoritative)](#14-api-endpoint-map)
 15. [Sprint Velocity Chart](#15-sprint-velocity-chart)
 16. [Balancing & OBA (NC Art.15)](#16-balancing--oba)
 17. [Fuel Gas Allocation Rules (NC Art.18 + Art.19.1.4)](#17-fuel-gas-allocation-rules-nc-art18--art1914--binding)
@@ -698,124 +698,137 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
 
 ---
 
-## 14. API Endpoint Map (82 Endpoints — authoritative, Sprint 17 DEBT-02 audit)
+## 14. API Endpoint Map (95 Endpoints — authoritative, Sprint 18 US-1802 audit)
+
+Source: `npm run count-endpoints` · OpenAPI 95/95 = 100% sync
 
 ```
-  AUTH (4)
+  HEALTH (1)
+  GET    /api/v1/health
+
+  AUTH (3)
   POST   /api/v1/auth/login
-  POST   /api/v1/auth/register
-  POST   /api/v1/auth/refresh
-  POST   /api/v1/auth/logout
+  GET    /api/v1/auth/me
+  POST   /api/v1/auth/change-password
 
-  CONTRACTS (8)
-  GET    /api/v1/contracts
-  GET    /api/v1/contracts/:id
-  POST   /api/v1/contracts
-  PATCH  /api/v1/contracts/:id
-  DELETE /api/v1/contracts/:id
-  GET    /api/v1/contracts/meta
-  GET    /api/v1/contracts/stats
-  GET    /api/v1/contracts/nc-routes
-
-  CAPACITY (12)
-  GET    /api/v1/capacity
-  GET    /api/v1/capacity/:id
-  POST   /api/v1/capacity
-  PATCH  /api/v1/capacity/:id
-  GET    /api/v1/capacity/tracker
-  GET    /api/v1/capacity/tracker/summary
-  POST   /api/v1/capacity/surrender
-  GET    /api/v1/capacity/surrender/history
-  GET    /api/v1/capacity/uioli
-  POST   /api/v1/capacity/uioli/trigger
-  GET    /api/v1/capacity/secondary
-  POST   /api/v1/capacity/secondary/trade
-
-  NOMINATIONS (10)
-  GET    /api/v1/nominations
-  GET    /api/v1/nominations/:id
-  POST   /api/v1/nominations
-  PATCH  /api/v1/nominations/:id
-  POST   /api/v1/nominations/:id/confirm
-  POST   /api/v1/nominations/:id/reject
-  POST   /api/v1/nominations/:id/renom
-  POST   /api/v1/nominations/:id/match
-  GET    /api/v1/nominations/:id/edigas
-  GET    /api/v1/nominations/balance
-
-  BILLING (12)
-  GET    /api/v1/billing
-  GET    /api/v1/billing/:id
-  POST   /api/v1/billing
-  PATCH  /api/v1/billing/:id
-  POST   /api/v1/billing/with-lines
-  POST   /api/v1/billing/generate
-  GET    /api/v1/billing/:id/lines
-  GET    /api/v1/billing/fuel-gas
-  POST   /api/v1/billing/fuel-gas/calculate
-  GET    /api/v1/billing/overdue
-  POST   /api/v1/billing/overdue/interest
-  GET    /api/v1/billing/stats
-
-  CREDITS (8)
-  GET    /api/v1/credits
-  GET    /api/v1/credits/:id
-  POST   /api/v1/credits
-  PATCH  /api/v1/credits/:id
-  GET    /api/v1/credits/exposure
-  POST   /api/v1/credits/margin-call
-  GET    /api/v1/credits/history
-  GET    /api/v1/credits/stats
-
-  AUCTIONS (10)
-  GET    /api/v1/auctions/calendar
-  POST   /api/v1/auctions/calendar
-  GET    /api/v1/auctions/calendar/:id
-  POST   /api/v1/auctions/:id/bid
-  GET    /api/v1/auctions/:id/bids
-  POST   /api/v1/auctions/:id/evaluate
-  GET    /api/v1/auctions/:id/results
-  GET    /api/v1/auctions/active
-  GET    /api/v1/auctions/history
-  GET    /api/v1/auctions/stats
-
-  SHIPPERS (8)
+  SHIPPERS (7)
   GET    /api/v1/shippers
-  GET    /api/v1/shippers/:id
+  POST   /api/v1/shippers
+  GET    /api/v1/shippers/{id}
+  PATCH  /api/v1/shippers/{id}
   POST   /api/v1/shippers/apply
-  PATCH  /api/v1/shippers/:id/status
-  GET    /api/v1/shippers/:id/history
-  PATCH  /api/v1/shippers/:id
-  GET    /api/v1/shippers/stats
-  GET    /api/v1/shippers/active
+  PATCH  /api/v1/shippers/{id}/status
+  GET    /api/v1/shippers/{id}/history
 
-  TARIFFS (6)
-  GET    /api/v1/tariffs/reserve-prices
-  GET    /api/v1/tariffs/reserve-prices/:point
-  POST   /api/v1/tariffs/reserve-prices
-  PATCH  /api/v1/tariffs/reserve-prices/:id
-  GET    /api/v1/tariffs/system-params
-  PATCH  /api/v1/tariffs/system-params
+  CONTRACTS (6)
+  GET    /api/v1/contracts
+  POST   /api/v1/contracts
+  GET    /api/v1/contracts/meta
+  GET    /api/v1/contracts/export          ← CSV/XLSX (Sprint 17-18)
+  GET    /api/v1/contracts/{id}
+  PATCH  /api/v1/contracts/{id}
 
-  RBP BRIDGE (11)
+  NOMINATIONS (12)
+  GET    /api/v1/nominations
+  POST   /api/v1/nominations
+  GET    /api/v1/nominations/export        ← CSV/XLSX (Sprint 17-18)
+  GET    /api/v1/nominations/{id}
+  POST   /api/v1/nominations/match
+  POST   /api/v1/nominations/{id}/match-adjacent   ← NC Art.13 (Sprint 17)
+  GET    /api/v1/nominations/{id}/matching-result   ← NC Art.13 (Sprint 17)
+  POST   /api/v1/nominations/{id}/renom
+  POST   /api/v1/nominations/over-nominate
+  GET    /api/v1/nominations/{id}/edigas-nomint
+  POST   /api/v1/nominations/{id}/edigas-submit
+  PATCH  /api/v1/nominations/{id}/status
+
+  CAPACITY (3)
+  GET    /api/v1/capacity
+  POST   /api/v1/capacity
+  GET    /api/v1/capacity/available
+
+  AUCTIONS (18)
+  GET    /api/v1/auctions
+  GET    /api/v1/auctions/calendar
+  GET    /api/v1/auctions/calendar/grid
+  GET    /api/v1/auctions/calendar/days
+  GET    /api/v1/auctions/calendar/upcoming
+  GET    /api/v1/auctions/calendar/next
+  GET    /api/v1/auctions/calendar/{id}
+  PATCH  /api/v1/auctions/calendar/{id}/status
+  GET    /api/v1/auctions/bids
+  POST   /api/v1/auctions/bids
+  GET    /api/v1/auctions/bids/{id}
+  PATCH  /api/v1/auctions/bids/{id}
+  DELETE /api/v1/auctions/bids/{id}
+  POST   /api/v1/auctions/bids/{id}/submit
+  POST   /api/v1/auctions/bids/{id}/result
+  POST   /api/v1/auctions/bids/{id}/create-contract
+  GET    /api/v1/auctions/summary
+  GET    /api/v1/auctions/timeline
+
+  BILLING (10)
+  GET    /api/v1/billing
+  POST   /api/v1/billing
+  GET    /api/v1/billing/export            ← CSV/XLSX (Sprint 17-18)
+  GET    /api/v1/billing/gas-quality
+  POST   /api/v1/billing/with-lines
+  POST   /api/v1/billing/generate          ← FG split Art.20.3.5 (Sprint 18)
+  GET    /api/v1/billing/{id}
+  GET    /api/v1/billing/{id}/statement
+  PATCH  /api/v1/billing/{id}/status
+  POST   /api/v1/billing/{id}/erp-sync
+
+  CREDITS (7)
+  GET    /api/v1/credits
+  GET    /api/v1/credits/margin-calls
+  GET    /api/v1/credits/{shipperId}
+  PATCH  /api/v1/credits/{shipperId}
+  GET    /api/v1/credits/{shipperId}/instruments
+  POST   /api/v1/credits/{shipperId}/instruments
+  GET    /api/v1/credits/{shipperId}/rating
+
+  BALANCE (4)
+  GET    /api/v1/balance
+  GET    /api/v1/balance/oba/daily         ← OBA Art.15 (Sprint 16)
+  GET    /api/v1/balance/oba/monthly/{month}
+  GET    /api/v1/balance/oba/summary
+
+  AUDIT (1)
+  GET    /api/v1/audit
+
+  SYSTEM-PARAMS (2)
+  GET    /api/v1/system-params
+  PATCH  /api/v1/system-params/{key}
+
+  RESERVE-PRICES (1)
+  GET    /api/v1/reserve-prices
+
+  RBP BRIDGE (12)
   GET    /api/v1/rbp/status
-  GET    /api/v1/rbp/auctions
-  GET    /api/v1/rbp/trades
   POST   /api/v1/rbp/sync-capacity
   POST   /api/v1/rbp/sync-credit
-  GET    /api/v1/rbp/credit/:id
+  GET    /api/v1/rbp/auctions
+  GET    /api/v1/rbp/trades
+  GET    /api/v1/rbp/credit/{shipperId}
   GET    /api/v1/rbp/sync-log
   POST   /api/v1/rbp/surrender/approve
   POST   /api/v1/rbp/bilateral
   POST   /api/v1/rbp/bilateral/approve
   GET    /api/v1/rbp/network-users
-  GET    /api/v1/rbp/remit
+  POST   /api/v1/rbp/remit
 
-  SYSTEM (4)
-  GET    /api/v1/system/health
-  GET    /api/v1/system/version
-  GET    /api/v1/system/config
-  GET    /docs (Swagger UI)
+  ANALYTICS (3)                            ← Sprint 17
+  GET    /api/v1/analytics/volumes
+  GET    /api/v1/analytics/revenue
+  GET    /api/v1/analytics/utilization
+
+  VTP (5)                                  ← Sprint 18 (NC Art.11)
+  GET    /api/v1/vtp/trades
+  POST   /api/v1/vtp/trades
+  GET    /api/v1/vtp/trades/{id}
+  PATCH  /api/v1/vtp/trades/{id}/confirm
+  GET    /api/v1/vtp/balance
 ```
 
 ---
@@ -838,8 +851,10 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   14     |  35  | 442   |   0        | Auction Calendar, Available Capacity, EDIGAS v5.1, UAT
   15     |  16  | 442   |   0        | NC consistency, documentation alignment
   16     |  13  | 442   |   2        | RESCOPED: capacity_kwh_h + OBA (Art.15 split) + UI cleanup
+  17     |  29  | 527   |   2        | FG Art.18 hotfix, NC Art.13 matching, Analytics, CSV export
+  18     |  19  | 559   |   2        | VTP Art.11, Excel export, FG-invoice split, OpenAPI 100%
   -------|------|-------|------------|----------------------------------
-  TOTAL  | ~572 | 458   |  19        | 82 endpoints (audited), NC 79%, 5 bugs fixed + FG hotfix
+  TOTAL  | ~633 | 559   |  22        | 95 endpoints (audited), NC ~87%, OpenAPI 100% sync
 
   Velocity trend (SP/week):
   Sprint 1-4:  ~12 SP/wk (foundation)
@@ -853,6 +868,8 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   Sprint 14:   ~35 SP/1d (auctions+UAT)
   Sprint 15:   ~16 SP/1d (consistency)
   Sprint 16:   ~13 SP/4d (NC re-interpretation, rescoped from 35 SP plan)
+  Sprint 17:   ~29 SP/3d (closed early Day 3 — record velocity)
+  Sprint 18:   ~19 SP/2d (VTP + Excel + FG-invoice + OpenAPI sync)
 
   NC Coverage:
   Sprint 7:  ~60% (42/70 articles)
@@ -860,6 +877,8 @@ cap*T  cap*T  cap*T  cap*T  cap*T    (see below)
   Sprint 10: ~73% (51/70)
   Sprint 12: ~79% (55/70)
   Sprint 14: ~79% (55/70) + NC verified against full PDF (111 pages)
+  Sprint 17: ~85% (Art.13 = 100%, Art.18 FG fully compliant)
+  Sprint 18: ~87% (Art.11 VTP basic, Art.20.3.5 FG-invoice split)
   Sprint 13: ~79% (55/70) + 79 NC compliance regression tests
   Sprint 16: ~79% (55/70) + Art.15 re-interpreted (shippers always balanced
              per Art.12.3; OBA TSO-to-TSO read-only; Art.15 sub-coverage 50→83%)

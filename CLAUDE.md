@@ -119,16 +119,16 @@ Implementation: Option A (real-time SQL on every request).
 - `GET /auctions/calendar/grid` — Product × Month grid for Gas Year (Yearly/Quarterly/Monthly status per month)
 - `GET /auctions/calendar/days?year=YYYY&month=M` — Day-centric calendar: DB auctions (Y/Q/M) + on-the-fly Daily/WD per day
 
-Total API endpoints: **82** (authoritative, from `node scripts/count-endpoints.js` · Sprint 17 DEBT-02 completed 15.04.2026).
-> OpenAPI coverage: 58/82 (71%). Gap: 42 endpoints in code without openapi spec + 18 in openapi without code (obsolete names). Full OpenAPI sync → Sprint 18 US-1802.
-> Previous docs counts (99 / 96 / 93) were stale estimates. The new single source of truth is `npm run count-endpoints` (see backend/scripts/count-endpoints.js).
+Total API endpoints: **95** (authoritative, from `node scripts/count-endpoints.js` · Sprint 18 US-1802 completed 17.04.2026).
+> OpenAPI coverage: **95/95 (100%)**. Full sync achieved in Sprint 18 US-1802.
+> Single source of truth: `npm run count-endpoints` (see backend/scripts/count-endpoints.js).
 
 **Sprint 16 capacity_kwh_h (09.04.2026):**
 - Migration 017: `capacity_bookings.capacity_kwh_h` — native kWh/h column (АЕРС-exact)
 - All 12 runtime conversions `capacity_mwh_d * 1000 / 24` replaced with `capacity_kwh_h` in 6 files
 - `capacity_mwh_d` kept for backward compatibility (deprecated, do not use in new code)
 - Bug fixed: nominations.js over-nomination compared MWh/d with kWh/h (BUG-04/05)
-- Migrations: 000–017
+- Migrations: 000–022
 
 **Sprint 16 OBA Settlement (10.04.2026) — Binding Rule for Art.15:**
 
@@ -434,17 +434,20 @@ FG_eur = (FG_kwh / 1000) × price_eur_mwh   (тендерная цена Art.18.
 - Art.20.3.6: для LT GTA FG выставляется по LT GTA, не по NC.
 - Art.18.5.1.4: цена FG публикуется на сайте TSO ежедневно.
 
-### Текущие баги backend/src/routes/billing.js (зафиксировано 14.04.2026)
+### Исправленные баги billing.js (Sprint 17–18)
 
-1. [billing.js:553-558](../backend/src/routes/billing.js#L553-L558) — fallback `estFlowKwh = cap × 24 × days × 0.85` начисляет FG **любому** shipper'у с capacity, независимо от маршрута и election. **Исправить**: early return `0` для маршрутов вне `{KIREVO_HORGOS, KIREVO_HORGOS_AND_SERBIA}`.
-2. [billing.js:556-558](../backend/src/routes/billing.js#L556-L558) — для `KIREVO_EXIT_SERBIA` fallback кладёт поток в `qHorgosKwh` → начисляет X1 (компрессор) вместо X2 (подогрев). Критично.
-3. Отсутствует поле `shippers.fuel_gas_election` → нельзя различить in-kind/cash.
-4. Отсутствует проверка `AAQ > 0` — счёт генерируется даже при нулевых фактических аллокациях.
-5. Нарушение Art.20.3.5 — FG как line item вместо отдельного invoice для мультипродуктовых shippers.
+Все 5 багов FG billing **исправлены**:
+1. ✅ FG-01: `calcFuelGas()` guard — route must be `KIREVO_HORGOS` | `KIREVO_HORGOS_AND_SERBIA` (Sprint 17 US-1708)
+2. ✅ FG-02: `qHorgosKwh` resolved from `nominations.allocated_kwh_h`, fallback `cap×0.85` with `estimated=true` (Sprint 17 US-1711)
+3. ✅ FG-03: `shippers.fuel_gas_election` field added — migration 019 (Sprint 17 US-1708)
+4. ✅ FG-04: `AAQ > 0` check before FG calculation (Sprint 17 US-1708)
+5. ✅ FG-05: Art.20.3.5 separate FG-invoice for multi-product shippers — migration 022 `invoice_type` (Sprint 18 US-1712)
+- ✅ Data sweep: 4 NIS invoices corrected, 299,535.64 EUR aggregate correction (Sprint 17 US-1710)
 
-### Последствия для seed / существующих счетов
-
-- **INV-2026-0008 (NIS, `KIREVO_EXIT_SERBIA`)**: line item FUEL_GAS = 74 883,91 EUR **должен быть 0**. Total пересчитать: 3 350 312,03 EUR (не 3 425 195,94).
-- Проверить все исторические invoice для NIS и Commercial Reverse shipper'ов — удалить/занулить FG-строки.
-- Summary-блок Fuel Gas 0,00 EUR в INV-2026-0008 — правильный.
+**Sprint 18 additions (17.04.2026):**
+- VTP Basic (NC Art.11): migration 021, `src/routes/vtp.js` — 5 endpoints (trades CRUD + balance)
+- Excel xlsx export: `src/utils/xlsxExport.js` (exceljs) — `?format=xlsx` on billing/contracts/nominations export
+- FG separate invoice: migration 022 `invoice_type` ∈ {CAPACITY, FUEL_GAS, IMBALANCE}
+- OpenAPI 100% sync: 95/95 endpoints documented, 18 obsolete removed
+- Tests: 559 (36 suites), all passing
 
