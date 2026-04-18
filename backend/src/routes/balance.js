@@ -8,25 +8,81 @@ const authorize = require('../middleware/authorize');
 const router = express.Router();
 router.use(authenticate);
 
-// GET /balance — imbalance charges by gas day (NC Art. 15)
+// GET /balance — shipper balance view with VTP adjustment (NC Art.12.3 + Art.11)
+// Entry = Nominations ENTRY + VTP BUY
+// Exit  = Nominations EXIT  + VTP SELL
+// Balance = Entry - Exit (should be 0 per NC Art.12.3)
 router.get('/', authorize('billing:read'), async (req, res, next) => {
-  const { gas_day, shipper_id, limit = 100, offset = 0 } = req.query;
-  const conds = [];
-  const params = [];
-  let i = 1;
-  if (gas_day)    { conds.push(`b.gas_day = $${i++}`);    params.push(gas_day); }
-  if (shipper_id) { conds.push(`b.shipper_id = $${i++}`); params.push(shipper_id); }
-  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const { gas_day, shipper_id } = req.query;
+  const nomConds = []; const vtpConds = ["t.status = 'CONFIRMED'"];
+  const nomParams = []; const vtpParams = [];
+  let ni = 1; let vi = 1;
+  if (gas_day) {
+    nomConds.push(`n.gas_day = $${ni++}`); nomParams.push(gas_day);
+    vtpConds.push(`t.gas_day = $${vi++}`); vtpParams.push(gas_day);
+  }
+  if (shipper_id) {
+    nomConds.push(`n.shipper_id = $${ni++}`); nomParams.push(shipper_id);
+    vtpConds.push(`t.shipper_id = $${vi++}`); vtpParams.push(shipper_id);
+  }
+  const nomWhere = nomConds.length ? `WHERE ${nomConds.join(' AND ')}` : '';
+  const vtpWhere = `WHERE ${vtpConds.join(' AND ')}`;
 
   try {
-    const { rows } = await db.query(
-      `SELECT b.*, s.code AS shipper_code
-       FROM balance_charges b
-       JOIN shippers s ON s.id = b.shipper_id
-       ${where} ORDER BY b.gas_day DESC LIMIT $${i++} OFFSET $${i++}`,
-      [...params, limit, offset]
+    // Nomination balances
+    const { rows: nomRows } = await db.query(
+      `SELECT n.shipper_id, s.code AS shipper_code, s.name AS shipper_name, n.gas_day,
+              SUM(CASE WHEN n.direction='ENTRY' THEN n.volume_kwh_h ELSE 0 END)::numeric AS nom_entry_kwh_h,
+              SUM(CASE WHEN n.direction='EXIT'  THEN n.volume_kwh_h ELSE 0 END)::numeric AS nom_exit_kwh_h
+       FROM nominations n JOIN shippers s ON s.id = n.shipper_id
+       ${nomWhere} AND n.status NOT IN ('REJECTED','CANCELLED')
+       GROUP BY n.shipper_id, s.code, s.name, n.gas_day
+       ORDER BY n.gas_day DESC, s.code`,
+      nomParams
     );
-    res.json(rows);
+
+    // VTP balances (BUY = virtual entry, SELL = virtual exit)
+    const { rows: vtpRows } = await db.query(
+      `SELECT t.shipper_id, t.gas_day,
+              SUM(CASE WHEN t.direction='BUY'  THEN t.volume_kwh_h ELSE 0 END)::numeric AS vtp_buy_kwh_h,
+              SUM(CASE WHEN t.direction='SELL' THEN t.volume_kwh_h ELSE 0 END)::numeric AS vtp_sell_kwh_h
+       FROM vtp_trades t
+       ${vtpWhere}
+       GROUP BY t.shipper_id, t.gas_day`,
+      vtpParams
+    );
+
+    // Merge: combine nomination + VTP positions
+    const vtpMap = {};
+    for (const v of vtpRows) {
+      vtpMap[`${v.shipper_id}_${v.gas_day}`] = v;
+    }
+
+    const balances = nomRows.map(n => {
+      const vtp = vtpMap[`${n.shipper_id}_${n.gas_day}`] || { vtp_buy_kwh_h: 0, vtp_sell_kwh_h: 0 };
+      const totalEntry = Number(n.nom_entry_kwh_h) + Number(vtp.vtp_buy_kwh_h);
+      const totalExit  = Number(n.nom_exit_kwh_h)  + Number(vtp.vtp_sell_kwh_h);
+      const diff = totalEntry - totalExit;
+      return {
+        shipper_id: n.shipper_id,
+        shipper_code: n.shipper_code,
+        shipper_name: n.shipper_name,
+        gas_day: n.gas_day,
+        nom_entry_kwh_h: Number(n.nom_entry_kwh_h),
+        nom_exit_kwh_h: Number(n.nom_exit_kwh_h),
+        vtp_buy_kwh_h: Number(vtp.vtp_buy_kwh_h),
+        vtp_sell_kwh_h: Number(vtp.vtp_sell_kwh_h),
+        total_entry_kwh_h: totalEntry,
+        total_exit_kwh_h: totalExit,
+        balance_kwh_h: diff,
+        balanced: Math.abs(diff) < 1, // NC Art.12.3: entry = exit
+      };
+    });
+
+    res.json({
+      ncRef: 'NC Art.12.3 (Equal Nominations) + Art.11 (VTP = virtual entry/exit)',
+      balances,
+    });
   } catch (err) { next(err); }
 });
 

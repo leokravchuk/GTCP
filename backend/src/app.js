@@ -28,6 +28,7 @@ const reservePricesRouter = require('./routes/reservePrices');
 const rbpRouter          = require('./routes/rbp');
 const analyticsRouter    = require('./routes/analytics');
 const vtpRouter          = require('./routes/vtp');
+const publicRouter       = require('./routes/public');
 
 const app = express();
 const API = process.env.API_PREFIX || '/api/v1';
@@ -110,6 +111,7 @@ app.use(`${API}/reserve-prices`, reservePricesRouter);
 app.use(`${API}/rbp`,            rbpRouter);
 app.use(`${API}/analytics`,      analyticsRouter);
 app.use(`${API}/vtp`,            vtpRouter);
+app.use(`${API}/public`,         publicRouter);
 
 // ── 404 & Error handlers ───────────────────────────────────────────────────────
 app.use(notFound);

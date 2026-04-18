@@ -2364,3 +2364,79 @@ paths:
                         sell_kwh_h:   { type: number }
                         net_kwh_h:    { type: number }
                         trade_count:  { type: integer }
+
+  # ── Transparency Portal (NC Art.24) — public, no JWT ─────────────────
+
+  /public/capacity:
+    get:
+      summary: Technical vs contracted capacity per IP (public)
+      tags: [public]
+      security: []
+      responses:
+        200:
+          description: Capacity data per IP with utilization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ncRef: { type: string }
+                  capacities:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        point: { type: string }
+                        direction: { type: string }
+                        technical_kwh_h: { type: number }
+                        contracted_kwh_h: { type: number }
+                        available_kwh_h: { type: number }
+                        utilization_pct: { type: number }
+
+  /public/auctions:
+    get:
+      summary: Upcoming and recent auction calendar (public)
+      tags: [public]
+      security: []
+      responses:
+        200:
+          description: Upcoming + recent auctions (anonymized)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upcoming: { type: array, items: { type: object } }
+                  recent: { type: array, items: { type: object } }
+
+  /public/gas-quality:
+    get:
+      summary: Latest gas quality per IP (NC Art.17, public)
+      tags: [public]
+      security: []
+      responses:
+        200:
+          description: Latest gas quality measurements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  measurements: { type: array, items: { type: object } }
+
+  /public/fuel-gas-price:
+    get:
+      summary: Current fuel gas tender price (NC Art.18.5.1.4, public)
+      tags: [public]
+      security: []
+      responses:
+        200:
+          description: Current FG price in EUR/MWh
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fuel_gas_price_eur_mwh: { type: number, nullable: true }
+                  currency: { type: string }
+                  unit: { type: string }
