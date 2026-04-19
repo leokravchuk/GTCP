@@ -119,8 +119,8 @@ Implementation: Option A (real-time SQL on every request).
 - `GET /auctions/calendar/grid` — Product × Month grid for Gas Year (Yearly/Quarterly/Monthly status per month)
 - `GET /auctions/calendar/days?year=YYYY&month=M` — Day-centric calendar: DB auctions (Y/Q/M) + on-the-fly Daily/WD per day
 
-Total API endpoints: **95** (authoritative, from `node scripts/count-endpoints.js` · Sprint 18 US-1802 completed 17.04.2026).
-> OpenAPI coverage: **95/95 (100%)**. Full sync achieved in Sprint 18 US-1802.
+Total API endpoints: **110** (authoritative, from `node scripts/count-endpoints.js` · Sprint 21 completed 19.04.2026).
+> OpenAPI coverage: **110/110 (100%)**. Full sync maintained since Sprint 18.
 > Single source of truth: `npm run count-endpoints` (see backend/scripts/count-endpoints.js).
 
 **Sprint 16 capacity_kwh_h (09.04.2026):**
@@ -128,7 +128,7 @@ Total API endpoints: **95** (authoritative, from `node scripts/count-endpoints.j
 - All 12 runtime conversions `capacity_mwh_d * 1000 / 24` replaced with `capacity_kwh_h` in 6 files
 - `capacity_mwh_d` kept for backward compatibility (deprecated, do not use in new code)
 - Bug fixed: nominations.js over-nomination compared MWh/d with kWh/h (BUG-04/05)
-- Migrations: 000–022
+- Migrations: 000–025
 
 **Sprint 16 OBA Settlement (10.04.2026) — Binding Rule for Art.15:**
 

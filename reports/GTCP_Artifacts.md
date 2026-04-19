@@ -1,8 +1,8 @@
 # GTCP Artifacts — Diagrams, Schemes & Session Artifacts
 
-**Gas Trading & Commercial Platform · Compilation v1.4**
-**Date:** 18.04.2026 · Sprint 18 IN PROGRESS (see [SPRINT_18_PLAN.md](SPRINT_18_PLAN.md))
-**Source:** Sessions Sprint 8–18
+**Gas Trading & Commercial Platform · Compilation v1.5**
+**Date:** 19.04.2026 · Sprint 22 (see [SPRINT_21_REPORT.md](SPRINT_21_REPORT.md))
+**Source:** Sessions Sprint 8–22
 
 ---
 
@@ -853,8 +853,12 @@ Source: `npm run count-endpoints` · OpenAPI 95/95 = 100% sync
   16     |  13  | 442   |   2        | RESCOPED: capacity_kwh_h + OBA (Art.15 split) + UI cleanup
   17     |  29  | 527   |   2        | FG Art.18 hotfix, NC Art.13 matching, Analytics, CSV export
   18     |  19  | 559   |   2        | VTP Art.11, Excel export, FG-invoice split, OpenAPI 100%
+  19     |  19  | 565   |   0        | Transparency Portal Art.24, VTP balance, Diploma index
+  20     |  22  | 600   |   1        | Surrender Art.8, WD Art.6, Interruption Art.14, 600 tests
+  21     |  21  | 607   |   0        | Раздел «Заявка», RBP panel, bids reporting, CAM NC report
+  22     |   5  | 612   |   2        | CAM NC compliance: clearing price, premium, auction_rounds, interruptible seed
   -------|------|-------|------------|----------------------------------
-  TOTAL  | ~633 | 559   |  22        | 95 endpoints (audited), NC ~87%, OpenAPI 100% sync
+  TOTAL  | ~750 | 612   |  25        | 110 endpoints, NC ~93%, OpenAPI 100%, CAM NC compliance documented
 
   Velocity trend (SP/week):
   Sprint 1-4:  ~12 SP/wk (foundation)
@@ -870,6 +874,10 @@ Source: `npm run count-endpoints` · OpenAPI 95/95 = 100% sync
   Sprint 16:   ~13 SP/4d (NC re-interpretation, rescoped from 35 SP plan)
   Sprint 17:   ~29 SP/3d (closed early Day 3 — record velocity)
   Sprint 18:   ~19 SP/2d (VTP + Excel + FG-invoice + OpenAPI sync)
+  Sprint 19:   ~19 SP/2d (Transparency Portal + VTP balance)
+  Sprint 20:   ~22 SP/1d (Surrender + WD + Interruption + 600 tests)
+  Sprint 21:   ~21 SP/1d (Заявка section + RBP panel + CAM NC report)
+  Sprint 22:   ~5 SP/1d (CAM NC compliance: clearing price + premium + rounds)
 
   NC Coverage:
   Sprint 7:  ~60% (42/70 articles)
@@ -879,6 +887,8 @@ Source: `npm run count-endpoints` · OpenAPI 95/95 = 100% sync
   Sprint 14: ~79% (55/70) + NC verified against full PDF (111 pages)
   Sprint 17: ~85% (Art.13 = 100%, Art.18 FG fully compliant)
   Sprint 18: ~87% (Art.11 VTP basic, Art.20.3.5 FG-invoice split)
+  Sprint 20: ~92% (Art.8 Surrender, Art.10 UIOLI, Art.14 Interruption, Art.6.3.1.4 WD)
+  Sprint 22: ~93% (Art.17-18 clearing price + premium + auction_rounds table, Interruptible seed)
   Sprint 13: ~79% (55/70) + 79 NC compliance regression tests
   Sprint 16: ~79% (55/70) + Art.15 re-interpreted (shippers always balanced
              per Art.12.3; OBA TSO-to-TSO read-only; Art.15 sub-coverage 50→83%)
