@@ -3845,14 +3845,14 @@ function renderAuctionKPI() {
   const grid = document.getElementById('auc-kpi-grid');
   if (!grid) return;
   const open     = auctionsData.filter(a=>a.status==='OPEN').length;
-  const ann      = auctionsData.filter(a=>a.status==='ANNOUNCED').length;
-  const awarded  = auctionsData.filter(a=>a.status==='AWARDED'||a.status==='CONTRACTED').length;
+  const upcoming = auctionsData.filter(a=>a.status==='UPCOMING').length;
+  const closed   = auctionsData.filter(a=>a.status==='CLOSED'||a.status==='AWARDED'||a.status==='CONTRACTED').length;
   const myBids   = auctionBids.length;
   const kpis = [
     { label:'ОТКРЫТЫЕ АУКЦИОНЫ', val:open, sub:'принимают заявки', color:open>0?'var(--green)':'' },
-    { label:'ОБЪЯВЛЕННЫЕ',       val:ann,  sub:'скоро открытие', color:ann>0?'var(--accent)':'' },
-    { label:'ПРИСУЖДЕНО',        val:awarded, sub:'контрактов' },
-    { label:'МОИ ЗАЯВКИ',        val:myBids,  sub:'всего подано' },
+    { label:'ПРЕДСТОЯЩИЕ',       val:upcoming, sub:'скоро открытие', color:upcoming>0?'var(--accent)':'' },
+    { label:'ЗАВЕРШЁННЫЕ',       val:closed, sub:'аукционов' },
+    { label:'МОИ ЗАЯВКИ',        val:myBids, sub:'всего подано' },
   ];
   grid.innerHTML = kpis.map(k=>`
     <div class="cs-kpi">
@@ -3869,7 +3869,7 @@ function aucTab(el, filter) {
   renderAuctions();
 }
 
-let aucCalMonth = 3, aucCalYear = 2026;
+let aucCalMonth = new Date().getMonth() + 1, aucCalYear = new Date().getFullYear();
 function changeAucMonth(delta) {
   aucCalMonth += delta;
   if (aucCalMonth > 12) { aucCalMonth = 1; aucCalYear++; }
