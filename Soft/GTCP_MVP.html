@@ -4594,7 +4594,7 @@ document.addEventListener('click', e=>{ if(e.target.classList.contains('overlay'
 // ═══════════════════════════════════════════════════════════════
 
 const WD_TARIFFS = {'KIREVO-ENTRY':0.0021,'HORGOS-EXIT':0.0023,'EXIT-SERBIA':0.0014};
-const TECH_CAP = {'KIREVO-ENTRY':15280488,'HORGOS-EXIT':10240233,'EXIT-SERBIA':5040256};
+const BIDS_TECH = {'KIREVO-ENTRY':15280488,'HORGOS-EXIT':10240233,'EXIT-SERBIA':5040256};
 let bidsCurrentTab = 'available';
 let bidsPortfolioData = [];
 let bidsCurrentAuction = null;
@@ -4748,7 +4748,7 @@ async function openGtcpBid(aucId) {
     const a = aucs.find(x=>x.id===aucId);
     if(!a) return alert('Аукцион не найден');
     bidsCurrentAuction = a;
-    const avail = TECH_CAP[a.point_code] ? Math.round(TECH_CAP[a.point_code]*0.1) : 0;
+    const avail = BIDS_TECH[a.point_code] ? Math.round(BIDS_TECH[a.point_code]*0.1) : 0;
     document.getElementById('gtcp-bid-info').innerHTML = `
       <b>Аукцион #${a.id}</b> · ${a.product_type} ${a.capacity_type||'FIRM'} · ${a.point_code}<br>
       Period: ${(a.delivery_start||'').slice(0,10)} → ${(a.delivery_end||'').slice(0,10)}<br>
