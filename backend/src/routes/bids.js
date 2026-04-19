@@ -27,14 +27,14 @@ function unifiedBidsSQL(where = '', extraParams = []) {
       SELECT 'GTCP' AS channel, b.id AS bid_id, 'BID-' || b.id AS ref,
              ac.product_type, ac.capacity_type, ac.point_code AS point,
              b.bid_capacity_kwh_h AS volume_kwh_h,
-             b.offered_price_eur AS price_eur,
-             (b.bid_capacity_kwh_h * COALESCE(b.offered_price_eur, 0))::numeric(18,2) AS fee_eur,
+             b.bid_price_eur_kwh_h_yr AS price_eur,
+             (b.bid_capacity_kwh_h * COALESCE(b.bid_price_eur_kwh_h_yr, 0))::numeric(18,2) AS fee_eur,
              b.status, b.shipper_id,
              s.code AS shipper_code, s.name AS shipper_name,
              ac.delivery_start, ac.delivery_end,
              b.created_at
         FROM auction_bids b
-        JOIN auction_calendar ac ON ac.id = b.auction_calendar_id
+        JOIN auction_calendar ac ON ac.id = b.auction_id
         JOIN shippers s ON s.id = b.shipper_id
        ${where ? 'WHERE ' + where : ''}
       UNION ALL
@@ -49,7 +49,7 @@ function unifiedBidsSQL(where = '', extraParams = []) {
              cb.created_at
         FROM capacity_bookings cb
         JOIN shippers s ON s.id = cb.shipper_id
-       WHERE cb.product_type = 'WITHIN_DAY'
+       WHERE cb.booking_type = 'WITHIN_DAY'
          ${where ? 'AND ' + where.replace(/b\./g, 'cb.').replace(/ac\./g, '') : ''}
       ORDER BY created_at DESC`,
     params: extraParams,
@@ -74,12 +74,12 @@ router.get('/my', authorize('capacity:read'), async (req, res, next) => {
       `SELECT 'GTCP' AS channel, b.id AS bid_id, 'BID-' || b.id AS ref,
               ac.product_type, ac.capacity_type, ac.point_code AS point,
               b.bid_capacity_kwh_h AS volume_kwh_h,
-              b.offered_price_eur AS price_eur,
-              (b.bid_capacity_kwh_h * COALESCE(b.offered_price_eur, 0))::numeric(18,2) AS fee_eur,
+              b.bid_price_eur_kwh_h_yr AS price_eur,
+              (b.bid_capacity_kwh_h * COALESCE(b.bid_price_eur_kwh_h_yr, 0))::numeric(18,2) AS fee_eur,
               b.status, b.shipper_id, s.code AS shipper_code, s.name AS shipper_name,
               ac.delivery_start, ac.delivery_end, b.created_at
          FROM auction_bids b
-         JOIN auction_calendar ac ON ac.id = b.auction_calendar_id
+         JOIN auction_calendar ac ON ac.id = b.auction_id
          JOIN shippers s ON s.id = b.shipper_id
          ${where ? 'WHERE ' + where : ''}
          ORDER BY b.created_at DESC
@@ -90,8 +90,8 @@ router.get('/my', authorize('capacity:read'), async (req, res, next) => {
     // WD bookings
     const wdConds = conds.map(c => c.replace(/b\./g, 'cb.'));
     const wdWhere = wdConds.length
-      ? "WHERE cb.product_type = 'WITHIN_DAY' AND " + wdConds.join(' AND ')
-      : "WHERE cb.product_type = 'WITHIN_DAY'";
+      ? "WHERE cb.booking_type = 'WITHIN_DAY' AND " + wdConds.join(' AND ')
+      : "WHERE cb.booking_type = 'WITHIN_DAY'";
 
     const { rows: wdBookings } = await db.query(
       `SELECT 'WD' AS channel, cb.id AS bid_id, 'WD-' || cb.id AS ref,
@@ -137,7 +137,7 @@ router.get('/report', authorize('capacity:read'), async (req, res, next) => {
          COUNT(*) FILTER (WHERE b.status = 'LOST')::int AS lost,
          COUNT(*) FILTER (WHERE b.status = 'CONTRACT_CREATED')::int AS contracted,
          COALESCE(SUM(b.bid_capacity_kwh_h) FILTER (WHERE b.status IN ('WON','PARTIALLY_WON','CONTRACT_CREATED')), 0)::numeric AS won_volume_kwh_h,
-         COALESCE(SUM(b.bid_capacity_kwh_h * COALESCE(b.offered_price_eur, 0)) FILTER (WHERE b.status IN ('WON','PARTIALLY_WON','CONTRACT_CREATED')), 0)::numeric(18,2) AS won_fee_eur
+         COALESCE(SUM(b.bid_capacity_kwh_h * COALESCE(b.bid_price_eur_kwh_h_yr, 0)) FILTER (WHERE b.status IN ('WON','PARTIALLY_WON','CONTRACT_CREATED')), 0)::numeric(18,2) AS won_fee_eur
        FROM auction_bids b ${where}`,
       params
     );
@@ -146,7 +146,7 @@ router.get('/report', authorize('capacity:read'), async (req, res, next) => {
     const { rows: wdRows } = await db.query(
       `SELECT COUNT(*)::int AS wd_count,
               COALESCE(SUM(capacity_kwh_h), 0)::numeric AS wd_total_kwh_h
-       FROM capacity_bookings WHERE product_type = 'WITHIN_DAY'`
+       FROM capacity_bookings WHERE booking_type = 'WITHIN_DAY'`
     );
 
     // Breakdown by product
@@ -154,13 +154,13 @@ router.get('/report', authorize('capacity:read'), async (req, res, next) => {
       `SELECT ac.product_type,
               COUNT(*)::int AS bid_count,
               COALESCE(SUM(b.bid_capacity_kwh_h), 0)::numeric AS total_volume,
-              COALESCE(AVG(b.offered_price_eur), 0)::numeric(10,4) AS avg_price,
+              COALESCE(AVG(b.bid_price_eur_kwh_h_yr), 0)::numeric(10,4) AS avg_price,
               COUNT(*) FILTER (WHERE b.status IN ('WON','PARTIALLY_WON'))::int AS won_count,
               CASE WHEN COUNT(*) > 0
                 THEN ROUND(COUNT(*) FILTER (WHERE b.status IN ('WON','PARTIALLY_WON'))::numeric / COUNT(*) * 100, 1)
                 ELSE 0 END AS win_rate_pct
        FROM auction_bids b
-       JOIN auction_calendar ac ON ac.id = b.auction_calendar_id
+       JOIN auction_calendar ac ON ac.id = b.auction_id
        ${where}
        GROUP BY ac.product_type
        ORDER BY ac.product_type`
@@ -185,12 +185,12 @@ router.get('/export', authorize('capacity:read'), async (req, res, next) => {
     const { rows } = await db.query(
       `SELECT 'BID-' || b.id AS ref, ac.product_type, ac.capacity_type,
               ac.point_code AS point, b.bid_capacity_kwh_h AS volume_kwh_h,
-              b.offered_price_eur AS price_eur,
-              (b.bid_capacity_kwh_h * COALESCE(b.offered_price_eur, 0))::numeric(18,2) AS fee_eur,
+              b.bid_price_eur_kwh_h_yr AS price_eur,
+              (b.bid_capacity_kwh_h * COALESCE(b.bid_price_eur_kwh_h_yr, 0))::numeric(18,2) AS fee_eur,
               b.status, s.code AS shipper_code,
               ac.delivery_start, ac.delivery_end, b.created_at
          FROM auction_bids b
-         JOIN auction_calendar ac ON ac.id = b.auction_calendar_id
+         JOIN auction_calendar ac ON ac.id = b.auction_id
          JOIN shippers s ON s.id = b.shipper_id
          ${where}
          ORDER BY b.created_at DESC`,
