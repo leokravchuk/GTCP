@@ -1,899 +1,100 @@
 # GTCP — Action Plan
 **Текущие задачи, приоритеты и решения · Living Document**
 
-> Последнее обновление: 14.04.2026 · Sprint 17 в работе + FG hotfix · Sprint 18 запланирован · Версия 18.1
+> Последнее обновление: 19.04.2026 · Sprint 22 CLOSED · Версия 22.0
 
 ---
 
-## 📋 Sprint 18 · Diploma Final Assembly + VTP Art.11 + Excel Export + Performance (27.04–08.05.2026)
+## Текущее состояние
 
-> Детали: `reports/SPRINT_18_PLAN.md` · Target: 24 SP (+4 резерв/carryover)
-
-### 🔴 P0 — Diploma & OpenAPI
-
-- [ ] **US-1801** · Diploma Final Assembly — обновить Diploma Text (Sprint 15-18), Presentation, создать DIPLOMA_ARTIFACTS_INDEX.md, ревизия GTCP_Artifacts.md (5 SP)
-- [ ] **US-1802** · OpenAPI Final Sync — добавить Sprint 17-18 endpoints в openapi.yaml, подтвердить count-endpoints = 0 расхождений (2 SP)
-
-### 🟡 P1 — VTP + Excel + Performance
-
-- [ ] **US-1803** · VTP Basic (NC Art.11) — миграция 020 vtp_trades, 5 endpoints (CRUD + balance), VTP Trading tab, ≥8 тестов (5 SP)
-- [ ] **US-1804** · Excel (xlsx) Export — exceljs, /billing/export?format=xlsx + /contracts/export + /nominations/export, кнопки Export Excel, ≥4 тестов (3 SP)
-- [ ] **US-1805** · k6 Load Testing — smoke/stress/spike scripts, ≥100 RPS p95<500ms, LOAD_TEST_RESULTS.md (3 SP)
-
-### 🟢 P2 — Docs + Buffer
-
-- [ ] **US-1806** · LOCAL_RUN.md + Deployment Docs — prerequisites, env, migrations, tests, API quick start (2 SP)
-- [ ] **US-1807** · Sprint 17 Carryover Buffer — резерв для P0 items из Sprint 17 или Transparency Portal Art.24 (4 SP)
-
----
-
-## 📋 Sprint 17 · NC Art.13 + Analytics + Sprint 16 Debt + FG Hotfix + Diploma (13–24.04.2026)
-
-> Детали: [`SPRINT_17_PLAN.md`](SPRINT_17_PLAN.md) · Target: 26 SP + 7 SP FG hotfix = **33 SP** (US-1712 FG отдельный invoice → Sprint 18)
-
-### 🔴 P0 — Sprint 16 Debt
-
-- [x] **US-1701** · Sprint 16 Test Coverage (DEBT-01) — **30 новых тестов** (target ≥18): [balance-oba.integration.test.js](../backend/tests/balance-oba.integration.test.js) 11 cases (auth, 12m window, filters, monthly aggregation, summary), [capacity-kwh-h.dbspec.test.js](../backend/tests/capacity-kwh-h.dbspec.test.js) 8 cases (conversion invariants, AERS 90/10, ST balance, over-nom regression BUG-04/05, precision), [shipper-balance.test.js](../backend/tests/shipper-balance.test.js) 11 cases (Σ Entry=Σ Exit, LT ceilings, Gazprom 90%, ST pool, NIS domestic-only). Jest total 446 → **476** (+30). (4 SP) — **P0 ✅ 15.04.2026**
-- [x] **US-1702** · Endpoint Count Audit (DEBT-02) — скрипт [`scripts/count-endpoints.js`](../backend/scripts/count-endpoints.js) добавлен с `:id ↔ {id}` нормализацией; `npm run count-endpoints` + `npm run fix-fuel-gas` зарегистрированы. **Actual = 82 endpoints** (OpenAPI: 58, gap 42/18 → полный sync в Sprint 18 US-1802). Обновлены CLAUDE.md, GTCP_Artifacts.md (TOC + §14 header + velocity table), UserGuide §architecture table (RU + EN), roadmap velocity footer. (2 SP) — **P0 ✅ 15.04.2026**
-
-### 🔴 P0 — HOTFIX: Fuel Gas Allocation (NC Art.18 + Art.19.1.4) · добавлено 14.04.2026
-
-> Обнаружено при аудите INV-2026-0008: FG начисляется не тем shipper'ам. Bound rule записан в CLAUDE.md "Fuel Gas Allocation Rules" и GTCP_Artifacts.md §17.
-> **Правило:** `FG_fee > 0 ⟺ flow_direction ∈ {KIREVO_HORGOS, KIREVO_HORGOS_AND_SERBIA} AND election='CASH' AND AAQ_horgos > 0`. Все остальные → FG=0.
-
-- [x] **US-1708 (FG-01/FG-02)** · Billing fix: `calcFuelGas()` guards (FG_APPLICABLE_DIRECTIONS + election + AAQ) + `FG_ZERO` + `Q_serbia = 0` в mixed transit; fallback ветка ограничена транзитом. [billing.js:220-288, 568-624](../backend/src/routes/billing.js#L220-L624) (2 SP) — **P0 ✅ 15.04.2026**
-- [x] **US-1709 (FG-03)** · Migration 019 `fuel_gas_election.sql` + backfill (SHP-001=CASH, SHP-002=IN_KIND). `calcFuelGas()` читает election через shipperId lookup с try/catch до migrate. (1 SP) — **P1 ✅ 15.04.2026**
-- [x] **US-1710 (FG-04)** · Guard `qHorgosKwh ≤ 0 → FG=0` в `calcFuelGas()`. POST /billing теперь делает `SELECT SUM(allocated_kwh_h × 24) FROM nominations WHERE point='HORGOS-EXIT'` для billing-периода; capacity×0.85 — last-resort с флагом `estimated=true`. `_breakdown.fuelGas` дополнен `election`, `flowDirection`, `qHorgosKwh` (resolved). (1 SP) — **P1 ✅ 15.04.2026**
-- [x] **US-1711 (FG-06/FG-07)** · Migration 019 применена (7 shippers seed'ну election). Скрипт v2 (shipper-level check: EXISTS ACTIVE contract on transit route, чтобы Газпром с mix-контрактами не затрагивался) запущен `--apply --report` → 4 invoice NIS исправлены (INV-2026-0002/04/06/08), суммарная коррекция **299 535,64 EUR**. Отчёт: [FG_DATA_FIX_REPORT.md](./FG_DATA_FIX_REPORT.md). INV-2026-0008: total 3 425 195,94 → **3 350 312,03 EUR**, FG line = 0,00. (2 SP) — **P0 ✅ 15.04.2026**
-- [ ] **US-1712 (FG-05)** · Отдельный FG-invoice при >1 Capacity Product (Art.20.3.5) (3 SP) — **P2 → Sprint 18**
-- [x] **US-1713** · [`tests/fuel-gas.unit.test.js`](../backend/tests/fuel-gas.unit.test.js) — 12 тестов (matrix routes × elections × AAQ + регрессия INV-2026-0008), все зелёные. Обновлён `billing.unit.test.js` (Q_serbia excluded). `flowDirection` whitelist в POST /billing расширен до 7+2 NC routes. (1 SP) — **P1 ✅ 15.04.2026**
-
-### 🔴 P0 — NC Art.13 Matching Completion
-
-- [x] **US-1703** · Adjacent TSO Auto-Matching — [migration 020](../backend/src/db/migrations/020_adjacent_tso_matching.sql) (`adjacent_tso_matches` table, applied); [adjacentTsoService.js](../backend/src/services/adjacentTsoService.js) с `fetchAdjacentNomination()` mock (FGSZ/Bulgartransgaz/TRANSPORTGAS SRBIJA) + `applyLesserRule()` (OURS/THEIRS/EQUAL) + `matchWithAdjacentTso()` persistence; [`POST /nominations/:id/match-adjacent`](../backend/src/routes/nominations.js) endpoint со статусом `MATCHED_ADJACENT`. [adjacent-tso.unit.test.js](../backend/tests/adjacent-tso.unit.test.js) 15 cases + [adjacent-tso.integration.test.js](../backend/tests/adjacent-tso.integration.test.js) 7 endpoint cases = **22 теста**. (5 SP) — **P0 ✅ 15.04.2026**
-- [x] **US-1704** · Double-Sided Matching Result — [`GET /nominations/:id/matching-result`](../backend/src/routes/nominations.js) endpoint возвращает nomination summary + adjacent matches list + summary (hasAdjacentMatch, lastLesserSide, adjacentTso). 3 integration теста. UI panel в Sprint 17 P1 (параллельно US-1705/07). (3 SP) — **P0 ✅ backend 15.04.2026** (UI интеграция в UserGuide v3.4 US-1707)
-
-### 🟡 P1 — Analytics & Export
-
-- [x] **US-1705** · Analytics Dashboard — [routes/analytics.js](../backend/src/routes/analytics.js) + 3 endpoint'а: `GET /analytics/volumes` (monthly by IP, NC Art.12), `GET /analytics/revenue` (monthly by shipper, NC Art.20), `GET /analytics/utilization` (tech vs contracted per IP, NC Art.7 + AERS). Фильтры: from/to, shipper_id, point, gas_year. Router зарегистрирован в [app.js:29,110](../backend/src/app.js#L29). [analytics.test.js](../backend/tests/analytics.test.js) **11 тестов** (target ≥6). Chart.js UI — отложен в US-1707 (UserGuide v3.4 demo). (5 SP) — **P1 ✅ 15.04.2026**
-- [x] **US-1706** · Export to CSV — [utils/csvExport.js](../backend/src/utils/csvExport.js) (BOM, RFC 4180 escaping, sendCsv helper) + 3 endpoint'а: `GET /billing/export`, `GET /contracts/export`, `GET /nominations/export`. Фильтры: `status`, `shipper_id`, `from/to` (billing/nominations), `flow_direction`, `contract_type`. Dispatcher↔billing permission isolation. [csv-export.test.js](../backend/tests/csv-export.test.js) **15 тестов** (target ≥5: exceeded 3x). Кнопки UI — отложены до US-1707 (UserGuide) / Sprint 18 Excel. (3 SP) — **P1 ✅ 15.04.2026**
-
-### 🟡 P1 — Documentation
-
-- [x] **US-1707** · UserGuide v3.4 Final — [GTCP_UserGuide_v3.4.md](./GTCP_UserGuide_v3.4.md) готов: Changelog v3.3→v3.4 (Sprint 15-17), KPI-строка актуализирована (527/535 tests, 82 endpoints, NC 82%), API Reference переверстан (82 authoritative + 8 новых Sprint 17 endpoints detailed), NC Compliance Matrix (RU+EN) обновлена (Art.13 67%→100%, Art.15 50%→83%, Art.18 + Art.19 ссылка, TOTAL 79%→82%). Секции FG binding rule, Adjacent TSO matching, Analytics, CSV export, OBA Settlement добавлены в Changelog. Pandoc `.docx` — требует установки pandoc (внешний tool, выполняется локально: `pandoc GTCP_UserGuide_v3.4.md -o GTCP_UserGuide_v3.4.docx --toc`). (4 SP) — **P1 ✅ 15.04.2026 (.md версия)** · .docx → локальная конвертация
-
-### ❌ Отменено / отложено из Sprint 16
-
-- ~~**US-1603** · Shipper Imbalance Charge~~ — **отменено навсегда**, противоречит NC Art.12.3 (shippers always balanced). Замещено US-1603b OBA в Sprint 16.
-- **US-1606** k6 Load Testing → Sprint 18 (не критично для диплома, нет VPS)
-- **US-1609** VTP Basic (NC Art.11) → Sprint 18+ (P2 stretch, полный эпик)
-- **US-1605 Excel/xlsx** → Sprint 18, в Sprint 17 только CSV (US-1706)
-
----
-
-## 📋 Sprint 16 · NC Art.15 Re-interpretation + capacity_kwh_h + UI Cleanup (06–10.04.2026) · ✅ ЗАКРЫТ (RESCOPED)
-
-> Детали: [`SPRINT_16_PLAN.md`](SPRINT_16_PLAN.md) (устарел к 10.04) · Отчёт: [`SPRINT_16_REPORT.md`](SPRINT_16_REPORT.md)
-> **Факт:** ~13/35 SP (37%). Pivot на Sprint 3-м дне после пересмотра NC Art.12.3.
-
-### ✅ P0 — Выполнено (09.04.2026)
-
-- [x] **US-1610** · Migration 017: capacity_kwh_h native column (ADD COLUMN + backfill + view) (3 SP) ✅
-- [x] **US-1611** · Replace all 12 runtime MWh/d→kWh/h conversions in 6 files (2 SP) ✅
-- [x] **US-1612** · BUG-04/05: Over-nomination unit mismatch fix (nominations.js:453,489) (1 SP) ✅
-- [x] **US-1613** · Seed data АЕРС alignment (capacity_kwh_h exact values) (2 SP) ✅
-- [x] **US-1614** · 90/10 rule enforcement: LT=90% exact, ST=10% free for auctions, shipper balance Δ=0 (3 SP) ✅
-- [x] **US-1615** · Газпром HORGOS-EXIT=90% rule + CTR-2026-006 domestic contract + billing tariff lookup fix (price_eur) (2 SP) ✅
-- [x] **US-1616** · CLAUDE.md + Artifacts + memory: LT Booking Rules, capacity 90/10 updated (1 SP) ✅
-- [x] **US-1617** · Billing tariff SQL fix (tariff_eur→price_eur) + contract_type mapping FIRM→FIRM_YEARLY (1 SP) ✅ (10.04)
-- [x] **US-1618** · Frontend contracts mapping: capEntry/capExit + AERS tariff lookup by flow_direction (2 SP) ✅ (10.04)
-- [x] **US-1619** · Credit NC Art.5.1.6: Modal shows "ОСВОБОЖДЁН" for rated shippers (Газпром BBB-) (1 SP) ✅ (10.04)
-- [x] **US-1620** · Gas quality UI mapping: wobbe_kwh_nm3, methane_pct, density_kg_nm3 (1 SP) ✅ (10.04)
-- [x] **US-1621** · Billing table: totalAmount + lineCount + dueDate (instead of volume*tariff=0) (1 SP) ✅ (10.04)
-- [x] **US-1622** · Contracts table: cap_entry/cap_exit kWh/h + separate AERS tariffs (1 SP) ✅ (10.04)
-- [x] **US-1623** · Data cleanup: delete 7 stale invoices + 3 orphan ST contracts + generate 8 monthly Jan-Apr 2026 (3 SP) ✅ (10.04)
-- [x] **US-1603b** · OBA Settlement NC Art.15 — migration 018, 3 endpoints, Balance UI section, nominations allocated=matched enforcement (5 SP) ✅ (10.04)
-- [x] **US-1608** · Artifacts + CLAUDE.md update — Sprint 16 state + endpoint count 96→99 + binding rules (2 SP) ✅ (10.04)
-
-### ❌ Не выполнено → перенесено в Sprint 17
-
-- [ ] ~~**US-1601**~~ → **US-1703** · Adjacent TSO Auto-Matching (5 SP)
-- [ ] ~~**US-1602**~~ → **US-1704** · Double-Sided Matching Result (3 SP)
-- ~~**US-1603**~~ · **ОТМЕНЕНО НАВСЕГДА** — противоречит NC Art.12.3 (shippers always balanced). Замещено US-1603b.
-- [ ] ~~**US-1604**~~ → **US-1705** · Analytics Dashboard (5 SP)
-- [ ] ~~**US-1605**~~ → **US-1706** · Export CSV (3 SP, упрощено из 4 SP)
-- [ ] ~~**US-1606**~~ → Sprint 18 · k6 Load Testing
-- [ ] ~~**US-1607**~~ → **US-1707** · UserGuide v3.4 (4 SP)
-- [ ] ~~**US-1609**~~ → Sprint 18+ · VTP Basic
-
-### ⚠️ Technical Debt из Sprint 16
-
-- [ ] **DEBT-01** · Нет тестов на OBA endpoints и capacity_kwh_h migration → US-1701 в Sprint 17
-- [ ] **DEBT-02** · Endpoint count drift: docs `99`, grep `~84` → US-1702 в Sprint 17
-
-### ⚠️ Fuel Gas Debt (обнаружено 14.04.2026, аудит INV-2026-0008)
-
-- [ ] **FG-01** · `calcFuelGas()` fallback начисляет FG любому shipper'у независимо от маршрута → US-1708 **P0** (Sprint 17)
-- [ ] **FG-02** · KIREVO_EXIT_SERBIA → X1 вместо X2 (двойная ошибка: не должно быть начисления вовсе) → US-1708 **P0** (Sprint 17)
-- [ ] **FG-03** · Нет поля `shippers.fuel_gas_election` → US-1709 P1 (Sprint 17)
-- [ ] **FG-04** · Нет проверки `AAQ > 0` перед начислением → US-1710 P1 (Sprint 17)
-- [ ] **FG-05** · FG как line item вместо отдельного invoice (Art.20.3.5) → US-1712 P2 (Sprint 18)
-- [ ] **FG-06** · INV-2026-0008: FG=74 883,91 должно быть 0, total пересчитать → US-1711 **P0** (Sprint 17)
-- [ ] **FG-07** · Исторические FG-строки у NIS и CR-shipper'ов — требуется data sweep → US-1711 P1 (Sprint 17)
-
-Источник правды: [`CLAUDE.md` раздел "Fuel Gas Allocation Rules"](../CLAUDE.md) + [`GTCP_Artifacts.md` §17](./GTCP_Artifacts.md).
-
-### 🎯 Sprint 16 — Выводы (retro)
-
-**Что прошло хорошо:** Pivot на NC Art.12.3 binding rule поймал архитектурную ошибку до implementation. Migration 017 устранила 12 runtime conversions одним заходом + поймала BUG-04/05.
-
-**Что можно улучшить:** Plan 35 SP был слишком амбициозным; тесты отстают; NC re-interpretation должен был произойти **до** sprint planning, а не в середине.
-
-**Действия:** Fresh NC review перед Sprint 17 Planning. Test debt — P0 в Sprint 17.
-
----
-
-## ✅ Sprint 14 — Auction Calendar + UAT (30-31.03.2026) · ЗАВЕРШЁН
-
-> Период: 30-31.03.2026 | Target: ~30 SP | Actual: ~35 SP | Статус: ✅ ЗАВЕРШЁН
-
-### P0 — Auction Calendar (NC Art.7 + MAR0277-24)
-
-| # | Задача | SP | Статус |
-|---|---|---|---|
-| A-200 | CAM NC Calendar download + parse (MAR0277-24 ENTSOG) | 1 | ✅ |
-| A-201 | seed_auctions_v2.sql: 115 аукционов (Yearly+Quarterly+Monthly+CR) | 3 | ✅ |
-| A-202 | GET /auctions/calendar/grid endpoint | 2 | ✅ |
-| A-203 | GET /auctions/calendar/days endpoint (Daily/WD on-the-fly) | 3 | ✅ |
-| A-204 | Frontend: day-centric calendar (month grid + detail card + timeline) | 5 | ✅ |
-| A-205 | NC Art.7.1.2 fix: Yearly Firm = only surrendered LT | 1 | ✅ |
-
-### P0 — UAT Frontend Fixes
-
-| # | Задача | SP | Статус |
-|---|---|---|---|
-| A-206 | auth.js: accessToken + fullName in login response | 1 | ✅ |
-| A-207 | billing/auctions: res.json(rows) instead of {data:[]} | 1 | ✅ |
-| A-208 | credits: /margin-calls, /:id/rating, /:id/instruments | 2 | ✅ |
-| A-209 | capacity: period_from/period_to, audit: occurred_at | 1 | ✅ |
-| A-210 | nominations: shipperId code→UUID resolve, PATCH /status, reference lookup | 2 | ✅ |
-| A-211 | GTCP_MVP.html: shipperName(code+name), confirm/reject via API, edigas XML | 2 | ✅ |
-| A-212 | Dashboard: shipper code, active filter, GTA type, capacity KPI blocks | 3 | ✅ |
-| A-213 | Rate limiter: production-only guard | 1 | ✅ |
-
-### P0 — Available Capacity Engine (NC Art.7.1.1)
-
-| # | Задача | SP | Статус |
-|---|---|---|---|
-| A-219 | GET /capacity/available endpoint (real-time SQL) | 3 | ✅ |
-| A-220 | Dynamic available in /auctions/calendar/days (replace hardcoded ST_FREE) | 2 | ✅ |
-| A-221 | Frontend: AVAILABLE column + TECH column in auction table | 1 | ✅ |
-| A-222 | Frontend: capacity_type badge (Firm/CR/Int) | 1 | ✅ |
-| A-223 | CR Monthly dates fix (4th Tuesday M-1, Art.7.4.3.3) | 1 | ✅ |
-| A-224 | Shippers endpoint: +status, +gta_type, +ratings | 1 | ✅ |
-| A-225 | Dashboard: nominations KPI = Entry only, activeShippers filter | 1 | ✅ |
-
-### P0 — EDIGAS v5.1 + Credit Instruments + Fixes
-
-| # | Задача | SP | Статус |
-|---|---|---|---|
-| A-226 | EDIGAS v5.1 NOMINT full XML (01G/P03, sender/receiver, direction, contract, GasDay) | 3 | ✅ |
-| A-227 | EDIGAS timezone fix: GasDay local date not UTC | 1 | ✅ |
-| A-228 | Credit Instruments: credit_support table + 7 seed rows + frontend mapping | 2 | ✅ |
-| A-229 | Matching via backend API (not in-memory), gasDay timezone fix | 2 | ✅ |
-| A-230 | Balance page: filter all non-rejected nominations, active shippers only | 1 | ✅ |
-| A-231 | NOMRES mock (confirmation XML from TSO) | 1 | ✅ |
-| A-232 | Real-time update analysis: Polling/WebSocket/PWA comparison | 1 | ✅ (analysis only) |
-
-### P0 — Data Integrity (Contract→Booking→Nomination)
-
-| # | Задача | SP | Статус |
-|---|---|---|---|
-| A-214 | Contracts: cap_entry/exit filled for all 5 shippers | 1 | ✅ |
-| A-215 | Capacity bookings: 90/10 AERS split, ST bookings WIEH+Srbijagas | 2 | ✅ |
-| A-216 | Nominations: volumes ≤ contracted, Entry=Exit per shipper (Art.12.3) | 2 | ✅ |
-| A-217 | Shippers: GTA types (LT/ST), ratings (S&P/Moodys/Creditreform) | 1 | ✅ |
-| A-218 | DB constraints: auction_calendar +YEARLY, nominations +CONFIRMED | 1 | ✅ |
-
----
-
-## ✅ Sprint 13 — Testing Infrastructure (30.03.2026) · ЗАВЕРШЁН
-
-> Период: 30.03.2026 | Target: ~40 SP | Actual: ~45 SP | Статус: ✅ ЗАВЕРШЁН
-
-### P0 — Backend Infrastructure (восстановление, 12 SP)
-
-| # | Задача | SP | Статус |
-|---|---|---|---|
-| T-01 | package.json + npm scripts | 1 | ✅ |
-| T-02 | middleware: authenticate (JWT), authorize (RBAC), errorHandler | 3 | ✅ |
-| T-03 | db/index.js (pg pool + withTransaction) + logger (winston) | 2 | ✅ |
-| T-04 | services: auditService, edigasService (buildNomint/Renomint/submitToTso) | 2 | ✅ |
-| T-05 | routes: auth, credits, capacity, balance, audit, systemParams | 4 | ✅ |
-
-### P0 — Integration Tests Level 1 (supertest, 10 SP)
-
-| # | Задача | SP | Tests | Статус |
-|---|---|---|---|---|
-| T-06 | auth.integration.test.js | 2 | 14 | ✅ |
-| T-07 | shippers.integration.test.js | 1 | 12 | ✅ |
-| T-08 | contracts.integration.test.js | 1 | 12 | ✅ |
-| T-09 | nominations.integration.test.js | 2 | 13 | ✅ |
-| T-10 | billing.integration.test.js | 2 | 14 | ✅ |
-| T-11 | auctions.integration.test.js | 2 | 10 | ✅ |
-
-### P0 — NC Compliance Suite Level 3 (5 SP)
-
-| # | Задача | SP | Tests | Статус |
-|---|---|---|---|---|
-| T-12 | nc-compliance.test.js (9 NC sections, 79 tests) | 5 | 79 | ✅ |
-
-### P0 — Coverage Push + DB-specific (13 SP)
-
-| # | Задача | SP | Tests | Статус |
-|---|---|---|---|---|
-| T-13 | billing.coverage + billing.deep + billing.unit + billing.dbspec | 5 | 72 | ✅ |
-| T-14 | auctions.coverage + auctions.dbspec | 3 | 35 | ✅ |
-| T-15 | nominations.coverage + nominations.deep + nominations.dbspec + nominations.realdb | 3 | 25 + 6 realdb | ✅ |
-| T-16 | shippers.coverage + stubs.coverage + rbp.coverage + rbp.dbspec + edge-cases | 2 | 53 | ✅ |
-
-### P0 — CI/CD + PostgreSQL (5 SP)
-
-| # | Задача | SP | Статус |
-|---|---|---|---|
-| T-17 | .github/workflows/test.yml (2 jobs: mock + PostgreSQL 15) | 2 | ✅ |
-| T-18 | docker-compose.test.yml + .env.test | 1 | ✅ |
-| T-19 | 000_init.sql (19 таблиц) + migrate.js + seed-runner.js | 2 | ✅ |
-
-### P1 — Bugfixes found by tests (0 SP — побочный результат)
-
-| # | Баг | Файл | Статус |
-|---|---|---|---|
-| BUG-01 | Rounding ±€0.01 в billing (toFixed(4) → toFixed(2)) | billing.js | ✅ |
-| BUG-02 | ReferenceError: pts before initialization в /generate | billing.js | ✅ |
-| BUG-03 | Missing column is_over_nomination в nominations | 000_init.sql | ✅ |
-
-### Итоги Sprint 13
-
-| Метрика | До | После |
-|---------|-----|-------|
-| Test suites | 3 | **25** |
-| Tests | 61 | **442** |
-| billing.js coverage | 17% | **97%** |
-| Модули на 100% | 2 | **8** |
-| Средний coverage | ~40% | **~95%** |
-| GitHub коммиты | — | `33ccf6e` + `c38c400` |
-
----
-
-## 🔄 Sprint 10 — Invoice Line Items + Capacity 90/10 (27.03.2026)
-
-### ✅ P0 — Frontend Real Data (F-1–F-7, 14 SP) ЗАВЕРШЁН
-
-| # | Задача | Статус |
-|---|---|---|
-| F-1 | Balance: TECH_CAP from API (15.28M/10.24M/5.04M) | ✅ |
-| F-2 | Invoice: separate entry/exit + tariffs | ✅ |
-| F-3 | Reserve Prices API + api.js | ✅ |
-| F-4 | Balance NC point codes | ✅ |
-| F-5 | Contract filter: 9 NC routes | ✅ |
-| F-6 | Fuel Gas via API.systemParams | ✅ |
-| F-7 | Tracker data mapping | ✅ |
-
-### ✅ P0 — Invoice Line Items (IL-1–IL-7, 19 SP) ЗАВЕРШЁН
-
-| # | Задача | Статус |
-|---|---|---|
-| IL-1 | Migration 011: invoice_line_items + capacity_category | ✅ |
-| IL-2 | POST /billing/with-lines (9 types, auto FG from EXIT) | ✅ |
-| IL-3 | POST /billing/generate (auto from contracts) | ✅ |
-| IL-4 | GET /billing/:id + line_items + subtotals | ✅ |
-| IL-5 | Auction Premium calc | ✅ |
-| IL-6 | Frontend: Invoice modal с наборными строками | ✅ |
-| IL-7 | Frontend: Invoice detail popup (📋) | ✅ |
-
-### ✅ P0 — Capacity 90/10 (C-1–C-5, 9 SP) ЗАВЕРШЁН
-
-| # | Задача | Статус |
-|---|---|---|
-| C-1 | capacity_category LONG_TERM/SHORT_TERM | ✅ |
-| C-2 | Tracker: Tech/LT Reserve/ST Available/ST Sold/ST Free | ✅ |
-| C-3 | Auction bid ≤ Available(10%) | ✅ |
-| C-4 | Balance: 3 NC points + real tech from API | ✅ |
-| C-5 | Seed data LONG_TERM backfill | ✅ |
-
-### ✅ P0 — NC Art.3: Shipper Registration (15 SP) ЗАВЕРШЁН
-
-| # | Задача | Статус |
-|---|---|---|
-| A-172 | Migration 012: shipper_status enum, gta_type, 15 полей, shipper_changes | ✅ |
-| A-173 | POST /shippers/apply → APPLICANT | ✅ |
-| A-174 | GTA type: SHORT_TERM / LONG_TERM | ✅ |
-| A-175 | Removal: contracted=0 + debt=0 (NC Art.3.7) | ✅ |
-| A-176 | Audit trail: shipper_changes (old/new/reason) | ✅ |
-| A-177 | Frontend: [+ Зарегистрировать], badges, lifecycle actions | ✅ |
-
-### ✅ P1 — Documentation (5 SP) ЗАВЕРШЁН
-
-| # | Задача | Статус |
-|---|---|---|
-| A-181 | UserGuide v3.0 (1873 строк, двуязычный) | ✅ |
-| A-182 | OpenAPI: +7 endpoints Sprint 9–10 | ✅ |
-
-### ⏸ Отложено — Infrastructure (11 SP) — нет VPS
-
-| # | Задача | Статус |
-|---|---|---|
-| A-178 | VPS деплой (nginx + PM2 + SSL) | ⏸ |
-| A-179 | WebSocket real-time | ⏸ |
-| A-180 | Email-уведомления | ⏸ |
-
-### 🔲 Перенесено в Sprint 11 — Analytics (14 SP)
-
-| # | Задача | Статус |
-|---|---|---|
-| A-185 | Performance testing k6 | 🔲 |
-| A-186 | Аналитический дашборд (графики) | 🔲 |
-| A-187 | Экспорт Excel/CSV | 🔲 |
-
----
-
-## ✅ Sprint 11 — Nominations NC Art.12-13 + RBP Core · ЗАВЕРШЁН (27.03.2026)
-
-> Период: 01–20.05.2026 | Target: ~39 SP
-> Два блока: Nominations NC compliance (19 SP) + RBP Core (20 SP)
-
-### P0 — Nominations NC Compliance (19 SP)
-
-| # | Задача | SP | NC Ref |
-|---|---|---|---|
-| N-1 | `volumeMwh` → `volume_kwh_h` (backend + frontend + migration 013) | 2 | NC §2.1 |
-| N-2 | Equal Nominations check: Entry = Σ Exit + VTP | 2 | Art.12.3 |
-| N-3 | Contracted Capacity lookup при подаче номинации | 3 | Art.13.2.1 |
-| N-4 | Nomination ≤ Contracted validation + Over-Nomination (Art.12.8) | 3 | Art.13.2.1 + 12.8 |
-| N-5 | Direction auto-select по point | 1 | UX |
-| N-6 | Frontend: Entry/Exit side-by-side + Balance panel + auto Exit-Serbia | 3 | Art.12.3 |
-| N-7 | Frontend: Contracted Capacity в nomination modal | 2 | UX |
-| N-8 | Renomination Limitation 90/10 rule | 3 | Art.12.7.5 |
-
-### P0 — RBP Core (20 SP)
-
-| # | Задача | SP |
-|---|---|---|
-| RBP-06 | rbpClient.js (SOAP + mock toggle) | 5 |
-| RBP-07 | UploadCapacityAndTariffV4 | 5 |
-| RBP-08 | UploadFinanceCreditV3 | 3 |
-| RBP-09 | GetAuctionsV5 | 3 |
-| RBP-10 | GetTradesV4 + Bundled logic | 3 |
-| RBP-12 | REST routes /api/v1/rbp/* | 1 |
-
-## ✅ Sprint 12 — RBP Secondary + UI + Tests · ЗАВЕРШЁН (28.03.2026)
-
-> Период: 20.05–10.06.2026 | Target: ~33 SP
-
-| Блок | SP |
+| Метрика | Значение |
 |---|---|
-| RBP Secondary (surrender, bilateral, REMIT, NU sync) | 12 |
-| Frontend RBP Bridge UI | 4 |
-| RBP Tests | 3 |
-| Analytics: дашборд + Excel export + k6 | 9 |
-| Infrastructure: VPS + WebSocket + Email (если VPS готов) | 5 |
+| Sprint | 22 (closed 19.04.2026) |
+| Tests | 612 (42 suites, 0 failing) |
+| Endpoints | 110 (OpenAPI 110/110 = 100%) |
+| Migrations | 25 (000–025) |
+| NC Coverage | ~93% |
+| SP delivered | ~750 |
 
 ---
 
-## ✅ Sprint 9 — NC Full Compliance + AERS Tariff Alignment (27.03.2026) · ЗАВЕРШЁН
+## ✅ Завершённые спринты (Sprint 17–22)
 
-> Источники: NC Gastrans 2020, АЕРС Decision 05-145 (17.07.2025, GY2025/26), NC Audit 26.03.2026
-> Детали: `reports/SPRINT_9_PLAN.md` (25 задач, 46 SP)
-> **Аудит 03.04.2026:** Все 20 задач верифицированы в codebase. Backend NC-compliant.
+### Sprint 17 (13–15.04.2026) — 29/33 SP ✅
+- [x] FG Art.18 Hotfix: route guards, election, AAQ check, data sweep (299K EUR fix)
+- [x] NC Art.13 Matching: Adjacent TSO mock, Lesser Rule, 100% coverage
+- [x] Analytics Dashboard: volumes/revenue/utilization endpoints
+- [x] CSV Export: 3 endpoints, RFC 4180 + BOM
+- [x] Sprint 16 Test Debt: +85 tests (442→527)
+- [x] Endpoint Audit: `npm run count-endpoints` = 82 actual
+- [x] UserGuide v3.4
 
-### P0 — Тарифы АЕРС 05-145 (12 SP) · ✅ ВСЕ РЕАЛИЗОВАНЫ
+### Sprint 18 (17–18.04.2026) — 22/27 SP ✅
+- [x] VTP Basic (NC Art.11): migration 021, 5 endpoints, 16 tests
+- [x] Excel xlsx Export: exceljs, ?format=xlsx, 5 tests
+- [x] FG Separate Invoice (Art.20.3.5): migration 022, invoice_type
+- [x] OpenAPI 100% Sync: 95/95 (18 obsolete removed)
+- [x] LOCAL_RUN.md rewrite
+- [x] Load testing: autocannon, 854 RPS avg
 
-| # | Задача | Статус | Верификация (аудит 03.04.2026) |
-|---|---|---|---|
-| A-147 | Entry Kirevo annual tariff = **6.00** | ✅ | migration 010:45, GTCP_MVP.html:2426 |
-| A-148 | Daily Entry tariff = **0.0329** | ✅ | migration 010:100, GTCP_MVP.html:2436 |
-| A-149 | Quarterly тарифы — 4Q × 3 точки × 3 режима | ✅ | migration 010:53-82 (36 rows seeded) |
-| A-150 | Monthly тарифы — 28/30/31 × 3 точки × 2 режима | ✅ | migration 010:83-97 |
-| A-151 | Within-Day тарифы — 0.0021/0.0014/0.0023 | ✅ | migration 010:110-116, billing.js:177-189 |
-| A-152 | CR тарифы 2.85/1.99/3.25 | ✅ | migration 010:49-51 |
-| A-153 | Миграция 010: `reserve_prices` + KIREVO-EXIT | ✅ | `010_reserve_prices.sql` (116 строк, 69 seed rows) |
+### Sprint 19 (18–19.04.2026) — 19/24 SP ✅
+- [x] Transparency Portal (NC Art.24): 4 public endpoints, rate-limited
+- [x] VTP Balance Integration: nominations + VTP combined view
+- [x] Diploma Artifacts Index
+- [x] UserGuide v3.5
 
-### P0 — Формулы биллинга (10 SP) · ✅ ВСЕ РЕАЛИЗОВАНЫ
+### Sprint 20 (19.04.2026) — 22 SP ✅
+- [x] Capacity Surrender + UIOLI (NC Art.8/10)
+- [x] Within-Day Continuous Booking (NC Art.6.3.1.4)
+- [x] Interruption Management (NC Art.14): penalty × 3
+- [x] 600 tests milestone
+- [x] Auction KPI fix (UPCOMING + current month)
 
-| # | Задача | Статус | Верификация |
-|---|---|---|---|
-| A-154 | Раздельный entry/exit capacity fee | ✅ | `calcCapacityFee()` billing.js:158-218, returns `{entryFeeEur, exitFeeEur}` |
-| A-155 | Within-Day hourly fee (NOT /365) | ✅ | billing.js:177-189 `cap × price/hour × hours` |
-| A-156 | EURIBOR **6M** (не 3M!) | ✅ | billing.js:272, seed `euribor_6m_pct = 2.64` |
-| A-157 | Invoice due 20th of month (NC Art.20.4.1) | ✅ | billing.js:573-581 (NC-correct: 20-е число, не 30 дней) |
-| A-158 | Interruption penalty ×3 | ✅ | `calcInterruptionPenalty()` billing.js:282-296 |
-| A-159 | Over-Nomination endpoint (NC Art.12.8) | ✅ | nominations.js:477-526 `POST /over-nominate` |
+### Sprint 21 (19.04.2026) — 21 SP ✅
+- [x] Раздел «Заявка» — sidebar + 4 таба (Available, Submit, Portfolio, Reports)
+- [x] RBP Platform panel (sync capacity/credit, auctions, trades, sync log)
+- [x] Backend bids.js: /bids/my, /bids/report, /bids/export (7 tests)
+- [x] CAM NC Compliance Report: ascending clock vs sealed-bid
+- [x] Bid modals removed (NC Art.17-18 compliance)
 
-### P0 — Маршруты и точки (7 SP) · ✅ ВСЕ РЕАЛИЗОВАНЫ
+### Sprint 22 (19.04.2026) — 5 SP ✅
+- [x] CAM NC Art.17-18: clearing_price + auction_premium auto-calc
+- [x] Migration 024: auction_rounds table
+- [x] Migration 025: Interruptible auctions seed + auction_rounds seed (127 rows)
+- [x] Diploma Final Summary
 
-| # | Задача | Статус | Верификация |
-|---|---|---|---|
-| A-160 | 7 NC-маршрутов в contracts/meta | ✅ | ncRoutes.js:57-128, migration 009 |
-| A-161 | KIREVO-EXIT в interconnection_points | ✅ | migration 010:7-17, ncRoutes.js:30 |
-| A-162 | Frontend nomination NC-коды | ✅ | GTCP_MVP.html:804 (6 NC кодов в dropdown) |
-| A-163 | Capacity units кВт·ч/ч | ✅ | migration 013, весь codebase |
+---
 
-### P1 — Security (7 SP) · ✅ РЕАЛИЗОВАНО (express-validator вместо Joi/Zod)
+## 📋 Sprint 23 (Backlog — не запланирован)
 
-| # | Задача | Статус | Верификация |
-|---|---|---|---|
-| A-164 | OWASP audit — SQL injection, XSS | ✅ | 100% parameterized queries ($1,$2), Helmet, CORS whitelist |
-| A-165 | Input validation | ✅ | express-validator ^7.3.1 (92 правила, 9 routes). Joi/Zod не нужен — P2 |
-| A-166 | Nomination deadline 14:00 CET D-1 | ✅ | nominations.js:107-126, nc-compliance.test.js подтверждает |
+### Potential scope
 
-### P1 — Docs & Testing (10 SP)
-
-| # | Задача | Ответственный | Срок | Статус |
+| # | Задача | SP | Priority | NC Ref |
 |---|---|---|---|---|
-| A-167 | Jest: nc-routes.test.js — target 70+ cases | QA | 10.04.2026 | ✅ Sprint 13: 79 NC compliance + 25 nc-routes = 104 tests |
-| A-168 | Jest: tariffs.test.js — calcCapacityFee entry≠exit, Within-Day | QA | 10.04.2026 | ✅ Sprint 13: billing.unit.test.js — все 4 mode + 25 tariff tests |
-| A-169 | UserGuide v3.2 — тестирование (mock/DB/CI команды) | Docs | 05.04.2026 | 🔲 |
-| A-170 | LOCAL_RUN.md — CORS, CSP, http-server | Docs | 10.04.2026 | 🔲 |
-| A-171 | Sprint 13 Review Gate — 442 tests, push ✅ | Tech Lead | 30.03.2026 | ✅ |
+| 1 | Swagger UI HTML (swagger-ui.html) | 1 | P0 | — |
+| 2 | Demo bids seed для portfolio | 1 | P0 | — |
+| 3 | NC Art.9 Congestion Management | 5 | P1 | Art.9 |
+| 4 | NC Art.16 Measurement | 3 | P2 | Art.16 |
+| 5 | NC Art.21 Force Majeure | 3 | P2 | Art.21 |
+| 6 | WebSocket real-time notifications | 5 | P2 | — |
+| 7 | Diploma text/presentation update | 5 | P0 | — |
 
 ---
 
-## ✅ Sprint 8 — Frontend-Backend Alignment (26.03.2026) · ЗАВЕРШЁН (partial)
+## Решённые проблемы (Sprint 17–22)
 
-| # | Задача | Статус |
-|---|---|---|
-| A-131 | Swagger UI CSP fix — helmet relaxation для `/docs` | ✅ |
-| A-132 | CORS config — `.env` CORS_ORIGIN расширен | ✅ |
-| A-133 | api.js v2.0 — 65 методов | ✅ |
-| A-134 | `_refreshFromBackend()` — все модули | ✅ |
-| A-135 | Credit Module — backend wiring | ✅ |
-| A-136 | Auctions Module — 2-step bid flow | ✅ |
-| A-137 | Capacity Module — 4 таба | ✅ |
-| A-138 | Nominations — EDIGAS XML preview | ✅ |
-| A-139 | Billing — Gas Quality + Statement | ✅ |
-| A-140 | System Parameters page | ✅ |
-| A-141 | NC Route Labels — 7 маршрутов | ✅ |
-| A-142 | VPS деплой | 🔲 → Sprint 10 |
-| A-144 | WebSocket | 🔲 → Sprint 10 |
-| A-145 | Email-уведомления | 🔲 → Sprint 10 |
-
----
-
-## ✅ Sprint 5 — Все задачи выполнены (25.03.2026)
-
-| # | Задача | Ответственный | Срок | Статус |
-|---|---|---|---|---|
-| A-106 | Swagger/OpenAPI 3.0 — `openapi.yaml` 60+ endpoints + CDN Swagger UI | Backend Dev | 25.03.2026 | ✅ DONE |
-| A-107 | Integration tests — Jest+Supertest: billing NC Art.18, credits NC Art.5, auctions lifecycle | Backend Dev | 25.03.2026 | ✅ DONE |
-| A-108 | GitHub Actions CI/CD — lint + test (PG service) + security audit + OpenAPI validate | DevOps | 25.03.2026 | ✅ DONE |
-| A-109 | Credit Support UI — витрина в GTCP_MVP.html (гарантии + рейтинг) | Frontend Dev | 10.04.2026 | 🔲 Sprint 6 |
-| A-110 | Sprint 5 Review Gate — node --check все routes ✅ / миграции 001-008 верифицированы | Tech Lead | 25.03.2026 | ✅ DONE |
-
-## ✅ Sprint 6 · Все задачи выполнены (26.03.2026)
-
-| # | Задача | Ответственный | Срок | Статус |
-|---|---|---|---|---|
-| A-111 | Credit Support UI — 4 таба: Позиции, Инструменты NC Art.5, Рейтинги, MC | Frontend Dev | 15.04.2026 | ✅ DONE |
-| A-116 | Auction Management UI — аукционы CAM NC, заявки, KPI, 5 статусов | Frontend Dev | 15.04.2026 | ✅ DONE |
-| A-114 | 1С ERP Connector — erp-connector.js (getInvoices, syncInvoice, payments, mock) | Backend Dev | 26.04.2026 | ✅ DONE |
-| A-112 | VPS конфиги — nginx.conf (SSL/proxy/gzip) + ecosystem.config.js (PM2 cluster) | DevOps | 18.04.2026 | ✅ DONE |
-| A-113 | Migrations 004/007/008 fix + Jest тесты — **56/56 passing** (billing/credits/auctions) | Backend Dev | 26.03.2026 | ✅ DONE |
-| A-115 | Sprint 6 Review Gate — commit `e63fceb`, тег `sprint-6`, push pending (VPS — Sprint 7) | Tech Lead | 26.03.2026 | ✅ DONE |
-
----
-
-## ✅ Sprint 5 · Выполнено (25.03.2026)
-
-### ✅ P0 — CAP-FIX (критическое исправление формулы)
-
-- [x] **A-101** · Создать `005_capacity_entry_exit.sql` — поля cap_entry + cap_exit, EXIT-SERBIA, gas_quality_daily ✅
-- [x] **A-102** · Обновить `calcCapacityFee()` в billing.js — раздельный entry/exit, 3 flow directions ✅
-- [x] **A-103** · Добавить `calcFuelGas()` NC Art.18 — X1=0.42%, X2=0.08%, Annex 3A данные ✅
-- [x] **A-104** · Добавить `calcLatePaymentInterest()` NC Art.20.4.2 — EURIBOR 6M + 3%, 360d basis ✅
-- [x] **A-105** · Обновить contracts.js — 3 направления: GOSPODJINCI_HORGOS / HORGOS_GOSPODJINCI / KIREVO_EXIT_SERBIA ✅
-
-> **P0 Gate Review пройден (25.03.2026):**
-> Transit 31d: Entry €4,893,910 + Exit €5,361,814 = Total **€10,255,724** ✅
-> Domestic 30d: Entry €2,236,942 + Exit €1,562,131 = Total **€3,799,073** ✅
-> Fuel Gas Apr (X1=0.42%): 28,110,146 kWh = **€913,580** ✅
-
-### ✅ P1 — Gas Quality & RBP Capacity Tracker
-
-- [x] **US-505** · Horgoš quality Annex 3A Apr 2025 — 28 дней: GCV 11.523 kWh/Nm³, Wobbe 14.975, CH4 94.38%, Density 0.7656 ✅
-- [x] **US-508** · Migration 006 — capacity_technical (3 IP), capacity_surrenders, 4 views, fn_create_surrender() ✅
-- [x] **US-509** · capacity.js rewrite — GET /capacity/tracker, /rbp-offerings, /uioli, /tracker/:point_code ✅
-- [x] **US-510** · Surrender workflow — POST /capacity/surrender, PATCH /rbp, NC Art.8.3 Uncovered Auction Premium ✅
-- [x] **US-511** · UIOLI fallback — 72% utilization estimate (апр 2025 факт: 221M kWh/d vs ~330M contracted) ✅
-
-> **Capacity Tracker проверен (inline Node.js test):**
-> Surrender Premium: 500,000 kWh/h × 90d → reserve €516,575 − resale €431,507 = **€85,068** ✅
-
-### ✅ P0 — Credit Support NC Art.5
-
-- [x] **US-514** · Migration 007 — credit_support table, credit_rating_history, credit_support_events ✅
-- [x] **US-515** · v_available_credit view — total/available/shortfall/utilization/risk_level ✅
-- [x] **US-516** · v_credit_by_product view — минимальный размер по типу продукта NC Art.5.3.1 ✅
-- [x] **US-517** · fn_check_rating_exempt() — BBB-/Baa3/Creditreform≤235 (IMMUTABLE function) ✅
-- [x] **US-518** · fn_calc_min_credit_size() — мультипликаторы по product_type ✅
-- [x] **US-518b** · credits.js rewrite — 14 endpoints NC Art.5 (instruments, ratings, eligibility, MC) ✅
-
-> **Credit Support формулы NC Art.5.3.1 верифицированы:**
-> Annual multiplier = 2/12 = 16.67% · Quarterly = 2/3 квартала = 22.22%
-> Monthly = 100% месяца = 8.33% · Daily = 100% суток = 0.27%
-> Rating exempt: BBB- (S&P/Fitch) ≥ Baa3 (Moody's) ≥ Creditreform ≤ 235
-
----
-
-## 📋 Sprint 5 · Полный backlog (25.03 – 09.04.2026)
-
-> Детали: `reports/SPRINT_5_PLAN.md`
-
-### ✅ P0 — CAP-FIX (ЗАВЕРШЕНО)
-
-- [x] **US-501** · Migration 005 — `capacity_entry_kwh_h` + `capacity_exit_kwh_h` + EXIT-SERBIA ✅
-- [x] **US-502** · `calcCapacityFee()` — раздельный расчёт: entryFee + exitFee = totalFee ✅
-- [x] **US-503** · Fuel Gas NC Art.18 + Late Payment NC Art.20.4.2 ✅
-- [x] **US-504** · `contracts.js` — 3 flow directions + АЕРС тарифы по направлениям ✅
-
-### ✅ P1 — Gas Quality (ЗАВЕРШЕНО)
-
-- [x] **US-505** · Horgoš Annex 3A Apr 2025 — 28 rows gas_quality_daily seed ✅
-- [x] **US-506** · GET /billing/gas-quality endpoint ✅
-- [x] **US-507** · fuel_gas_kwh / fuel_gas_volume_nm3 в Invoice ✅
-
-### ✅ P1 — RBP Capacity Tracker (ЗАВЕРШЕНО)
-
-- [x] **US-508** · Migration 006 — capacity_technical, capacity_surrenders, 4 views, UIOLI ✅
-- [x] **US-509** · capacity.js — Tracker, RBP offerings, UIOLI endpoint ✅
-- [x] **US-510** · Surrender workflow + NC Art.8.3 premium ✅
-- [x] **US-511** · UIOLI fallback logic ✅
-
-### ✅ P0 — Credit Support NC Art.5 (ЗАВЕРШЕНО)
-
-- [x] **US-514** · Migration 007 — credit_support, rating_history, support_events tables ✅
-- [x] **US-515** · v_available_credit + v_credit_by_product views ✅
-- [x] **US-516** · fn_check_rating_exempt() + fn_calc_min_credit_size() ✅
-- [x] **US-517** · system_params seed — NC Art.5 параметры ✅
-- [x] **US-518** · credits.js rewrite — NC Art.5 (14 endpoints) ✅
-
-### ✅ P0 — Auction Management CAM NC / MAR0277-24 (ЗАВЕРШЕНО)
-
-- [x] **US-519** · Migration 008 — auction_calendar (47 rows 2025-2026), auction_bids, fn_create_contract_from_bid() ✅
-- [x] **US-520** · auctions.js — 15 endpoints: full lifecycle DRAFT→SUBMITTED→WON→CONTRACT_CREATED ✅
-- [x] **US-521** · Credit check NC Art.5.3.1 pre-submission (calcCreditBlock per product_type) ✅
-- [x] **US-522** · v_auction_overview + v_bid_lifecycle + v_upcoming_auctions views ✅
-- [x] **US-523** · Timeline endpoint — events grouped by week (90 day window) ✅
-- [x] **US-524** · capacity.js — next_auctions graceful integration от auction_calendar ✅
-
-> **Auction seed (MAR0277-24, ENTSOG Oct 2024):**
-> Annual FIRM: 07.07.2025 (Horgoš) · Quarterly: AQC-1…4 · Monthly FIRM (3rd Mon M-1) · Interruptible (4th Tue M-1)
-> fn_create_contract_from_bid() → auto GTA-YYYY-NNN + АЕРС тарифы по flow_direction ✅
-
-### ✅ P1 — Infrastructure (ЗАВЕРШЕНО)
-
-- [x] **US-525** · Swagger/OpenAPI 3.0 — `openapi.yaml` 60+ endpoints, CDN Swagger UI (без npm) ✅
-- [x] **US-526** · Integration tests — Jest+Supertest: 33 test cases (billing/credits/auctions) ✅
-- [x] **US-527** · GitHub Actions CI/CD — 5 jobs: lint, test+PG, security, openapi-validate, build-check ✅
-- [ ] **US-528** · WebSocket сервер (socket.io) — Sprint 6
-- [ ] **US-529** · Credit alert push notifications — Sprint 6
-
----
-
-## ✅ Sprint 4 · Выполнено (23.03.2026)
-
-> Sprint 4 завершён досрочно — план 06.04–19.04.2026, факт 23.03.2026 (+14 дней опережение).
-
-- [x] **DB-01–10** · PostgreSQL схема (8 таблиц) + миграции + seed data ✅
-- [x] **AUTH-01–08** · JWT + Argon2id + RBAC middleware ✅
-- [x] **NOM-01–07** · Nominations REST API (CRUD + matching + renom) ✅
-- [x] **CRED-01–04** · Credit positions API + Margin Call ✅
-- [x] **BILL-01–04** · Billing API + ERP sync endpoint ✅
-- [x] **FE-01–08** · api.js + интеграция GTCP_MVP.html ✅
-- [x] **CTR-01–02, CAP-01–02** · Contracts + Capacity + Balance API ✅
-- [x] **DEV-01–05** · Docker Compose + README ✅
-- [x] **CAM-01–06** · 003_contracts_nc.sql, contracts.js rewrite (CAM NC) ✅
-- [x] **TAR-01–08** · 004_tariff_official.sql, billing.js (АЕРС 05-145) ✅
-- [x] **UI-01–05** · GTCP_MVP.html — contracts form CAM NC, invoice capacity mode ✅
-- [x] **REP-01** · Отчёт_Sprint4_FINAL.docx v3 (разд. 12 + 13) ✅
-- [x] **ANA-01** · Gastrans_Capacity_Analysis.xlsx — анализ entry/exit мощностей ✅
-
-### ⚠️ Sprint 4 Review — Критическая находка
-
-**Дата обнаружения:** 25.03.2026
-
-**Проблема:** Анализ реальных данных АЕРС (VOLUMES TOTAL.xlsx) показал:
-- Reserved Entry Kirevo: **13 752 230 kWh/h** (≠ Reserved Exit Horgoš: **9 216 209 kWh/h**)
-- Текущая формула использует единое `capacity_kWh_h` для обоих тарифов → ошибка до **±31M EUR/год**
-- Также выявлена необходимость поддержки domestic exit zone (4 536 021 kWh/h reserved)
-
-**Статус:** ✅ ИСПРАВЛЕНО в Sprint 5 (US-501–504, migration 005)
-
-**Контрольный расчёт (31 дн., Annual Firm):** 10 255 724 EUR ✅ верифицировано
-
----
-
-## ✅ Sprint 7 · Выполнено (26.03.2026)
-
-| # | Задача | Ответственный | Срок | Статус |
-|---|---|---|---|---|
-| A-124 | Migration 009 — NC route alignment: 6 IP кодов, 7 маршрутов, nc_routes ref table | Backend Dev | 26.03.2026 | ✅ DONE |
-| A-125 | src/utils/ncRoutes.js — константы POINTS, NC_ROUTES (7), helpers: getRoute/resolvePoints/isValid | Backend Dev | 26.03.2026 | ✅ DONE |
-| A-126 | seed.sql — NC-correct: удалены 'Horgoš'/'Gospođinci' plain-text, добавлены EXIT-пары контрактов | Backend Dev | 26.03.2026 | ✅ DONE |
-| A-127 | CLAUDE.md — NC compliance checklist (18 областей), Discrepancy Protocol, все IP/маршруты/продукты | Tech Lead | 26.03.2026 | ✅ DONE |
-| A-128 | KIREVO-EXIT NC §2.1 — добавлена симметричная EXIT-точка для Full Reverse маршрутов | Backend Dev | 26.03.2026 | ✅ DONE |
-| A-129 | GTCP_UserGuide_v1.1 (.md + .docx) — обновлено: 6 IP точек, KIREVO-EXIT, NC-correct маршруты | Tech Lead | 26.03.2026 | ✅ DONE |
-| A-130 | SPRINT_7_REPORT.md — итоговый отчёт спринта | Tech Lead | 26.03.2026 | ✅ DONE |
-
----
-
-## 🔥 Немедленные действия — Sprint 8 (10.04 – 30.04.2026)
-
-- [ ] **A-117** · VPS деплой — nginx + PM2 + SSL/Let's Encrypt (публичный URL для демо)
-- [ ] **A-119** · WebSocket real-time (socket.io) — алерты по кредитным лимитам (US-528)
-- [ ] **A-120** · Email-уведомления — Margin Call, просрочка (US-529)
-- [ ] **A-121** · OWASP Top 10 testing — penetration + fix
-- [ ] **A-122** · Аналитический дашборд — графики объёмов, трендов
-- [ ] **A-123** · Уточнить domestic exit тарифы у АЕРС → обновить system_params
-
----
-
-## 🎓 Дипломная работа · Чеклист
-
-- [x] Business Model Canvas (BMC) заполнен
-- [x] Анализ рынка выполнен
-- [x] Техническое задание написано (`.docx` + `.md`)
-- [x] MVP разработан (GTCP_MVP.html — все 15 FR)
-- [x] Отчёт о ходе разработки написан
-- [x] Дипломный текст (GTCP_Diploma_Text.docx)
-- [x] Презентация для защиты (GTCP_Diploma_Presentation.pptx)
-- [x] Backend API реализован (Sprint 4)
-- [x] CAM NC договоры — 7 типов, GTA-нумерация (Sprint 4)
-- [x] Официальные тарифы АЕРС интегрированы (Sprint 4)
-- [x] **Capacity billing исправлен (entry/exit split) — Sprint 5** ✅
-- [x] **Gas Quality Annex 3A + Fuel Gas NC Art.18 — Sprint 5** ✅
-- [x] **RBP Capacity Tracker + UIOLI + Surrender — Sprint 5** ✅
-- [x] **Credit Support NC Art.5 (гарантии, рейтинг, MC) — Sprint 5** ✅
-- [x] **Auction Management CAM NC MAR0277-24 (lifecycle + calendar 47 rows) — Sprint 5** ✅
-- [x] **OpenAPI 3.0 + Swagger UI (CDN, без npm) — Sprint 5** ✅
-- [x] **Integration tests Jest+Supertest (56 cases: billing/credits/auctions) — Sprint 6** ✅
-- [x] **GitHub Actions CI/CD (5 jobs: lint/test/security/openapi/build) — Sprint 5** ✅
-- [x] **Credit Support UI + Auction Management UI — Sprint 6** ✅
-- [x] **ERP Connector (erp-connector.js) + VPS infra конфиги — Sprint 6** ✅
-- [x] **Migrations 004–008 fix (UUID FK, JSONB) + 56/56 тестов — Sprint 6** ✅
-- [x] **NC Route alignment (009 + ncRoutes.js + seed) + KIREVO-EXIT §2.1 — Sprint 7** ✅
-- [x] **CLAUDE.md NC compliance checklist + Discrepancy Protocol — Sprint 7** ✅
-- [x] **Руководство пользователя v1.1 (NC-correct: 6 IP, 7 маршрутов) — Sprint 7** ✅
-- [ ] Демо-стенд доступен по публичному URL — Sprint 8
-- [ ] **Защита дипломной работы** (Июн 2026)
-
----
-
-## 🔧 Архитектурные решения (ADR)
-
-### ADR-001 · Frontend без фреймворка
-**Дата:** 03.03.2026 | **Статус:** ПРИНЯТО
-
-**Решение:** Vanilla JS (один HTML-файл)
-**Причина:** Максимальная простота деплоя, нет сборки
-**Последствие:** Sprint 6+ — рассмотреть миграцию на React 18 для Production
-
----
-
-### ADR-002 · База данных
-**Дата:** 23.03.2026 | **Статус:** ПРИНЯТО
-
-**Решение:** PostgreSQL 17
-**Причина:** ACID транзакции критичны для финансовых данных; JSON поддержка; ENTSO-G совместимость
-
----
-
-### ADR-003 · Аутентификация
-**Дата:** 23.03.2026 | **Статус:** ПРИНЯТО
-
-**Решение:** JWT (access 24h + refresh 7d) + Argon2id хэширование
-**Причина:** Stateless API, масштабируемость, безопасность
-
----
-
-### ADR-004 · CAM NC договоры
-**Дата:** 23.03.2026 | **Статус:** ПРИНЯТО
-
-**Решение:** 7 типов договоров по CAM NC EU 2017/459; нумерация GTA-YYYY-NNN
-**Реализация:** 003_contracts_nc.sql + contracts.js
-
----
-
-### ADR-005 · Модель биллинга
-**Дата:** 23.03.2026 | **Статус:** УТОЧНЕНО → ADR-006
-
-**Решение:** Capacity-based take-or-pay (EUR/(kWh/h)/год) согласно АЕРС 05-145
-**Формула (Sprint 4):** `capacity_fee = cap × (t_entry + t_exit) / 365 × days`
-**✅ Исправлено в Sprint 5 (ADR-006)**
-
----
-
-### ADR-006 · Раздельный учёт Entry/Exit capacity
-**Дата:** 25.03.2026 | **Статус:** ✅ РЕАЛИЗОВАНО (Sprint 5)
-
-**Решение:** `capacity_fee = cap_entry × t_entry / 365 × days + cap_exit × t_exit / 365 × days`
-**Причина:** Entry Kirevo (13 752 230 kWh/h) ≠ Exit Horgoš (9 216 209 kWh/h) — разница 4 536 021 kWh/h уходит в domestic zone. Единая формула даёт ошибку до ±31M EUR/год.
-**Источник:** VOLUMES TOTAL.xlsx (АЕРС, Табела 1 — реальные технические данные Gastrans)
-**Реализация:** 005_capacity_entry_exit.sql + billing.js
-
----
-
-### ADR-007 · EXIT_SERBIA как единая точка (NC Art. 6.3.1)
-**Дата:** 25.03.2026 | **Статус:** ✅ РЕАЛИЗОВАНО (Sprint 5)
-
-**Решение:** 1 EXIT_SERBIA в interconnection_points (не 3 отдельные точки: Paraćin + Pančevo + Gospođinci)
-**Причина:** Gastrans NC Art. 6.3.1 — Domestic Exit Zone объединяется в одну интерфейсную точку для шипперов
-**Новое направление:** `KIREVO_EXIT_SERBIA` (тариф Entry 6.00 + Exit 4.19 EUR/(kWh/h)/yr)
-**Мощность:** 4 536 021 kWh/h reserved (= Entry 13 752 230 − Exit Horgoš 9 216 209)
-**Реализация:** 005_capacity_entry_exit.sql + contracts.js
-
----
-
-### ADR-008 · Gas Quality — реальные данные Horgoš Annex 3A
-**Дата:** 25.03.2026 | **Статус:** ✅ РЕАЛИЗОВАНО (Sprint 5)
-
-**Решение:** Использовать реальные данные качества газа FGSZ Ltd. / GMS Kiskundorozsma 2 (Апрель 2025)
-**Данные:** GCV avg 11.523 kWh/Nm³, Wobbe avg 14.975, CH4 avg 94.38%, Density avg 0.7656 kg/Nm³
-**Fuel Gas NC Art.18:** FG = X1 × Q_horgos + X2 × Q_serbia − KN (X1=0.42%, X2=0.08%)
-**Реализация:** 005_capacity_entry_exit.sql seed (28 rows) + billing.js calcFuelGas()
-
----
-
-### ADR-009 · RBP Capacity Tracker — чтение из contracts
-**Дата:** 25.03.2026 | **Статус:** ✅ РЕАЛИЗОВАНО (Sprint 5)
-
-**Решение:** Вариант A — tracker свободных мощностей (оперативная витрина)
-**Принцип:** free = GREATEST(0, reserved − contracted + surrendered) по каждому IP и продукту
-**UIOLI:** unutilized annual capacity → daily FCFS pool (CAM NC Art.13-16)
-**Surrender:** Uncovered Auction Premium = reserve_revenue − resale_revenue (NC Art.8.3 + Art.20.3.2.4)
-**Реализация:** 006_capacity_tracker.sql + capacity.js
-
----
-
-### ADR-010 · Credit Support NC Art.5: URDG 758 или эскроу
-**Дата:** 25.03.2026 | **Статус:** ✅ РЕАЛИЗОВАНО (Sprint 5)
-
-**Решение:** Поддержка двух форм: Bank Guarantee (URDG 758, банк ≥ BBB-) и Escrow
-**Размер (NC Art.5.3.1):**
-- Annual: 2/12 годовой capacity fee (≈16.7%)
-- Quarterly: 2/3 квартальной (≈22.2%)
-- Monthly: 100% месяца (≈8.3%)
-- Daily: 100% суток (≈0.27%)
-
-**Margin Call NC Art.5.5:** 2 рабочих дня на доплнение
-**Реализация:** 007_credit_support.sql + credits.js (14 endpoints)
-
----
-
-### ADR-011 · Рейтинговое освобождение (NC Art.5.4)
-**Дата:** 25.03.2026 | **Статус:** ✅ РЕАЛИЗОВАНО (Sprint 5)
-
-**Решение:** Шипперы с инвестиционным рейтингом освобождаются от предоставления гарантии
-**Критерии:** S&P/Fitch ≥ BBB- ИЛИ Moody's ≥ Baa3 ИЛИ Creditreform ≤ 235
-**Реализация:** fn_check_rating_exempt() (IMMUTABLE) + credit_rating_history + credits.js
-
----
-
-### ADR-012 · NC Route Alignment — 7 канонических маршрутов
-**Дата:** 26.03.2026 | **Статус:** ✅ РЕАЛИЗОВАНО (Sprint 7)
-
-**Решение:** Все flow_direction коды выровнены по NC §2.1 и Art. 6.1.2. Создана таблица `nc_routes` (справочник 7 маршрутов с RU/EN описаниями и ссылками на статьи NC). Устаревшие коды `GOSPODJINCI_HORGOS` и `HORGOS_GOSPODJINCI` сохранены в CHECK для совместимости, но не используются в новых записях.
-**Реализация:** 009_nc_routes.sql + ncRoutes.js + seed.sql
-
----
-
-### ADR-013 · KIREVO-EXIT — симметричная EXIT-точка (NC §2.1)
-**Дата:** 26.03.2026 | **Статус:** ✅ РЕАЛИЗОВАНО (Sprint 7)
-
-**Решение:** Добавлен отдельный код `KIREVO-EXIT` для Exit Point Kirevo/Zaječar в коммерческих реверс-контрактах. Ранее неправильно использовался `KIREVO-ENTRY` в роли exit_point_code для маршрутов HORGOS_KIREVO и EXIT_SERBIA_KIREVO.
-**Причина NC §2.1:** физически это одна точка, но NC именует её «Entry Point Kirevo/Zaječar» при физическом потоке и «Exit Point Kirevo/Zaječar» при коммерческом реверсе — как HORGOS-ENTRY/HORGOS-EXIT и EXIT-SERBIA-ENTRY/EXIT-SERBIA.
-**Реализация:** 009_nc_routes.sql (INSERT + contracts UPDATE) + ncRoutes.js POINTS.KIREVO_EXIT + User Guide v1.1
-
----
-
-### ADR-014 · Real-time обновления
-**Дата:** 23.03.2026 | **Статус:** ЗАПЛАНИРОВАНО (Sprint 8)
-
-**Решение:** WebSocket (socket.io)
-**Текущий MVP:** setInterval(30s) — временное решение
-**Причина:** Критично для кредитного монитора (мгновенные алерты при превышении лимита)
-
----
-
-### ADR-015 · VPS деплой
-**Дата:** 23.03.2026 | **Статус:** ЗАПЛАНИРОВАНО (Sprint 8)
-
-**Решение:** nginx reverse proxy + PM2 process manager + Let's Encrypt SSL
-**Кандидаты:** Hetzner CX21 (2vCPU/4GB) или DigitalOcean Basic Droplet
-
----
-
-## ⚠️ Открытые вопросы
-
-| ID | Вопрос | Приоритет | Срок |
+| # | Проблема | Решение | Sprint |
 |---|---|---|---|
-| Q-001 | Какой VPS для деплоя? (Hetzner / DigitalOcean / Yandex Cloud) | 🔴 High | до 10.04.2026 |
-| Q-002 | Есть ли реальный API у 1С ERP для интеграции? | 🔴 High | до 10.04.2026 |
-| **Q-005** | **Тариф domestic exit (EXIT_SERBIA) из АЕРС 05-145 — верификация 4.19 EUR** | **🟡 Medium** | **до 09.04.2026** |
-| Q-003 | Нужна ли мультиязычность (EN/RU) для защиты? | 🟡 Medium | до 06.04.2026 |
-| Q-004 | Сколько реальных пользователей участвуют в UAT? | 🟡 Medium | до 15.04.2026 |
-| **Q-006** | **EIC коды domestic points — верификация (ENTSO-G lookup)** | **🟡 Medium** | **до 15.04.2026** |
-| **Q-007** | **EURIBOR 6M актуальный курс для calcLatePaymentInterest()** | **🟡 Medium** | **до 09.04.2026** |
-| **Q-008** | **Creditreform Россия/Сербия — доступность рейтинговых отчётов для шипперов** | **🟢 Low** | **до 26.04.2026** |
+| FG-01..07 | FG начисление не тем shipper'ам | Route guards + election + AAQ + data sweep | 17 |
+| BUG-04/05 | Over-nomination MWh/d vs kWh/h | capacity_kwh_h native column | 16 |
+| DEBT-01 | Sprint 16 test debt | +85 tests (OBA, capacity, balance) | 17 |
+| DEBT-02 | Endpoint count docs vs actual | `npm run count-endpoints`, 82 actual | 17 |
+| G-02 | No uniform price | clearing_price_eur in auction_bids | 22 |
+| G-07 | No auction premium | premium = clearing − reserve | 22 |
+| G-08 | No Interruptible auctions | 12 Interruptible in seed | 22 |
+| CSP | Helmet blocks inline scripts | Relaxed CSP for frontend | 19 (deploy) |
+| CORS | Login 500 from localhost:3003 | CORS_ORIGIN += http://localhost:3003 | 19 (deploy) |
 
 ---
 
-## 📊 Метрики проекта
-
-| Метрика | Sprint 1 | Sprint 2 | Sprint 3 | Sprint 4 | Sprint 5 | Sprint 6 (факт) | Sprint 7 (факт) |
-|---|---|---|---|---|---|---|---|
-| Story Points delivered | 28 | 34 | 21 | ~54 | **~72** | **~38** ✅ | **~21** ✅ |
-| FR реализовано | 7 | 15 | 15 | 15 (backend) | +NC + Auctions | +UI+ERP+QA | +NC align |
-| Документов создано | 1 | 3 | 5 | 5 | 5 | **6** | **9** (+UG v1.1 ×2 + SPRINT_7_REPORT + CLAUDE.md) |
-| Открытых дефектов (P0) | 0 | 0 | 0 | 1 (CAP-FIX) | 0 | **0** ✅ | **0** ✅ |
-| Migrations applied | — | — | — | 4 (001–004) | 8 (005–008) | **8** (004–008 fix ✅) | **9** (+ 009_nc_routes ✅) |
-| NC Routes (canonical) | — | — | — | — | — | — | **7** (009+ncRoutes.js ✅) |
-| IP точек подключения | — | — | — | — | — | — | **6** (+ KIREVO-EXIT ✅) |
-| Test cases passing | — | — | — | 0 | 33/33 | **56/56** ✅ | **56/56** ✅ |
-| CI/CD jobs | — | — | — | 0 | 5 | **5** | **5** |
-| NC Articles implemented | — | — | — | CAM NC | +Art.5,6.3,8.3,13-18,20 | **полная NC покрытость** | **+§2.1 IP/Routes align** |
-
----
-
-## 📊 Cumulative Velocity
-
-```
-Sprint 1:  28 SP  [████████████████████████████░░░░░░░░░░░░░░░] 28/34
-Sprint 2:  34 SP  [██████████████████████████████████░░░░░░░░░] 34/34
-Sprint 3:  21 SP  [█████████████████████░░░░░░░░░░░░░░░░░░░░░] 21/21
-Sprint 4: ~54 SP  [██████████████████████████████████████████████████████] 54/34 (+59%)
-Sprint 5: ~72 SP  [████████████████████████████████████████████████████████████████████████] 72/58 (+24%) ✅
-Sprint 6: ~38 SP  [██████████████████████████████████████░░░░] 38/40 ✅
-Sprint 7: ~21 SP  [█████████████████████░░░░░░░░░░░░░░░░░░░░░] 21/32 ✅ (NC focus)
-────────────────────────────────────────────────────────────────
-Total: ~565 SP delivered (Sprint 1–16) + 26 SP planned Sprint 17
-Migrations: 18 (000–018, all clean) + 019 planned Sprint 17 · NC Routes: 7 · IP Points: 6
-Tests: 442/442 ✅ (target ≥460 Sprint 17) · CI jobs: 5 · Endpoints: 99 docs (DEBT-02 audit Sprint 17)
-NC Coverage: 79% (Art.13 → 100% target Sprint 17) · Art.15 sub-coverage: 83%
-Git: tag sprint-16 · branch main · Sprint 17: 🔄 В РАБОТЕ (13–24.04.2026)
-```
-
----
-
-## 📝 История изменений Action Plan
-
-| Дата | Версия | Изменения |
-|---|---|---|
-| 23.03.2026 | 1.0 | Создан документ; Sprint 3 завершён; Sprint 4 backlog добавлен |
-| 23.03.2026 | 1.1 | Sprint 4 kickoff: backend структура создана, P0 задачи выполнены |
-| 25.03.2026 | 2.0 | Sprint 4 завершён досрочно (+CAM NC + АЕРС тарифы). Sprint 5 активирован. ADR-006 (capacity split) + ADR-007 (domestic points) добавлены. Q-005, Q-006 открыты. |
-| 25.03.2026 | 3.0 | Sprint 5 (75% done): ✅ CAP-FIX (005+billing.js+contracts.js), ✅ Gas Quality Annex 3A, ✅ RBP Tracker (006+capacity.js), ✅ Credit Support NC Art.5 (007+credits.js). ADR-008–011 добавлены. A-101–105 закрыты. A-106–110 открыты. Q-007,Q-008 добавлены. Migrations: 005–007 применены. |
-| 25.03.2026 | 3.1 | Sprint 5 (100% ✅): +Auction Management (008+auctions.js, 47 seed rows MAR0277-24), +OpenAPI 3.0 (openapi.yaml+swagger-ui.html), +Integration tests (33 cases, billing/credits/auctions), +GitHub Actions CI/CD (5 jobs). A-106–108,110 закрыты. A-111–115 открыты на Sprint 6. US-519–527 выполнены. SP: 72 (vs 58 план, +24%). |
-| 26.03.2026 | 4.0 | Sprint 6 АКТИВЕН (26.03–10.04.2026): ✅ A-111 Credit Support UI, ✅ A-116 Auction Management UI, ✅ A-114 ERP Connector, ✅ A-112 VPS infra конфиги. sprint-close.sh skill создан. |
-| 26.03.2026 | 4.1 | Sprint 6 ЗАВЕРШЁН ✅: ✅ A-113 migrations 004/007/008 fix (UUID FK, JSONB quoting, column names), ✅ routes billing/credits/auctions — API контракт исправлен под тесты, ✅ 56/56 Jest тестов (18+21+17). Коммит e63fceb, тег sprint-6. Версии roadmap+actionplan+LOCAL_RUN обновлены. Pending → Sprint 7: VPS deploy + руководство пользователя. |
-| 26.03.2026 | 5.0 | Sprint 7 ЗАВЕРШЁН ✅: ✅ A-124 Migration 009 NC route alignment (7 маршрутов, nc_routes ref table), ✅ A-125 ncRoutes.js (POINTS×6, NC_ROUTES×7, helpers), ✅ A-126 seed NC-correct (EXIT-пары, убраны plain-text точки), ✅ A-127 CLAUDE.md (NC compliance checklist 18 областей + Discrepancy Protocol), ✅ A-128 KIREVO-EXIT NC §2.1 симметрия (3 физических точки × 2 = 6 кодов), ✅ A-129 GTCP_UserGuide_v1.1 (.md+.docx, 1279 параграфов). ADR-012/013 добавлены. Тег sprint-7. Pending → Sprint 8: VPS deploy + WebSocket + OWASP. |
-| 26.03.2026 | 5.1 | Sprint 5 завершён, отчёт сформирован (SPRINT_5_REPORT.md): ~72 SP доставлено (план 36 SP, +100%). P0 CAP-FIX верифицирован €10 255 724. Credit Support NC Art.5, Auction Management CAM NC MAR0277-24, OpenAPI 3.0, CI/CD — все в DoD. |
-| 06.04.2026 | 14.1 | Sprint 15 завершён, отчёт сформирован (SPRINT_15_REPORT.md): ~16 SP доставлено (план 16 SP, 100%). 9/9 задач: NC IP codes в demo data, документация Sprint 14 alignment, CLAUDE.md endpoints updated. NC coverage 79%. |
-| 06.04.2026 | 16.0 | Sprint 16 plan сформирован автоматически: 9 US, 35 SP. P0: NC Art.13 Matching (100%), Art.15 Balancing (75%). P1: Analytics Dashboard, Export CSV/Excel, k6, UserGuide v3.4. P2: VTP Art.11. |
-| 13.04.2026 | 17.4 | Sprint 17 начат (День 1). Baseline report SPRINT_17_REPORT.md сформирован. 7 US, 26 SP, все в статусе TODO. P0: DEBT-01/02 + NC Art.13 Matching. P1: Analytics + Export CSV + UserGuide v3.4. |
-| 13.04.2026 | 18.0 | Sprint 18 plan сформирован автоматически. 7 US, 24 SP. P0: Diploma Final Assembly + OpenAPI Sync. P1: VTP Art.11 + Excel Export + k6 Load Testing. P2: LOCAL_RUN.md + Sprint 17 carryover buffer. |
-
----
-
-## 📌 Правила ведения этого документа
-
-1. **После каждого Sprint Review** — обновить статусы задач, добавить следующий спринт
-2. **При принятии архитектурного решения** — добавить ADR с датой и обоснованием
-3. **При выявлении дефекта P0** — добавить в «Немедленные действия» с дедлайном 48ч
-4. **Метрики** — обновлять в конце каждого спринта
-5. **История изменений** — добавлять строку при каждом обновлении
-
----
-
-*Action Plan обновляется в конце каждого Sprint Review.*
-*Связанные документы: `roadmap.md` · `SPRINT_5_PLAN.md` · `Отчёт_Sprint4_FINAL.docx`*
+*Action Plan v22.0 · 19.04.2026 · GTCP Project*

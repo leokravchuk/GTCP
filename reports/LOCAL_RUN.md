@@ -1,7 +1,7 @@
 # GTCP — Инструкция по локальному запуску
 
-**Gas Trading & Commercial Platform · v3.0 · Sprint 18**
-Последнее обновление: 17.04.2026 · Sprint 18
+**Gas Trading & Commercial Platform · v3.1 · Sprint 22**
+Последнее обновление: 19.04.2026 · Sprint 22
 
 > **Sprint 12–18 изменения (с предыдущей версии):**
 > - Миграции 000–022 (VTP trades, FG election, adjacent TSO, invoice_type, OBA, capacity_kwh_h)
@@ -138,7 +138,7 @@ npm run dev        # dev-сервер (nodemon hot-reload)
 ```powershell
 cd C:\Users\leokr\ETRM\backend
 
-# Все тесты (559 test cases, 36 suites)
+# Все тесты (612 test cases, 42 suites)
 npm test
 
 # С отчётом покрытия
@@ -157,8 +157,8 @@ DB_PORT=8887 DB_NAME=gtcp_test npx jest tests/nominations.realdb.test.js
 
 Ожидаемый результат (Sprint 18):
 ```
-Test Suites: 36 passed, 36 total
-Tests:       559 passed, 559 total
+Test Suites: 42 passed, 42 total
+Tests:       612 passed, 612 total
 ```
 
 ### Тест-сьюты (ключевые)
@@ -264,7 +264,7 @@ Swagger UI (CDN) с OpenAPI 3.0.3 спецификацией всех 95 endpoin
 ETRM/
 ├── backend/
 │   ├── src/
-│   │   ├── app.js                     # Express entry point (95 endpoints)
+│   │   ├── app.js                     # Express entry point (110 endpoints)
 │   │   ├── routes/                    # 15 route files
 │   │   │   ├── auth.js                # login, me, change-password
 │   │   │   ├── shippers.js            # CRUD shippers (NC Art.3)
@@ -273,10 +273,13 @@ ETRM/
 │   │   │   ├── billing.js             # Invoicing + FG + export (NC Art.18,20)
 │   │   │   ├── credits.js             # Credit support (NC Art.5)
 │   │   │   ├── capacity.js            # Capacity bookings + available
-│   │   │   ├── auctions.js            # CAM NC auctions + calendar
-│   │   │   ├── balance.js             # OBA settlement (NC Art.15)
+│   │   │   ├── auctions.js            # CAM NC auctions + calendar + clearing price
+│   │   │   ├── balance.js             # OBA + VTP balance (NC Art.15 + Art.11)
 │   │   │   ├── analytics.js           # Volumes, revenue, utilization
 │   │   │   ├── vtp.js                 # Virtual Trading Point (NC Art.11)
+│   │   │   ├── surrender.js           # Surrender + WD + Interruption (Art.8/10/14)
+│   │   │   ├── bids.js               # Bid reporting (portfolio, KPI, export)
+│   │   │   ├── public.js             # Transparency Portal (NC Art.24)
 │   │   │   ├── rbp.js                 # RBP Bridge (SOAP mock)
 │   │   │   ├── audit.js               # Audit log
 │   │   │   ├── systemParams.js        # System parameters
@@ -289,7 +292,7 @@ ETRM/
 │   │   │   ├── xlsxExport.js          # Excel xlsx (exceljs)
 │   │   │   └── ncRoutes.js            # NC routes + IP constants
 │   │   └── db/
-│   │       ├── migrations/            # 000–022 SQL migrations
+│   │       ├── migrations/            # 000–025 SQL migrations
 │   │       ├── migrate.js
 │   │       └── seed.js
 │   ├── scripts/
@@ -298,7 +301,7 @@ ETRM/
 │   ├── docs/
 │   │   ├── openapi.yaml               # OpenAPI 3.0.3 spec
 │   │   └── swagger-ui.html            # Swagger UI (CDN)
-│   ├── tests/                         # 36 Jest suites (559 tests)
+│   ├── tests/                         # 42 Jest suites (612 tests)
 │   ├── .env.example
 │   ├── docker-compose.yml
 │   └── package.json

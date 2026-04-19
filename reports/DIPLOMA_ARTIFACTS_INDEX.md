@@ -22,12 +22,12 @@
 
 | Метрика | Значение |
 |---|---|
-| API endpoints | 95 (authoritative: `npm run count-endpoints`) |
+| API endpoints | 110 (authoritative: `npm run count-endpoints`) |
 | Миграции | 22 (000–022) |
-| Jest тесты | 559 (36 suites, 0 failing) |
-| NC Coverage | ~87% (Art.3,5,6,7,10-13,15,17,18,20,24 partial) |
+| Jest тесты | 612 (42 suites, 0 failing) |
+| NC Coverage | ~93% (Art.3,5,6,7,8,10-15,17-18,20,24) |
 | OpenAPI coverage | 100% |
-| SP доставлено | ~655 (Sprint 1–18) |
+| SP доставлено | ~750 (Sprint 1–22) |
 
 ---
 
@@ -135,11 +135,11 @@
 | Метрика | Значение |
 |---|---|
 | Спринтов завершено | 18 |
-| Story Points доставлено | ~655 |
+| Story Points доставлено | ~750 |
 | API endpoints | 95 |
 | Миграций БД | 22 |
-| Jest тестов | 559 (36 suites) |
-| NC Coverage | ~87% |
+| Jest тестов | 612 (42 suites) |
+| NC Coverage | ~93% |
 | OpenAPI coverage | 100% |
 | Avg RPS (smoke test) | 854 |
 | Git commits (Sprint 5–18) | ~40+ |

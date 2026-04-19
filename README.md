@@ -45,7 +45,7 @@ docker compose up -d
 
 ### Операционные
 - [reports/LOCAL_RUN.md](reports/LOCAL_RUN.md) — локальный запуск (Docker / нативно), миграции, сиды, проверка
-- [reports/GTCP_UserGuide_v3.3.md](reports/GTCP_UserGuide_v3.3.md) — текущий User Guide (actual)
+- [reports/GTCP_UserGuide_v3.5.md](reports/GTCP_UserGuide_v3.5.md) — текущий User Guide (actual)
 - [reports/GTCP_Artifacts.md](reports/GTCP_Artifacts.md) — реестр артефактов, API surface, миграции, покрытие тестами
 
 ### Аналитика
@@ -58,31 +58,33 @@ docker compose up -d
 ### Планирование
 - [reports/actionplan.md](reports/actionplan.md) — активные задачи
 - [reports/roadmap.md](reports/roadmap.md) — roadmap и бэклог
-- `reports/SPRINT_*_PLAN.md` / `reports/SPRINT_*_REPORT.md` — планы и отчёты по спринтам (Sprint 5 → 17)
+- [reports/CAM_NC_AUCTION_COMPLIANCE_REPORT.md](reports/CAM_NC_AUCTION_COMPLIANCE_REPORT.md) — CAM NC ascending clock vs sealed-bid
+- [reports/DIPLOMA_FINAL_SUMMARY.md](reports/DIPLOMA_FINAL_SUMMARY.md) — итоговая сводка для дипломной защиты
+- `reports/SPRINT_*_PLAN.md` / `reports/SPRINT_*_REPORT.md` — планы и отчёты по спринтам (Sprint 5 → 22)
 
 ---
 
-## Текущее состояние (Sprint 17 closed, Sprint 18 planned — 17.04.2026)
+## Текущее состояние (Sprint 22 closed — 19.04.2026)
 
 | Метрика | Значение |
 |---|---|
-| **Миграции** | 000 → 020 (`capacity_kwh_h`, OBA, FG election, adjacent TSO matching) |
-| **API endpoints** | 90 actual (`npm run count-endpoints`) |
-| **Jest тесты** | 535 (527 passed / 8 failed / 33 suites) |
-| **Спринтов завершено** | 17 |
-| **Всего SP доставлено** | ~594 SP |
-| **NC compliance** | Art. 3, 5, 6, 7, 10–13 (100%), 15 (OBA read-only), 17, 18, 20 |
+| **Миграции** | 000 → 025 |
+| **API endpoints** | 110 (`npm run count-endpoints`) |
+| **OpenAPI** | 110/110 (100% sync) |
+| **Jest тесты** | 612 passed (42 suites, 0 failing) |
+| **Спринтов завершено** | 22 |
+| **Всего SP доставлено** | ~750 SP |
+| **NC compliance** | ~93% (Art.3,5,6,7,8,10-15,17-18,20,24) |
 
-**Sprint 17 (closed Day 3, 29/33 SP):** FG Art.18 hotfix, NC Art.13 matching (67%→100%), Analytics, CSV export, +85 тестов, UserGuide v3.4
+**Sprint 20–22 highlights:**
+- Capacity Surrender (Art.8), UIOLI (Art.10), WD (Art.6.3.1.4), Interruption (Art.14)
+- Раздел «Заявка» (Available Capacity, RBP panel, Portfolio, Reports)
+- CAM NC Compliance Report (ascending clock vs sealed-bid)
+- Clearing price + auction premium auto-calculation (Art.17-18)
 
-**Sprint 18 (planned, 27.04–08.05.2026, 27 SP):** Diploma Assembly, OpenAPI sync, VTP NC Art.11, Excel export, k6 load testing, FG-invoice split
+**Local deploy:** `http://localhost:3003/GTCP_MVP.html` (admin / admin123)
 
-**Последние релизы:**
-- Sprint 17 — FG Art.18 hotfix, NC Art.13 matching, Analytics, CSV export
-- Sprint 16 — OBA Settlement (NC Art.15) + `capacity_kwh_h` (migration 017) + UI cleanup
-- Sprint 15 — Auction Calendar endpoints
-
-Подробнее: [reports/SPRINT_17_REPORT.md](reports/SPRINT_17_REPORT.md), [reports/SPRINT_18_PLAN.md](reports/SPRINT_18_PLAN.md).
+Подробнее: [reports/DIPLOMA_FINAL_SUMMARY.md](reports/DIPLOMA_FINAL_SUMMARY.md), [reports/SPRINT_21_REPORT.md](reports/SPRINT_21_REPORT.md).
 
 ---
 
