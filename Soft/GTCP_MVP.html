@@ -739,7 +739,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
       </div>
 
       <!-- BIDS (Заявка) -->
-      <div class="page" id="page-bids" style="display:none">
+      <div class="page" id="page-bids">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <div>
             <h2 style="margin:0;font-size:16px;font-weight:700;color:var(--text)">ЗАЯВКА НА МОЩНОСТЬ</h2>
@@ -861,7 +861,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
       </div>
 
       <!-- Modal: GTCP Bid -->
-      <div class="modal-overlay" id="modal-gtcp-bid" style="display:none" onclick="if(event.target===this)closeModal('modal-gtcp-bid')">
+      <div class="modal-overlay" id="modal-gtcp-bid" onclick="if(event.target===this)closeModal('modal-gtcp-bid')">
         <div class="modal">
           <div class="modal-title">Подать заявку на аукцион</div>
           <div id="gtcp-bid-info" style="font-size:11px;color:var(--text2);margin-bottom:12px"></div>
@@ -879,7 +879,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
       </div>
 
       <!-- Modal: WD Booking -->
-      <div class="modal-overlay" id="modal-wd-booking" style="display:none" onclick="if(event.target===this)closeModal('modal-wd-booking')">
+      <div class="modal-overlay" id="modal-wd-booking" onclick="if(event.target===this)closeModal('modal-wd-booking')">
         <div class="modal">
           <div class="modal-title">Within-Day бронирование</div>
           <div id="wd-book-info" style="font-size:11px;color:var(--text2);margin-bottom:12px"></div>
@@ -4759,7 +4759,7 @@ async function openGtcpBid(aucId) {
     document.getElementById('gtcp-bid-price').value = a.reserve_price_eur_kwh_h||'';
     document.getElementById('gtcp-bid-fee-preview').innerHTML = 'Введите объём для расчёта fee';
     document.getElementById('gtcp-bid-credit').innerHTML = '';
-    document.getElementById('modal-gtcp-bid').style.display = 'flex';
+    openModal('modal-gtcp-bid');
   } catch(e) { alert('Ошибка: '+e.message); }
 }
 
@@ -4805,7 +4805,7 @@ function openWdBooking(point, direction, available, tariff, hours) {
   document.getElementById('wd-book-volume').value = '';
   document.getElementById('wd-book-hours').value = hours;
   document.getElementById('wd-book-fee-preview').innerHTML = 'Введите объём';
-  document.getElementById('modal-wd-booking').style.display = 'flex';
+  openModal('modal-wd-booking');
 }
 
 function calcWdFee() {
