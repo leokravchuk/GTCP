@@ -89,7 +89,21 @@ app.get('/docs/openapi.json', (_req, res) => {
 });
 
 // ── Serve frontend SPA ───────────────────────────────────────────────────────
+// Relax CSP for GTCP_MVP.html: inline scripts + event handlers required
+app.use('/', helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc:  ["'self'", "'unsafe-inline'", "'unsafe-hashes'"],
+    scriptSrcAttr: ["'unsafe-inline'"],
+    styleSrc:   ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    fontSrc:    ["'self'", "https://fonts.gstatic.com"],
+    imgSrc:     ["'self'", "data:"],
+    connectSrc: ["'self'", "http://localhost:*"],
+  },
+}));
 app.use(express.static(path.join(__dirname, '..', '..', 'Soft')));
+// Serve api.js from backend/frontend/ (GTCP_MVP.html loads ../backend/frontend/api.js)
+app.use('/backend/frontend', express.static(path.join(__dirname, '..', 'frontend')));
 
 // ── Health ─────────────────────────────────────────────────────────────────────
 app.get(`${API}/health`, (_req, res) => {

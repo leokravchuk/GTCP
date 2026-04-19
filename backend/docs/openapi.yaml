@@ -33,7 +33,7 @@ info:
     url: https://gastrans.rs
 
 servers:
-  - url: http://localhost:3000/api/v1
+  - url: http://localhost:3003/api/v1
     description: Local Development
   - url: https://gtcp.gastrans.rs/api/v1
     description: Production

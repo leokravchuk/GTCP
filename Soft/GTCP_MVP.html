@@ -235,7 +235,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
 </style>
 <!-- GTCP API Client — Sprint 4 backend integration -->
 <!-- Set GTCP_API_URL before loading api.js to point to your backend -->
-<script>window.GTCP_API_URL = window.GTCP_API_URL || 'http://localhost:3000/api/v1';</script>
+<script>window.GTCP_API_URL = window.GTCP_API_URL || 'http://localhost:3003/api/v1';</script>
 <script src="../backend/frontend/api.js"></script>
 </head>
 <body>
@@ -2290,7 +2290,7 @@ async function edigasPreview(nomId) {
   try {
     // Fetch XML directly (not via API wrapper which parses as JSON)
     const token = sessionStorage.getItem('gtcp_access_token');
-    const BASE = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+    const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
     const resp = await fetch(`${BASE}/nominations/${nomId}/edigas-nomint`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -2460,7 +2460,7 @@ async function renderOba() {
     }
 
     // Summary cards (12-month rolling window)
-    const sumRes = await fetch('http://localhost:3000/api/v1/balance/oba/summary', {
+    const sumRes = await fetch('http://localhost:3003/api/v1/balance/oba/summary', {
       headers: { Authorization: 'Bearer ' + (sessionStorage.getItem('gtcp_access_token') || '') }
     });
     const sumData = await sumRes.json();
@@ -2485,7 +2485,7 @@ async function renderOba() {
     const from = month + '-01';
     const toDate = new Date(parseInt(month.slice(0,4)), parseInt(month.slice(5,7)), 0);
     const to = month + '-' + String(toDate.getDate()).padStart(2,'0');
-    let url = `http://localhost:3000/api/v1/balance/oba/daily?gas_day_from=${from}&gas_day_to=${to}&limit=200`;
+    let url = `http://localhost:3003/api/v1/balance/oba/daily?gas_day_from=${from}&gas_day_to=${to}&limit=200`;
     if (point) url += '&point_code=' + point;
 
     const dRes = await fetch(url, { headers: { Authorization: 'Bearer ' + (sessionStorage.getItem('gtcp_access_token') || '') } });
@@ -2665,7 +2665,7 @@ async function saveFuelGasParams() {
   FUEL_GAS.vtpPriceEurMwh  = parseFloat(document.getElementById('fg-vtp-price').value) || 31.80;
 
   if (STATE.backendMode && window.API) {
-    const base = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+    const base = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
     const hdrs = { 'Content-Type':'application/json',
                    Authorization: `Bearer ${sessionStorage.getItem('gtcp_access')}` };
     const patch = async (key, value) =>
@@ -2898,7 +2898,7 @@ async function autoGeneratePreview() {
   if (STATE.backendMode && window.API) {
     try {
       const token = sessionStorage.getItem('gtcp_access_token');
-      const BASE = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+      const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
       const resp = await fetch(`${BASE}/billing/generate`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -3012,7 +3012,7 @@ async function createInvoiceWithLines() {
     });
     try {
       const token = sessionStorage.getItem('gtcp_access_token');
-      const BASE = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+      const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
       const resp = await fetch(`${BASE}/billing/with-lines`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -3126,7 +3126,7 @@ async function viewStatement(invId) {
   if (!STATE.backendMode) return;
   try {
     const token = sessionStorage.getItem('gtcp_access_token');
-    const BASE = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+    const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
     const resp = await fetch(`${BASE}/billing/${invId}/statement`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -3888,7 +3888,7 @@ async function renderAuctionDayCalendar() {
 
   try {
     const token = sessionStorage.getItem('gtcp_access_token');
-    const BASE = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+    const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
     const resp = await fetch(`${BASE}/auctions/calendar/days?year=${aucCalYear}&month=${aucCalMonth}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -4033,7 +4033,7 @@ async function renderAuctionCalendarGrid() {
 
   try {
     const token = sessionStorage.getItem('gtcp_access_token');
-    const BASE = window.GTCP_API_URL || 'http://localhost:3000/api/v1';
+    const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
     const resp = await fetch(`${BASE}/auctions/calendar/grid?gas_year=2025`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
