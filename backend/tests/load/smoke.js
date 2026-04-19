@@ -14,7 +14,7 @@ const autocannon = require('autocannon');
 const jwt = require('jsonwebtoken');
 
 const BASE = process.env.LOAD_TEST_URL || 'http://localhost:3000';
-const SECRET = process.env.JWT_ACCESS_SECRET || 'test-secret-for-jwt-signing';
+const SECRET = process.env.JWT_ACCESS_SECRET || 'dev-secret-change-me';
 
 // Generate admin JWT
 const token = jwt.sign(
@@ -73,10 +73,10 @@ async function main() {
     }
 
     const p50 = result.latency.p50;
-    const p95 = result.latency.p95;
+    const p95 = result.latency.p97_5; // autocannon uses p97.5, not p95
     const p99 = result.latency.p99;
     const rps = Math.round(result.requests.average);
-    const errors = result.errors + result.timeouts + (result.non2xx || 0);
+    const errors = (result.errors || 0) + (result.timeouts || 0) + (result.non2xx || 0);
     const total = result.requests.total;
     const errorRate = total > 0 ? (errors / total * 100).toFixed(2) : '0.00';
     const pass = p95 < 500 && parseFloat(errorRate) < 1;
