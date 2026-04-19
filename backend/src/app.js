@@ -30,6 +30,7 @@ const analyticsRouter    = require('./routes/analytics');
 const vtpRouter          = require('./routes/vtp');
 const publicRouter       = require('./routes/public');
 const surrenderRouter    = require('./routes/surrender');
+const bidsRouter         = require('./routes/bids');
 
 const app = express();
 const API = process.env.API_PREFIX || '/api/v1';
@@ -127,6 +128,7 @@ app.use(`${API}/rbp`,            rbpRouter);
 app.use(`${API}/analytics`,      analyticsRouter);
 app.use(`${API}/vtp`,            vtpRouter);
 app.use(`${API}/public`,         publicRouter);
+app.use(`${API}/bids`,           bidsRouter);
 app.use(`${API}/capacity`,       surrenderRouter); // surrender, WD, interruption endpoints (merged with capacity prefix)
 
 // ── 404 & Error handlers ───────────────────────────────────────────────────────

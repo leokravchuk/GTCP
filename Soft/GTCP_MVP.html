@@ -327,6 +327,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M9 9h6v6H9z"/><path d="M9 3v6M15 3v6M9 15v6M15 15v6M3 9h6M15 9h6M3 15h6M15 15h6"/></svg>
           Аукционы <span class="nav-badge yellow" id="nb-auctions">0</span>
         </div>
+        <div class="nav-item" onclick="nav('bids')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Заявка <span class="nav-badge" id="nb-bids" style="background:var(--accent2)">0</span>
+        </div>
       </div>
       <div class="nav-section">
         <div class="nav-section-label">СИСТЕМА</div>
@@ -730,6 +734,163 @@ tr:hover td{background:rgba(255,255,255,.02);}
                 <tbody></tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BIDS (Заявка) -->
+      <div class="page" id="page-bids" style="display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div>
+            <h2 style="margin:0;font-size:16px;font-weight:700;color:var(--text)">ЗАЯВКА НА МОЩНОСТЬ</h2>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">NC Art.6 · Art.7 · CAM NC EU 2017/459 · RBP (FGSZ)</div>
+          </div>
+          <button class="btn success" onclick="renderBidsPage()">&#8635; Обновить</button>
+        </div>
+        <div style="display:flex;gap:2px;margin-bottom:16px;flex-wrap:wrap">
+          <div class="tab active" onclick="bidsTab(this,'available')">Доступные мощности</div>
+          <div class="tab" onclick="bidsTab(this,'submit')">Подать заявку</div>
+          <div class="tab" onclick="bidsTab(this,'portfolio')">Мои заявки <span class="tab-count" id="bids-port-count">0</span></div>
+          <div class="tab" onclick="bidsTab(this,'reports')">Отчёты</div>
+        </div>
+
+        <!-- Tab: Available Capacity -->
+        <div id="bids-tab-available">
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-title">Physical IPs — Firm Capacity (AERS, GY 2025/2026)</div>
+            <table class="tbl"><thead><tr>
+              <th>IP</th><th>Direction</th><th>Technical kWh/h</th><th>LT (90%)</th><th>ST Free (10%)</th><th>Utilization</th>
+            </tr></thead><tbody id="bids-avail-physical"></tbody></table>
+          </div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-title">Commercial Reverse IPs</div>
+            <table class="tbl"><thead><tr>
+              <th>IP</th><th>Direction</th><th>Phys Contracted</th><th>CR Booked</th><th>CR Available</th>
+            </tr></thead><tbody id="bids-avail-cr"></tbody></table>
+          </div>
+          <div class="card">
+            <div class="card-title">Within-Day — Gas Day <span id="bids-wd-gasday"></span> | CET: <span id="bids-wd-cet"></span> | Осталось: <span id="bids-wd-hours"></span>h</div>
+            <table class="tbl"><thead><tr>
+              <th>IP</th><th>Direction</th><th>Available kWh/h</th><th>Тариф EUR/h</th><th>Fee (100K × remaining)</th><th></th>
+            </tr></thead><tbody id="bids-avail-wd"></tbody></table>
+          </div>
+        </div>
+
+        <!-- Tab: Submit Bid -->
+        <div id="bids-tab-submit" style="display:none">
+          <div style="display:flex;gap:2px;margin-bottom:12px">
+            <div class="tab active" onclick="bidsSubmitSub(this,'gtcp')">GTCP Internal</div>
+            <div class="tab" onclick="bidsSubmitSub(this,'rbp')">RBP Platform (FGSZ)</div>
+          </div>
+          <!-- GTCP Internal -->
+          <div id="bids-sub-gtcp">
+            <div class="card" style="margin-bottom:12px">
+              <div class="card-title">Открытые аукционы GTCP (OPEN / UPCOMING)</div>
+              <table class="tbl"><thead><tr>
+                <th>#</th><th>Product</th><th>IP</th><th>Period</th><th>Reserve Price</th><th>Status</th><th></th>
+              </tr></thead><tbody id="bids-gtcp-auctions"></tbody></table>
+            </div>
+            <div class="card">
+              <div class="card-title">Within-Day Booking</div>
+              <table class="tbl"><thead><tr>
+                <th>IP</th><th>Available</th><th>Tariff</th><th>Remaining Hours</th><th></th>
+              </tr></thead><tbody id="bids-wd-book"></tbody></table>
+            </div>
+          </div>
+          <!-- RBP Platform -->
+          <div id="bids-sub-rbp" style="display:none">
+            <div class="card" style="margin-bottom:12px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div class="card-title">RBP Platform (FGSZ Ltd.) — <span id="rbp-mode-badge" style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--accent2);color:#fff">mock</span></div>
+                <div style="display:flex;gap:6px">
+                  <button class="btn" onclick="rbpSyncCapacity()" style="font-size:10px">Sync Capacity &#8593;</button>
+                  <button class="btn" onclick="rbpSyncCredit()" style="font-size:10px">Sync Credit &#8593;</button>
+                  <button class="btn" onclick="loadRbpData()" style="font-size:10px">&#8635;</button>
+                </div>
+              </div>
+              <table class="tbl" style="margin-top:8px"><thead><tr>
+                <th>#</th><th>Product</th><th>IP</th><th>Period</th><th>Status</th><th></th>
+              </tr></thead><tbody id="bids-rbp-auctions"></tbody></table>
+            </div>
+            <div class="card" style="margin-bottom:12px">
+              <div class="card-title">Мои RBP Trades</div>
+              <table class="tbl"><thead><tr>
+                <th>Trade#</th><th>Auction</th><th>Volume</th><th>Price</th><th>Status</th>
+              </tr></thead><tbody id="bids-rbp-trades"></tbody></table>
+            </div>
+            <div class="card">
+              <div class="card-title">RBP Sync Log</div>
+              <table class="tbl"><thead><tr>
+                <th>Timestamp</th><th>Action</th><th>Status</th><th>Details</th>
+              </tr></thead><tbody id="bids-rbp-log"></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: My Bids (Portfolio) -->
+        <div id="bids-tab-portfolio" style="display:none">
+          <div style="display:flex;gap:6px;margin-bottom:12px">
+            <select id="bids-filter-channel" onchange="renderBidsPortfolio()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px">
+              <option value="">Все каналы</option><option value="GTCP">GTCP</option><option value="RBP">RBP</option><option value="WD">Within-Day</option>
+            </select>
+            <select id="bids-filter-status" onchange="renderBidsPortfolio()" style="background:var(--bg3);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:4px;font-size:11px">
+              <option value="">Все статусы</option><option value="DRAFT">Draft</option><option value="SUBMITTED">Submitted</option><option value="WON">Won</option><option value="LOST">Lost</option><option value="ACTIVE">Active</option>
+            </select>
+          </div>
+          <table class="tbl"><thead><tr>
+            <th>Ref</th><th>Канал</th><th>Product</th><th>IP</th><th>Volume kWh/h</th><th>Price EUR</th><th>Fee EUR</th><th>Status</th><th>Date</th><th></th>
+          </tr></thead><tbody id="bids-portfolio-body"></tbody></table>
+        </div>
+
+        <!-- Tab: Reports -->
+        <div id="bids-tab-reports" style="display:none">
+          <div id="bids-report-kpi" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px"></div>
+          <div class="card" style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="card-title">Breakdown по продуктам</div>
+              <div style="display:flex;gap:6px">
+                <button class="btn" onclick="exportBids('csv')" style="font-size:10px">Export CSV</button>
+                <button class="btn success" onclick="exportBids('xlsx')" style="font-size:10px">Export XLSX</button>
+              </div>
+            </div>
+            <table class="tbl"><thead><tr>
+              <th>Product</th><th>Заявок</th><th>Объём kWh/h</th><th>Ср. цена EUR</th><th>Выиграно</th><th>Win Rate %</th>
+            </tr></thead><tbody id="bids-report-breakdown"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: GTCP Bid -->
+      <div class="modal-overlay" id="modal-gtcp-bid" style="display:none" onclick="if(event.target===this)closeModal('modal-gtcp-bid')">
+        <div class="modal">
+          <div class="modal-title">Подать заявку на аукцион</div>
+          <div id="gtcp-bid-info" style="font-size:11px;color:var(--text2);margin-bottom:12px"></div>
+          <label class="form-label">Volume (kWh/h) <span id="gtcp-bid-max" style="color:var(--text3)"></span></label>
+          <input type="number" id="gtcp-bid-volume" class="form-input" oninput="calcGtcpBidFee()" min="1">
+          <label class="form-label">Offered Price (EUR) <span id="gtcp-bid-min-price" style="color:var(--text3)"></span></label>
+          <input type="number" id="gtcp-bid-price" class="form-input" oninput="calcGtcpBidFee()" step="0.0001" min="0">
+          <div id="gtcp-bid-fee-preview" style="margin:12px 0;padding:10px;background:var(--bg2);border-radius:6px;font-family:var(--mono);font-size:12px"></div>
+          <div id="gtcp-bid-credit" style="margin-bottom:12px;font-size:11px"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn" onclick="closeModal('modal-gtcp-bid')">Отмена</button>
+            <button class="btn success" id="gtcp-bid-submit-btn" onclick="submitGtcpBid()">Подать заявку</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: WD Booking -->
+      <div class="modal-overlay" id="modal-wd-booking" style="display:none" onclick="if(event.target===this)closeModal('modal-wd-booking')">
+        <div class="modal">
+          <div class="modal-title">Within-Day бронирование</div>
+          <div id="wd-book-info" style="font-size:11px;color:var(--text2);margin-bottom:12px"></div>
+          <label class="form-label">Volume (kWh/h) <span id="wd-book-max" style="color:var(--text3)"></span></label>
+          <input type="number" id="wd-book-volume" class="form-input" oninput="calcWdFee()" min="1">
+          <label class="form-label">Hours <span style="color:var(--text3)">(авто: до 06:00 CET)</span></label>
+          <input type="number" id="wd-book-hours" class="form-input" oninput="calcWdFee()" min="1" max="24">
+          <div id="wd-book-fee-preview" style="margin:12px 0;padding:10px;background:var(--bg2);border-radius:6px;font-family:var(--mono);font-size:12px"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn" onclick="closeModal('modal-wd-booking')">Отмена</button>
+            <button class="btn success" onclick="submitWdBooking()">Забронировать</button>
           </div>
         </div>
       </div>
@@ -1814,7 +1975,7 @@ function nav(page) {
   });
   const renders = {dashboard:renderDashboard, nominations:renderNominations, credit:renderCredit,
     balance:renderBalance, billing:renderBilling, contracts:renderContracts, capacity:renderCapacity,
-    auctions:renderAuctions, audit:renderAudit, settings:renderSettings, rbp:renderRbp};
+    auctions:renderAuctions, bids:renderBidsPage, audit:renderAudit, settings:renderSettings, rbp:renderRbp};
   if (renders[page]) renders[page]();
 }
 
@@ -4427,6 +4588,389 @@ function openModal(id) {
 }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.addEventListener('click', e=>{ if(e.target.classList.contains('overlay')) e.target.classList.remove('open'); });
+
+// ═══════════════════════════════════════════════════════════════
+// BIDS (Заявка) — Sprint 21
+// ═══════════════════════════════════════════════════════════════
+
+const WD_TARIFFS = {'KIREVO-ENTRY':0.0021,'HORGOS-EXIT':0.0023,'EXIT-SERBIA':0.0014};
+const TECH_CAP = {'KIREVO-ENTRY':15280488,'HORGOS-EXIT':10240233,'EXIT-SERBIA':5040256};
+let bidsCurrentTab = 'available';
+let bidsPortfolioData = [];
+let bidsCurrentAuction = null;
+let bidsCurrentWdIp = null;
+
+function bidsTab(el, tab) {
+  document.querySelectorAll('#page-bids .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  bidsCurrentTab = tab;
+  ['available','submit','portfolio','reports'].forEach(t=>{
+    const el = document.getElementById('bids-tab-'+t);
+    if(el) el.style.display = t===tab ? '' : 'none';
+  });
+  if(tab==='portfolio') renderBidsPortfolio();
+  if(tab==='reports') renderBidsReports();
+}
+
+function bidsSubmitSub(el, sub) {
+  document.querySelectorAll('#bids-tab-submit .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('bids-sub-gtcp').style.display = sub==='gtcp'?'':'none';
+  document.getElementById('bids-sub-rbp').style.display = sub==='rbp'?'':'none';
+  if(sub==='rbp') loadRbpData();
+}
+
+function remainingGasDayHours() {
+  const now = new Date();
+  const cetH = now.getUTCHours() + 1; // CET=UTC+1
+  return cetH < 6 ? (6-cetH) : (30-cetH);
+}
+
+async function renderBidsPage() {
+  if(!STATE.backendMode) return;
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  const h = {'Authorization':'Bearer '+token};
+
+  // Available capacity
+  try {
+    const resp = await fetch(BASE+'/capacity/available',{headers:h});
+    if(resp.ok) {
+      const data = await resp.json();
+      // Physical
+      const phys = document.getElementById('bids-avail-physical');
+      if(phys && data.physical) {
+        phys.innerHTML = data.physical.map(p=>`<tr>
+          <td class="mono fw7">${p.ip}</td><td>${p.direction}</td>
+          <td class="mono">${fmt(p.tech)}</td><td class="mono">${fmt(p.lt)}</td>
+          <td class="mono fw7 text-green">${fmt(p.availableQuarterly)}</td>
+          <td class="mono">${p.utilizationPct}%</td>
+        </tr>`).join('');
+      }
+      // CR
+      const cr = document.getElementById('bids-avail-cr');
+      if(cr && data.commercialReverse) {
+        cr.innerHTML = data.commercialReverse.map(c=>`<tr>
+          <td class="mono fw7">${c.ip}</td><td>${c.direction}</td>
+          <td class="mono">${fmt(c.totalPhysicalContracted)}</td>
+          <td class="mono">${fmt(c.crContracted)}</td>
+          <td class="mono fw7 text-accent">${fmt(c.available)}</td>
+        </tr>`).join('');
+      }
+    }
+  } catch(e) { console.warn('Bids available:', e); }
+
+  // WD
+  const remH = remainingGasDayHours();
+  const gasDay = new Date().toISOString().slice(0,10);
+  const cetNow = new Date(Date.now()+3600000).toISOString().slice(11,16);
+  const gdEl = document.getElementById('bids-wd-gasday'); if(gdEl) gdEl.textContent = gasDay;
+  const cetEl = document.getElementById('bids-wd-cet'); if(cetEl) cetEl.textContent = cetNow;
+  const hrEl = document.getElementById('bids-wd-hours'); if(hrEl) hrEl.textContent = remH;
+
+  try {
+    const resp = await fetch(BASE+'/capacity/within-day/available',{headers:h});
+    if(resp.ok) {
+      const data = await resp.json();
+      const wdTb = document.getElementById('bids-avail-wd');
+      const wdBk = document.getElementById('bids-wd-book');
+      if(wdTb && data.capacities) {
+        wdTb.innerHTML = data.capacities.map(c=>{
+          const tariff = WD_TARIFFS[c.point]||0;
+          const fee100k = (100000*tariff*remH).toFixed(2);
+          return `<tr>
+            <td class="mono fw7">${c.point}</td><td>${c.direction}</td>
+            <td class="mono fw7 text-green">${fmt(c.available_kwh_h)}</td>
+            <td class="mono">${tariff}</td>
+            <td class="mono text-accent">${fmt(parseFloat(fee100k))} EUR</td>
+            <td><button class="action-btn" onclick="openWdBooking('${c.point}','${c.direction}',${c.available_kwh_h},${tariff},${remH})">Забронировать</button></td>
+          </tr>`;
+        }).join('');
+      }
+      if(wdBk && data.capacities) {
+        wdBk.innerHTML = data.capacities.map(c=>{
+          const tariff = WD_TARIFFS[c.point]||0;
+          return `<tr>
+            <td class="mono fw7">${c.point}</td>
+            <td class="mono">${fmt(c.available_kwh_h)}</td>
+            <td class="mono">${tariff} EUR/h</td>
+            <td>${remH}h</td>
+            <td><button class="action-btn" onclick="openWdBooking('${c.point}','${c.direction}',${c.available_kwh_h},${tariff},${remH})">Забронировать</button></td>
+          </tr>`;
+        }).join('');
+      }
+    }
+  } catch(e) {}
+
+  // GTCP auctions (OPEN/UPCOMING)
+  try {
+    const resp = await fetch(BASE+'/auctions?limit=50',{headers:h});
+    if(resp.ok) {
+      const aucs = await resp.json();
+      const open = aucs.filter(a=>a.status==='OPEN'||a.status==='UPCOMING');
+      const tb = document.getElementById('bids-gtcp-auctions');
+      if(tb) {
+        tb.innerHTML = open.map(a=>`<tr>
+          <td class="mono text-accent">${a.id}</td>
+          <td>${a.product_type} ${a.capacity_type||''}</td>
+          <td class="mono">${a.point_code||''}</td>
+          <td class="text-dim" style="font-size:10px">${(a.delivery_start||'').slice(0,10)} / ${(a.delivery_end||'').slice(0,10)}</td>
+          <td class="mono">${a.reserve_price_eur_kwh_h ? '€'+a.reserve_price_eur_kwh_h : '—'}</td>
+          <td><span class="auc-status ${a.status}">${a.status}</span></td>
+          <td>${a.status==='OPEN'?'<button class="action-btn" onclick="openGtcpBid('+a.id+')">Подать заявку</button>':''}</td>
+        </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3)">Нет открытых аукционов</td></tr>';
+      }
+    }
+  } catch(e) {}
+
+  // Portfolio count
+  try {
+    const resp = await fetch(BASE+'/bids/my?limit=200',{headers:h});
+    if(resp.ok) {
+      bidsPortfolioData = await resp.json();
+      const cnt = document.getElementById('bids-port-count');
+      if(cnt) cnt.textContent = bidsPortfolioData.length;
+      const nb = document.getElementById('nb-bids');
+      if(nb) nb.textContent = bidsPortfolioData.filter(b=>b.status==='SUBMITTED'||b.status==='DRAFT').length;
+    }
+  } catch(e) {}
+}
+
+// ── GTCP Bid Modal ──────────────────────────────────────────
+
+async function openGtcpBid(aucId) {
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  // Fetch auction details from cached data
+  try {
+    const resp = await fetch(BASE+'/auctions?limit=200',{headers:{'Authorization':'Bearer '+token}});
+    const aucs = await resp.json();
+    const a = aucs.find(x=>x.id===aucId);
+    if(!a) return alert('Аукцион не найден');
+    bidsCurrentAuction = a;
+    const avail = TECH_CAP[a.point_code] ? Math.round(TECH_CAP[a.point_code]*0.1) : 0;
+    document.getElementById('gtcp-bid-info').innerHTML = `
+      <b>Аукцион #${a.id}</b> · ${a.product_type} ${a.capacity_type||'FIRM'} · ${a.point_code}<br>
+      Period: ${(a.delivery_start||'').slice(0,10)} → ${(a.delivery_end||'').slice(0,10)}<br>
+      Reserve Price: <b>${a.reserve_price_eur_kwh_h||0} EUR/kWh/h</b>`;
+    document.getElementById('gtcp-bid-max').textContent = `max: ${fmt(avail)}`;
+    document.getElementById('gtcp-bid-min-price').textContent = `min: ${a.reserve_price_eur_kwh_h||0} (reserve)`;
+    document.getElementById('gtcp-bid-volume').value = '';
+    document.getElementById('gtcp-bid-price').value = a.reserve_price_eur_kwh_h||'';
+    document.getElementById('gtcp-bid-fee-preview').innerHTML = 'Введите объём для расчёта fee';
+    document.getElementById('gtcp-bid-credit').innerHTML = '';
+    document.getElementById('modal-gtcp-bid').style.display = 'flex';
+  } catch(e) { alert('Ошибка: '+e.message); }
+}
+
+function calcGtcpBidFee() {
+  const vol = parseFloat(document.getElementById('gtcp-bid-volume').value)||0;
+  const price = parseFloat(document.getElementById('gtcp-bid-price').value)||0;
+  const fee = vol*price;
+  const deposit = fee*0.10;
+  document.getElementById('gtcp-bid-fee-preview').innerHTML = `
+    <div>Fee: <b>${fmt(vol)}</b> × <b>${price.toFixed(4)}</b> = <b class="text-accent">${fmt(fee)} EUR</b></div>
+    <div style="margin-top:4px;color:var(--text3)">Deposit (10%): ${fmt(deposit)} EUR</div>`;
+}
+
+async function submitGtcpBid() {
+  if(!bidsCurrentAuction) return;
+  const vol = parseFloat(document.getElementById('gtcp-bid-volume').value);
+  const price = parseFloat(document.getElementById('gtcp-bid-price').value);
+  if(!vol||vol<=0) return alert('Введите объём');
+  if(!price||price<(bidsCurrentAuction.reserve_price_eur_kwh_h||0)) return alert('Цена ниже Reserve Price');
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  try {
+    const resp = await fetch(BASE+'/auctions/bids',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({auctionCalendarId:bidsCurrentAuction.id, bidCapacityKwhH:vol, offeredPriceEur:price})});
+    if(resp.ok) {
+      const bid = await resp.json();
+      closeModal('modal-gtcp-bid');
+      showToast('Заявка BID-'+bid.id+' создана (DRAFT). Отправьте через портфель.','success');
+      renderBidsPage();
+    } else { const e = await resp.json(); alert('Ошибка: '+(e.error||resp.status)); }
+  } catch(e) { alert('Ошибка: '+e.message); }
+}
+
+// ── WD Booking Modal ────────────────────────────────────────
+
+function openWdBooking(point, direction, available, tariff, hours) {
+  bidsCurrentWdIp = {point, direction, available, tariff, hours};
+  document.getElementById('wd-book-info').innerHTML = `
+    <b>${point}</b> · ${direction} · Gas Day: ${new Date().toISOString().slice(0,10)}<br>
+    Тариф: <b>${tariff} EUR/kWh/h/hour</b> (AERS 05-145)<br>
+    Available: <b>${fmt(available)} kWh/h</b>`;
+  document.getElementById('wd-book-max').textContent = `max: ${fmt(available)}`;
+  document.getElementById('wd-book-volume').value = '';
+  document.getElementById('wd-book-hours').value = hours;
+  document.getElementById('wd-book-fee-preview').innerHTML = 'Введите объём';
+  document.getElementById('modal-wd-booking').style.display = 'flex';
+}
+
+function calcWdFee() {
+  if(!bidsCurrentWdIp) return;
+  const vol = parseFloat(document.getElementById('wd-book-volume').value)||0;
+  const hrs = parseInt(document.getElementById('wd-book-hours').value)||0;
+  const tariff = bidsCurrentWdIp.tariff;
+  const fee = vol*tariff*hrs;
+  document.getElementById('wd-book-fee-preview').innerHTML = `
+    <div><b>${fmt(vol)}</b> × <b>${tariff}</b> × <b>${hrs}h</b> = <b class="text-green">${fmt(fee)} EUR</b></div>
+    <div style="margin-top:4px;color:var(--text3)">NC Art.6.3.1.4: cap × price_per_hour × hours (NOT / 365)</div>`;
+}
+
+async function submitWdBooking() {
+  if(!bidsCurrentWdIp) return;
+  const vol = parseFloat(document.getElementById('wd-book-volume').value);
+  const hrs = parseInt(document.getElementById('wd-book-hours').value);
+  if(!vol||vol<=0) return alert('Введите объём');
+  if(!hrs||hrs<1||hrs>24) return alert('Часы: 1-24');
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  try {
+    const resp = await fetch(BASE+'/capacity/within-day',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({shipperId:'22222222-0000-0000-0000-000000000001',point:bidsCurrentWdIp.point,direction:bidsCurrentWdIp.direction,volumeKwhH:vol,hours:hrs,pricePerHour:bidsCurrentWdIp.tariff})});
+    if(resp.ok) {
+      const bk = await resp.json();
+      closeModal('modal-wd-booking');
+      showToast('WD бронирование создано. Fee: '+bk.fee_calculation.total_fee_eur+' EUR. Можно номинировать.','success');
+      renderBidsPage();
+    } else { const e = await resp.json(); alert('Ошибка: '+(e.error||resp.status)); }
+  } catch(e) { alert('Ошибка: '+e.message); }
+}
+
+// ── RBP Panel ───────────────────────────────────────────────
+
+async function loadRbpData() {
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  const h = {'Authorization':'Bearer '+token};
+  try {
+    const [statusR, aucR, tradeR, logR] = await Promise.all([
+      fetch(BASE+'/rbp/status',{headers:h}), fetch(BASE+'/rbp/auctions',{headers:h}),
+      fetch(BASE+'/rbp/trades',{headers:h}), fetch(BASE+'/rbp/sync-log',{headers:h})]);
+    if(statusR.ok){const d=await statusR.json();document.getElementById('rbp-mode-badge').textContent=d.mode||'mock';}
+    if(aucR.ok){const aucs=await aucR.json();const tb=document.getElementById('bids-rbp-auctions');
+      if(tb)tb.innerHTML=(aucs.data||aucs||[]).map(a=>`<tr><td>${a.id||''}</td><td>${a.product_type||''}</td><td>${a.point_code||''}</td><td>${a.delivery_start||''}</td><td>${a.status||''}</td><td><button class="action-btn" onclick="alert('RBP bid — mock mode')">Bid</button></td></tr>`).join('')||'<tr><td colspan="6" style="color:var(--text3)">No RBP auctions</td></tr>';}
+    if(tradeR.ok){const trades=await tradeR.json();const tb=document.getElementById('bids-rbp-trades');
+      if(tb)tb.innerHTML=(trades.data||trades||[]).map(t=>`<tr><td>${t.id||''}</td><td>${t.auction_id||''}</td><td>${fmt(t.volume||0)}</td><td>${t.price||''}</td><td>${t.status||''}</td></tr>`).join('')||'<tr><td colspan="5" style="color:var(--text3)">No trades</td></tr>';}
+    if(logR.ok){const logs=await logR.json();const tb=document.getElementById('bids-rbp-log');
+      if(tb)tb.innerHTML=(logs.data||logs||[]).slice(0,10).map(l=>`<tr><td style="font-size:10px">${(l.timestamp||l.created_at||'').slice(0,19)}</td><td>${l.action||l.method||''}</td><td>${l.status||''}</td><td style="font-size:10px">${l.details||l.message||''}</td></tr>`).join('')||'<tr><td colspan="4" style="color:var(--text3)">No sync log</td></tr>';}
+  } catch(e) { console.warn('RBP load:', e); }
+}
+
+async function rbpSyncCapacity() {
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  try {
+    const r = await fetch(BASE+'/rbp/sync-capacity',{method:'POST',headers:{'Authorization':'Bearer '+token}});
+    const d = await r.json(); showToast('Sync Capacity: '+(d.message||d.status||'OK'),'success'); loadRbpData();
+  } catch(e) { showToast('Sync error: '+e.message,'error'); }
+}
+
+async function rbpSyncCredit() {
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  try {
+    const r = await fetch(BASE+'/rbp/sync-credit',{method:'POST',headers:{'Authorization':'Bearer '+token}});
+    const d = await r.json(); showToast('Sync Credit: '+(d.message||d.status||'OK'),'success'); loadRbpData();
+  } catch(e) { showToast('Sync error: '+e.message,'error'); }
+}
+
+// ── Portfolio ───────────────────────────────────────────────
+
+function renderBidsPortfolio() {
+  const ch = document.getElementById('bids-filter-channel').value;
+  const st = document.getElementById('bids-filter-status').value;
+  let data = bidsPortfolioData;
+  if(ch) data = data.filter(b=>b.channel===ch);
+  if(st) data = data.filter(b=>b.status===st);
+  const tb = document.getElementById('bids-portfolio-body');
+  if(!tb) return;
+  tb.innerHTML = data.map(b=>{
+    const actions = [];
+    if(b.status==='DRAFT') actions.push('<button class="action-btn" onclick="submitBidFromPortfolio('+b.bid_id+')">Отправить</button>');
+    if(b.status==='WON') actions.push('<button class="action-btn" onclick="createContractFromBid('+b.bid_id+')">Контракт</button>');
+    return `<tr>
+      <td class="mono text-accent">${b.ref||''}</td>
+      <td><span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${b.channel==='RBP'?'#9c27b0':b.channel==='WD'?'var(--green2)':'var(--accent2)'};color:#fff">${b.channel}</span></td>
+      <td>${b.product_type||''}</td><td class="mono">${b.point||''}</td>
+      <td class="mono">${fmt(parseFloat(b.volume_kwh_h)||0)}</td>
+      <td class="mono">${b.price_eur?'€'+parseFloat(b.price_eur).toFixed(4):'—'}</td>
+      <td class="mono fw7">${b.fee_eur?'€'+fmt(parseFloat(b.fee_eur)):'—'}</td>
+      <td><span class="auc-status ${b.status}">${b.status}</span></td>
+      <td style="font-size:10px">${(b.created_at||'').slice(0,10)}</td>
+      <td>${actions.join(' ')}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--text3)">Нет заявок</td></tr>';
+}
+
+async function submitBidFromPortfolio(bidId) {
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  try {
+    const r = await fetch(BASE+'/auctions/bids/'+bidId+'/submit',{method:'POST',headers:{'Authorization':'Bearer '+token}});
+    if(r.ok) { showToast('Заявка BID-'+bidId+' отправлена (SUBMITTED)','success'); renderBidsPage(); }
+    else { const e=await r.json(); alert(e.error||'Error'); }
+  } catch(e) { alert(e.message); }
+}
+
+async function createContractFromBid(bidId) {
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  try {
+    const r = await fetch(BASE+'/auctions/bids/'+bidId+'/create-contract',{method:'POST',headers:{'Authorization':'Bearer '+token}});
+    if(r.ok) { showToast('Контракт создан из BID-'+bidId,'success'); renderBidsPage(); }
+    else { const e=await r.json(); alert(e.error||'Error'); }
+  } catch(e) { alert(e.message); }
+}
+
+// ── Reports ─────────────────────────────────────────────────
+
+async function renderBidsReports() {
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  try {
+    const resp = await fetch(BASE+'/bids/report',{headers:{'Authorization':'Bearer '+token}});
+    if(!resp.ok) return;
+    const data = await resp.json();
+    const s = data.summary||{};
+    const kpis = [
+      {label:'ПОДАНО ЗАЯВОК',val:s.total_bids||0,sub:'GTCP аукционов',color:''},
+      {label:'ВЫИГРАНО',val:s.won||0,sub:`${fmt(parseFloat(s.won_volume_kwh_h)||0)} kWh/h`,color:s.won>0?'var(--green)':''},
+      {label:'ПРОИГРАНО',val:s.lost||0,sub:'аукционов',color:s.lost>0?'var(--red)':''},
+      {label:'WD БРОНИРОВАНИЙ',val:s.wd_count||0,sub:`${fmt(parseFloat(s.wd_total_kwh_h)||0)} kWh/h`,color:s.wd_count>0?'var(--accent)':''},
+    ];
+    document.getElementById('bids-report-kpi').innerHTML = kpis.map(k=>`
+      <div class="cs-kpi"><div class="cs-kpi-label">${k.label}</div>
+      <div class="cs-kpi-val" style="${k.color?'color:'+k.color:''}">${k.val}</div>
+      <div class="cs-kpi-sub">${k.sub}</div></div>`).join('');
+    // Breakdown
+    const bd = data.breakdown||[];
+    document.getElementById('bids-report-breakdown').innerHTML = bd.map(r=>`<tr>
+      <td class="fw7">${r.product_type}</td><td class="mono">${r.bid_count}</td>
+      <td class="mono">${fmt(parseFloat(r.total_volume)||0)}</td>
+      <td class="mono">€${parseFloat(r.avg_price||0).toFixed(4)}</td>
+      <td class="mono text-green">${r.won_count}</td>
+      <td class="mono">${r.win_rate_pct}%</td>
+    </tr>`).join('') || '<tr><td colspan="6" style="color:var(--text3)">Нет данных</td></tr>';
+  } catch(e) { console.warn('Bids report:', e); }
+}
+
+async function exportBids(format) {
+  const token = sessionStorage.getItem('gtcp_access_token');
+  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
+  const url = BASE+'/bids/export'+(format==='xlsx'?'?format=xlsx':'');
+  try {
+    const resp = await fetch(url,{headers:{'Authorization':'Bearer '+token}});
+    if(!resp.ok) return alert('Export error');
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'bids-report-'+new Date().toISOString().slice(0,10)+'.'+(format||'csv');
+    a.click();
+  } catch(e) { alert('Export error: '+e.message); }
+}
 
 </script>
 </body>

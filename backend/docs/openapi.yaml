@@ -2572,3 +2572,39 @@ paths:
         - { name: status, in: query, schema: { type: string } }
       responses:
         200: { description: List of interruptions }
+
+  # ── Bids Reporting (Sprint 21) ───────────────────────────────────────
+
+  /bids/my:
+    get:
+      summary: All bids for current shipper (auction_bids + WD bookings)
+      tags: [bids]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: shipper_id, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: channel, in: query, schema: { type: string, enum: [GTCP, RBP, WD] } }
+      responses:
+        200: { description: Unified bid list }
+
+  /bids/report:
+    get:
+      summary: KPI aggregation — bid summary + product breakdown
+      tags: [bids]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        200: { description: Summary + breakdown }
+
+  /bids/export:
+    get:
+      summary: Export bids to CSV or XLSX
+      tags: [bids]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [csv, xlsx] } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        200: { description: CSV or XLSX file download }
