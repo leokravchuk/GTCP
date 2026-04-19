@@ -2440,3 +2440,135 @@ paths:
                   fuel_gas_price_eur_mwh: { type: number, nullable: true }
                   currency: { type: string }
                   unit: { type: string }
+
+  # ── Capacity Surrender (NC Art.8) ────────────────────────────────────
+
+  /capacity/surrender:
+    post:
+      summary: Surrender contracted capacity (NC Art.8.3)
+      tags: [capacity]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, point, direction, volumeKwhH, effectiveDate]
+              properties:
+                shipperId: { type: string, format: uuid }
+                point: { type: string }
+                direction: { type: string, enum: [ENTRY, EXIT] }
+                volumeKwhH: { type: number }
+                effectiveDate: { type: string, format: date }
+                reason: { type: string }
+      responses:
+        201: { description: Surrender request created }
+        422: { description: Validation failed (no booking or exceeds capacity) }
+
+  /capacity/surrender/{id}/approve:
+    patch:
+      summary: Approve or reject surrender (TSO)
+      tags: [capacity]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        200: { description: Surrender approved/rejected }
+        404: { description: Not found }
+
+  /capacity/surrender/history:
+    get:
+      summary: Surrender history
+      tags: [capacity]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: shipper_id, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        200: { description: List of surrenders }
+
+  /capacity/uioli/check:
+    post:
+      summary: Check UIOLI underutilization (NC Art.10)
+      tags: [capacity]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                point: { type: string }
+                direction: { type: string }
+                thresholdPct: { type: number, default: 80 }
+      responses:
+        200: { description: Underutilized bookings list }
+
+  # ── Within-Day Capacity (NC Art.6.3.1.4) ─────────────────────────────
+
+  /capacity/within-day:
+    post:
+      summary: Book within-day capacity (hourly, NC Art.6.3.1.4)
+      tags: [capacity]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, point, direction, volumeKwhH, hours, pricePerHour]
+              properties:
+                shipperId: { type: string, format: uuid }
+                point: { type: string }
+                direction: { type: string, enum: [ENTRY, EXIT] }
+                volumeKwhH: { type: number }
+                hours: { type: integer, minimum: 1, maximum: 24 }
+                pricePerHour: { type: number }
+      responses:
+        201: { description: WD booking created with fee calculation }
+
+  /capacity/within-day/available:
+    get:
+      summary: Available within-day capacity per IP
+      tags: [capacity]
+      security: [{ bearerAuth: [] }]
+      responses:
+        200: { description: Available WD capacity per IP }
+
+  # ── Interruption (NC Art.14) ─────────────────────────────────────────
+
+  /capacity/interrupt:
+    post:
+      summary: Interrupt interruptible capacity (NC Art.14, penalty ×3)
+      tags: [capacity]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shipperId, gasDay, point, hoursInterrupted, interruptedKwhH, reason]
+              properties:
+                shipperId: { type: string, format: uuid }
+                gasDay: { type: string, format: date }
+                point: { type: string }
+                hoursInterrupted: { type: integer, minimum: 1, maximum: 24 }
+                interruptedKwhH: { type: number }
+                reason: { type: string }
+      responses:
+        201: { description: Interruption recorded with penalty calculation }
+
+  /capacity/interruptions:
+    get:
+      summary: Interruption history
+      tags: [capacity]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: shipper_id, in: query, schema: { type: string } }
+        - { name: gas_day, in: query, schema: { type: string, format: date } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        200: { description: List of interruptions }
