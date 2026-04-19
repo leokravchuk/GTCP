@@ -860,40 +860,8 @@ tr:hover td{background:rgba(255,255,255,.02);}
         </div>
       </div>
 
-      <!-- Modal: GTCP Bid -->
-      <div class="modal-overlay" id="modal-gtcp-bid" onclick="if(event.target===this)closeModal('modal-gtcp-bid')">
-        <div class="modal">
-          <div class="modal-title">Подать заявку на аукцион</div>
-          <div id="gtcp-bid-info" style="font-size:11px;color:var(--text2);margin-bottom:12px"></div>
-          <label class="form-label">Volume (kWh/h) <span id="gtcp-bid-max" style="color:var(--text3)"></span></label>
-          <input type="number" id="gtcp-bid-volume" class="form-input" oninput="calcGtcpBidFee()" min="1">
-          <label class="form-label">Offered Price (EUR) <span id="gtcp-bid-min-price" style="color:var(--text3)"></span></label>
-          <input type="number" id="gtcp-bid-price" class="form-input" oninput="calcGtcpBidFee()" step="0.0001" min="0">
-          <div id="gtcp-bid-fee-preview" style="margin:12px 0;padding:10px;background:var(--bg2);border-radius:6px;font-family:var(--mono);font-size:12px"></div>
-          <div id="gtcp-bid-credit" style="margin-bottom:12px;font-size:11px"></div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn" onclick="closeModal('modal-gtcp-bid')">Отмена</button>
-            <button class="btn success" id="gtcp-bid-submit-btn" onclick="submitGtcpBid()">Подать заявку</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modal: WD Booking -->
-      <div class="modal-overlay" id="modal-wd-booking" onclick="if(event.target===this)closeModal('modal-wd-booking')">
-        <div class="modal">
-          <div class="modal-title">Within-Day бронирование</div>
-          <div id="wd-book-info" style="font-size:11px;color:var(--text2);margin-bottom:12px"></div>
-          <label class="form-label">Volume (kWh/h) <span id="wd-book-max" style="color:var(--text3)"></span></label>
-          <input type="number" id="wd-book-volume" class="form-input" oninput="calcWdFee()" min="1">
-          <label class="form-label">Hours <span style="color:var(--text3)">(авто: до 06:00 CET)</span></label>
-          <input type="number" id="wd-book-hours" class="form-input" oninput="calcWdFee()" min="1" max="24">
-          <div id="wd-book-fee-preview" style="margin:12px 0;padding:10px;background:var(--bg2);border-radius:6px;font-family:var(--mono);font-size:12px"></div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button class="btn" onclick="closeModal('modal-wd-booking')">Отмена</button>
-            <button class="btn success" onclick="submitWdBooking()">Забронировать</button>
-          </div>
-        </div>
-      </div>
+      <!-- Bid modals removed — CAM NC Art.17-18 requires ascending clock,
+           not simplified sealed-bid. See CAM_NC_AUCTION_COMPLIANCE_REPORT.md -->
 
       <!-- AUDIT -->
       <div class="page" id="page-audit">
@@ -4683,7 +4651,7 @@ async function renderBidsPage() {
             <td class="mono fw7 text-green">${fmt(c.available_kwh_h)}</td>
             <td class="mono">${tariff}</td>
             <td class="mono text-accent">${fmt(parseFloat(fee100k))} EUR</td>
-            <td><button class="action-btn" onclick="openWdBooking('${c.point}','${c.direction}',${c.available_kwh_h},${tariff},${remH})">Забронировать</button></td>
+            <td class="text-dim" style="font-size:9px">Ascending clock (CAM NC Art.17)</td>
           </tr>`;
         }).join('');
       }
@@ -4695,7 +4663,7 @@ async function renderBidsPage() {
             <td class="mono">${fmt(c.available_kwh_h)}</td>
             <td class="mono">${tariff} EUR/h</td>
             <td>${remH}h</td>
-            <td><button class="action-btn" onclick="openWdBooking('${c.point}','${c.direction}',${c.available_kwh_h},${tariff},${remH})">Забронировать</button></td>
+            <td class="text-dim" style="font-size:9px">FCFS (NC Art.6.3.1.4)</td>
           </tr>`;
         }).join('');
       }
@@ -4717,7 +4685,7 @@ async function renderBidsPage() {
           <td class="text-dim" style="font-size:10px">${(a.delivery_start||'').slice(0,10)} / ${(a.delivery_end||'').slice(0,10)}</td>
           <td class="mono">${a.reserve_price_eur_kwh_h ? '€'+a.reserve_price_eur_kwh_h : '—'}</td>
           <td><span class="auc-status ${a.status}">${a.status}</span></td>
-          <td>${a.status==='OPEN'?'<button class="action-btn" onclick="openGtcpBid('+a.id+')">Подать заявку</button>':''}</td>
+          <td class="text-dim" style="font-size:9px">${a.status==='OPEN'?'Ascending clock':'—'}</td>
         </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text3)">Нет открытых аукционов</td></tr>';
       }
     }
@@ -4736,108 +4704,19 @@ async function renderBidsPage() {
   } catch(e) {}
 }
 
-// ── GTCP Bid Modal ──────────────────────────────────────────
+// ── GTCP Bid Modal — REMOVED (CAM NC Art.17-18 ascending clock required) ──
+// See: reports/CAM_NC_AUCTION_COMPLIANCE_REPORT.md
+// Existing auction bid modal in page-auctions remains as legacy demo.
 
-async function openGtcpBid(aucId) {
-  const token = sessionStorage.getItem('gtcp_access_token');
-  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
-  // Fetch auction details from cached data
-  try {
-    const resp = await fetch(BASE+'/auctions?limit=200',{headers:{'Authorization':'Bearer '+token}});
-    const aucs = await resp.json();
-    const a = aucs.find(x=>x.id===aucId);
-    if(!a) return alert('Аукцион не найден');
-    bidsCurrentAuction = a;
-    const avail = BIDS_TECH[a.point_code] ? Math.round(BIDS_TECH[a.point_code]*0.1) : 0;
-    document.getElementById('gtcp-bid-info').innerHTML = `
-      <b>Аукцион #${a.id}</b> · ${a.product_type} ${a.capacity_type||'FIRM'} · ${a.point_code}<br>
-      Period: ${(a.delivery_start||'').slice(0,10)} → ${(a.delivery_end||'').slice(0,10)}<br>
-      Reserve Price: <b>${a.reserve_price_eur_kwh_h||0} EUR/kWh/h</b>`;
-    document.getElementById('gtcp-bid-max').textContent = `max: ${fmt(avail)}`;
-    document.getElementById('gtcp-bid-min-price').textContent = `min: ${a.reserve_price_eur_kwh_h||0} (reserve)`;
-    document.getElementById('gtcp-bid-volume').value = '';
-    document.getElementById('gtcp-bid-price').value = a.reserve_price_eur_kwh_h||'';
-    document.getElementById('gtcp-bid-fee-preview').innerHTML = 'Введите объём для расчёта fee';
-    document.getElementById('gtcp-bid-credit').innerHTML = '';
-    openModal('modal-gtcp-bid');
-  } catch(e) { alert('Ошибка: '+e.message); }
-}
+function openGtcpBid() { /* removed */ }
+function calcGtcpBidFee() { /* removed */ }
+async function submitGtcpBid() { /* removed */ }
+function openWdBooking() { /* removed */ }
+function calcWdFee() { /* removed */ }
+async function submitWdBooking() { /* removed */ }
 
-function calcGtcpBidFee() {
-  const vol = parseFloat(document.getElementById('gtcp-bid-volume').value)||0;
-  const price = parseFloat(document.getElementById('gtcp-bid-price').value)||0;
-  const fee = vol*price;
-  const deposit = fee*0.10;
-  document.getElementById('gtcp-bid-fee-preview').innerHTML = `
-    <div>Fee: <b>${fmt(vol)}</b> × <b>${price.toFixed(4)}</b> = <b class="text-accent">${fmt(fee)} EUR</b></div>
-    <div style="margin-top:4px;color:var(--text3)">Deposit (10%): ${fmt(deposit)} EUR</div>`;
-}
-
-async function submitGtcpBid() {
-  if(!bidsCurrentAuction) return;
-  const vol = parseFloat(document.getElementById('gtcp-bid-volume').value);
-  const price = parseFloat(document.getElementById('gtcp-bid-price').value);
-  if(!vol||vol<=0) return alert('Введите объём');
-  if(!price||price<(bidsCurrentAuction.reserve_price_eur_kwh_h||0)) return alert('Цена ниже Reserve Price');
-  const token = sessionStorage.getItem('gtcp_access_token');
-  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
-  try {
-    const resp = await fetch(BASE+'/auctions/bids',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({auctionCalendarId:bidsCurrentAuction.id, bidCapacityKwhH:vol, offeredPriceEur:price})});
-    if(resp.ok) {
-      const bid = await resp.json();
-      closeModal('modal-gtcp-bid');
-      showToast('Заявка BID-'+bid.id+' создана (DRAFT). Отправьте через портфель.','success');
-      renderBidsPage();
-    } else { const e = await resp.json(); alert('Ошибка: '+(e.error||resp.status)); }
-  } catch(e) { alert('Ошибка: '+e.message); }
-}
-
-// ── WD Booking Modal ────────────────────────────────────────
-
-function openWdBooking(point, direction, available, tariff, hours) {
-  bidsCurrentWdIp = {point, direction, available, tariff, hours};
-  document.getElementById('wd-book-info').innerHTML = `
-    <b>${point}</b> · ${direction} · Gas Day: ${new Date().toISOString().slice(0,10)}<br>
-    Тариф: <b>${tariff} EUR/kWh/h/hour</b> (AERS 05-145)<br>
-    Available: <b>${fmt(available)} kWh/h</b>`;
-  document.getElementById('wd-book-max').textContent = `max: ${fmt(available)}`;
-  document.getElementById('wd-book-volume').value = '';
-  document.getElementById('wd-book-hours').value = hours;
-  document.getElementById('wd-book-fee-preview').innerHTML = 'Введите объём';
-  openModal('modal-wd-booking');
-}
-
-function calcWdFee() {
-  if(!bidsCurrentWdIp) return;
-  const vol = parseFloat(document.getElementById('wd-book-volume').value)||0;
-  const hrs = parseInt(document.getElementById('wd-book-hours').value)||0;
-  const tariff = bidsCurrentWdIp.tariff;
-  const fee = vol*tariff*hrs;
-  document.getElementById('wd-book-fee-preview').innerHTML = `
-    <div><b>${fmt(vol)}</b> × <b>${tariff}</b> × <b>${hrs}h</b> = <b class="text-green">${fmt(fee)} EUR</b></div>
-    <div style="margin-top:4px;color:var(--text3)">NC Art.6.3.1.4: cap × price_per_hour × hours (NOT / 365)</div>`;
-}
-
-async function submitWdBooking() {
-  if(!bidsCurrentWdIp) return;
-  const vol = parseFloat(document.getElementById('wd-book-volume').value);
-  const hrs = parseInt(document.getElementById('wd-book-hours').value);
-  if(!vol||vol<=0) return alert('Введите объём');
-  if(!hrs||hrs<1||hrs>24) return alert('Часы: 1-24');
-  const token = sessionStorage.getItem('gtcp_access_token');
-  const BASE = window.GTCP_API_URL || 'http://localhost:3003/api/v1';
-  try {
-    const resp = await fetch(BASE+'/capacity/within-day',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify({shipperId:'22222222-0000-0000-0000-000000000001',point:bidsCurrentWdIp.point,direction:bidsCurrentWdIp.direction,volumeKwhH:vol,hours:hrs,pricePerHour:bidsCurrentWdIp.tariff})});
-    if(resp.ok) {
-      const bk = await resp.json();
-      closeModal('modal-wd-booking');
-      showToast('WD бронирование создано. Fee: '+bk.fee_calculation.total_fee_eur+' EUR. Можно номинировать.','success');
-      renderBidsPage();
-    } else { const e = await resp.json(); alert('Ошибка: '+(e.error||resp.status)); }
-  } catch(e) { alert('Ошибка: '+e.message); }
-}
+// Bid/WD modals removed — CAM NC Art.17-18 requires ascending clock auction.
+// See: reports/CAM_NC_AUCTION_COMPLIANCE_REPORT.md
 
 // ── RBP Panel ───────────────────────────────────────────────
 
