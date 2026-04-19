@@ -885,26 +885,41 @@ router.post(
           ? parseFloat(won_capacity_kwh_h || 0)
           : 0;
 
-      // 3. Update bid
+      // 3. Calculate clearing price + premium (CAM NC Art.17-18)
+      const reservePrice = aRows.length ? parseFloat(aRows[0].reserve_price_eur_kwh_h || 0) : 0;
+      const clearingPrice = final_price_eur ? parseFloat(final_price_eur) : reservePrice;
+      const premiumPerUnit = Math.max(0, clearingPrice - reservePrice);
+      const totalPremium = auction_premium_eur
+        ? parseFloat(auction_premium_eur)
+        : allocCap * premiumPerUnit;
+
+      // 4. Update bid with clearing price + premium
       const { rows } = await db.query(`
         UPDATE auction_bids
         SET status = $1,
-            won_capacity_kwh_h = $2,
-            final_price_eur = $3,
+            allocated_capacity_kwh_h = $2,
+            clearing_price_eur_kwh_h_yr = $3,
+            auction_premium_eur = $4,
             result_received_at = NOW(),
-            updated_by = $4
-        WHERE id = $5 RETURNING *
+            result_notes = $5,
+            updated_by = $6
+        WHERE id = $7 RETURNING *
       `, [
         result, allocCap || null,
-        final_price_eur ? parseFloat(final_price_eur) : null,
+        clearingPrice || null,
+        totalPremium || null,
+        result_notes || null,
         req.user.id, id,
       ]);
 
-      // 4. Update auction status → RESULTS_PUBLISHED
+      // 5. Update auction: clearing_price + status → RESULTS_PUBLISHED
       await db.query(`
-        UPDATE auction_calendar SET status = 'RESULTS_PUBLISHED', updated_at = NOW()
+        UPDATE auction_calendar
+        SET status = 'RESULTS_PUBLISHED',
+            clearing_price_eur = COALESCE($2, clearing_price_eur),
+            updated_at = NOW()
         WHERE id = $1
-      `, [auctionId]);
+      `, [auctionId, clearingPrice || null]);
 
       await addAudit({
         actionType: 'UPDATE', entityType: 'auction_bid', entityId: id,
